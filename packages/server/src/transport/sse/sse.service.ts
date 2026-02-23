@@ -8,6 +8,7 @@ import { McpExecutorService } from '../../execution/executor.service';
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { McpContextFactory } from '../../execution/context.factory';
 import { createMcpServer } from '../../server/server.factory';
+import { registerHandlers } from '../register-handlers';
 import {
   DEFAULT_SSE_MESSAGES_ENDPOINT,
   DEFAULT_PING_INTERVAL,
@@ -36,7 +37,7 @@ export class SseService implements OnModuleDestroy {
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options);
-    this.registerHandlers(server, sessionId);
+    this.registerServerHandlers(server, sessionId);
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
@@ -78,35 +79,13 @@ export class SseService implements OnModuleDestroy {
     await transport.handlePostMessage(req, res);
   }
 
-  private registerHandlers(server: McpServer, sessionId: string): void {
+  private registerServerHandlers(server: McpServer, sessionId: string): void {
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.SSE,
     });
 
-    for (const tool of this.registry.getAllTools()) {
-      (server as any).tool(tool.name, tool.description, async (args: any) => {
-        return this.pipeline.callTool(tool.name, args, ctx) as any;
-      });
-    }
-
-    for (const resource of this.registry.getAllResources()) {
-      (server as any).resource(resource.name, resource.uri, async (uri: URL) => {
-        return this.pipeline.readResource(uri.href, ctx) as any;
-      });
-    }
-
-    for (const template of this.registry.getAllResourceTemplates()) {
-      (server as any).resource(template.name, template.uriTemplate, async (uri: URL) => {
-        return this.pipeline.readResource(uri.href, ctx) as any;
-      });
-    }
-
-    for (const prompt of this.registry.getAllPrompts()) {
-      (server as any).prompt(prompt.name, prompt.description, async (args: any) => {
-        return this.pipeline.getPrompt(prompt.name, args, ctx) as any;
-      });
-    }
+    registerHandlers(server, this.registry, this.pipeline, ctx);
   }
 
   private async cleanupSession(sessionId: string): Promise<void> {

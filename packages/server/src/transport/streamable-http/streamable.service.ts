@@ -9,6 +9,7 @@ import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { McpContextFactory } from '../../execution/context.factory';
 import { McpTransportType } from '@btwld/mcp-common';
 import { createMcpServer } from '../../server/server.factory';
+import { registerHandlers } from '../register-handlers';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -122,85 +123,18 @@ export class StreamableHttpService implements OnModuleDestroy {
 
   private createAndConnectServer(transport: StreamableHTTPServerTransport, label: string): McpServer {
     const server = createMcpServer(this.registry, this.options);
-    this.registerHandlers(server, label);
+    this.registerServerHandlers(server, label);
     server.connect(transport);
     return server;
   }
 
-  private registerHandlers(server: McpServer, sessionId: string): void {
+  private registerServerHandlers(server: McpServer, sessionId: string): void {
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.STREAMABLE_HTTP,
     });
 
-    // Register tools
-    for (const tool of this.registry.getAllTools()) {
-      (server as any).tool(
-        tool.name,
-        tool.description,
-        tool.parameters ? this.getInputSchema(tool) : {},
-        async (args: any) => {
-          return this.pipeline.callTool(tool.name, args, ctx) as any;
-        },
-      );
-    }
-
-    // Register resources
-    for (const resource of this.registry.getAllResources()) {
-      (server as any).resource(
-        resource.name,
-        resource.uri,
-        resource.mimeType ? { mimeType: resource.mimeType } : {},
-        async (uri: URL) => {
-          return this.pipeline.readResource(uri.href, ctx) as any;
-        },
-      );
-    }
-
-    // Register resource templates
-    for (const template of this.registry.getAllResourceTemplates()) {
-      (server as any).resource(
-        template.name,
-        template.uriTemplate,
-        template.mimeType ? { mimeType: template.mimeType } : {},
-        async (uri: URL) => {
-          return this.pipeline.readResource(uri.href, ctx) as any;
-        },
-      );
-    }
-
-    // Register prompts
-    for (const prompt of this.registry.getAllPrompts()) {
-      (server as any).prompt(
-        prompt.name,
-        prompt.description,
-        prompt.parameters ? this.getPromptArgs(prompt) : {},
-        async (args: any) => {
-          return this.pipeline.getPrompt(prompt.name, args, ctx) as any;
-        },
-      );
-    }
-  }
-
-  private getInputSchema(tool: any): Record<string, unknown> {
-    if (!tool.parameters) return {};
-    // Use the Zod schema directly - the SDK handles conversion
-    const { zodToJsonSchema } = require('@btwld/mcp-common');
-    return zodToJsonSchema(tool.parameters);
-  }
-
-  private getPromptArgs(prompt: any): Record<string, any> {
-    if (!prompt.parameters) return {};
-    const { extractZodDescriptions } = require('@btwld/mcp-common');
-    const descriptions = extractZodDescriptions(prompt.parameters);
-    const args: Record<string, any> = {};
-    for (const desc of descriptions) {
-      args[desc.name] = {
-        description: desc.description,
-        required: desc.required,
-      };
-    }
-    return args;
+    registerHandlers(server, this.registry, this.pipeline, ctx);
   }
 
   private async cleanupSession(sessionId: string): Promise<void> {

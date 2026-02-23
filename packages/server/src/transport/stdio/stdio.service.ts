@@ -7,6 +7,7 @@ import { McpExecutorService } from '../../execution/executor.service';
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { McpContextFactory } from '../../execution/context.factory';
 import { createMcpServer } from '../../server/server.factory';
+import { registerHandlers } from '../register-handlers';
 
 @Injectable()
 export class StdioService {
@@ -29,33 +30,7 @@ export class StdioService {
       transport: McpTransportType.STDIO,
     });
 
-    // Register all tools
-    for (const tool of this.registry.getAllTools()) {
-      (server as any).tool(tool.name, tool.description, async (args: any) => {
-        return this.pipeline.callTool(tool.name, args, ctx) as any;
-      });
-    }
-
-    // Register all resources
-    for (const resource of this.registry.getAllResources()) {
-      (server as any).resource(resource.name, resource.uri, async (uri: URL) => {
-        return this.pipeline.readResource(uri.href, ctx) as any;
-      });
-    }
-
-    // Register all resource templates
-    for (const template of this.registry.getAllResourceTemplates()) {
-      (server as any).resource(template.name, template.uriTemplate, async (uri: URL) => {
-        return this.pipeline.readResource(uri.href, ctx) as any;
-      });
-    }
-
-    // Register all prompts
-    for (const prompt of this.registry.getAllPrompts()) {
-      (server as any).prompt(prompt.name, prompt.description, async (args: any) => {
-        return this.pipeline.getPrompt(prompt.name, args, ctx) as any;
-      });
-    }
+    registerHandlers(server, this.registry, this.pipeline, ctx);
 
     await server.connect(transport);
     this.logger.log('STDIO transport connected');
