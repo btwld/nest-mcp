@@ -1,2 +1,4 @@
-// @btwld/mcp-server/testing - placeholder
-export {};
+// @btwld/mcp-server/testing
+export { createMcpTestApp } from './create-test-app';
+export type { McpTestApp, CreateTestAppOptions } from './create-test-app';
+export { mockMcpContext } from './mock-context';

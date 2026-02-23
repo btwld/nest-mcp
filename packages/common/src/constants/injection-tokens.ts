@@ -1,0 +1,13 @@
+export const MCP_OPTIONS = Symbol('MCP_OPTIONS');
+export const MCP_SERVER_INSTANCE = Symbol('MCP_SERVER_INSTANCE');
+export const MCP_REGISTRY = Symbol('MCP_REGISTRY');
+export const MCP_TRANSPORT = Symbol('MCP_TRANSPORT');
+export const MCP_SESSION_MANAGER = Symbol('MCP_SESSION_MANAGER');
+export const MCP_AUTH_SERVICE = Symbol('MCP_AUTH_SERVICE');
+export const MCP_MIDDLEWARE_SERVICE = Symbol('MCP_MIDDLEWARE_SERVICE');
+export const MCP_METRICS_SERVICE = Symbol('MCP_METRICS_SERVICE');
+export const MCP_TOOL_BUILDER = Symbol('MCP_TOOL_BUILDER');
+export const MCP_RESOURCE_BUILDER = Symbol('MCP_RESOURCE_BUILDER');
+export const MCP_PROMPT_BUILDER = Symbol('MCP_PROMPT_BUILDER');
+export const MCP_CLIENT_OPTIONS = Symbol('MCP_CLIENT_OPTIONS');
+export const MCP_GATEWAY_OPTIONS = Symbol('MCP_GATEWAY_OPTIONS');

@@ -11,8 +11,11 @@ export default defineConfig({
   external: [
     '@btwld/mcp-common',
     '@modelcontextprotocol/sdk',
+    /^@modelcontextprotocol\/sdk\/.*/,
     '@nestjs/common',
     '@nestjs/core',
+    '@nestjs/microservices',
+    '@nestjs/testing',
     'rxjs',
     'reflect-metadata',
   ],

@@ -1,0 +1,14 @@
+export const MCP_TOOL_METADATA = Symbol('mcp:tool');
+export const MCP_RESOURCE_METADATA = Symbol('mcp:resource');
+export const MCP_RESOURCE_TEMPLATE_METADATA = Symbol('mcp:resource-template');
+export const MCP_PROMPT_METADATA = Symbol('mcp:prompt');
+export const MCP_PUBLIC_METADATA = Symbol('mcp:public');
+export const MCP_SCOPES_METADATA = Symbol('mcp:scopes');
+export const MCP_ROLES_METADATA = Symbol('mcp:roles');
+export const MCP_GUARDS_METADATA = Symbol('mcp:guards');
+export const MCP_MIDDLEWARE_METADATA = Symbol('mcp:middleware');
+export const MCP_RATE_LIMIT_METADATA = Symbol('mcp:rate-limit');
+export const MCP_RETRY_METADATA = Symbol('mcp:retry');
+export const MCP_CIRCUIT_BREAKER_METADATA = Symbol('mcp:circuit-breaker');
+export const MCP_MODULE_OPTIONS = Symbol('mcp:module-options');
+export const MCP_MODULE_ID = Symbol('mcp:module-id');
