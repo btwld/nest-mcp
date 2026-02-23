@@ -1,13 +1,17 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Query,
+  Req,
+  Res,
   Inject,
   HttpException,
   HttpStatus,
   type Type,
 } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type {
   TokenResponse,
@@ -27,6 +31,109 @@ export function createOAuthController(basePath: string): Type<any> {
       private readonly clientService: OAuthClientService,
       @Inject(MCP_OAUTH_STORE) private readonly store: IOAuthStore,
     ) {}
+
+    @Get('authorize')
+    async authorize(
+      @Query('response_type') responseType: string,
+      @Query('client_id') clientId: string,
+      @Query('redirect_uri') redirectUri: string,
+      @Query('code_challenge') codeChallenge: string,
+      @Query('code_challenge_method') codeChallengeMethod: string,
+      @Query('scope') scope: string,
+      @Query('state') state: string,
+      @Query('resource') resource: string,
+      @Req() req: any,
+      @Res({ passthrough: false }) res: any,
+    ): Promise<void> {
+      // Validate required params before redirect_uri is trusted
+      if (responseType !== 'code') {
+        throw new HttpException(
+          { error: 'unsupported_response_type', error_description: 'response_type must be "code"' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (!clientId) {
+        throw new HttpException(
+          { error: 'invalid_request', error_description: 'client_id is required' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (!redirectUri) {
+        throw new HttpException(
+          { error: 'invalid_request', error_description: 'redirect_uri is required' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (!codeChallenge) {
+        throw new HttpException(
+          { error: 'invalid_request', error_description: 'code_challenge is required (PKCE is mandatory)' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (!state) {
+        throw new HttpException(
+          { error: 'invalid_request', error_description: 'state is required' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate client exists
+      const client = await this.clientService.getClient(clientId);
+      if (!client) {
+        throw new HttpException(
+          { error: 'invalid_client', error_description: 'Unknown client_id' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate redirect_uri matches registered URIs — never redirect to unvalidated URI
+      if (!client.redirect_uris.includes(redirectUri)) {
+        throw new HttpException(
+          { error: 'invalid_request', error_description: 'redirect_uri does not match any registered URI' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // redirect_uri is now validated — errors after this point redirect back
+      const method = codeChallengeMethod === 'plain' ? 'plain' : 'S256';
+
+      // Authenticate user via pluggable callback
+      if (!this.options.validateUser) {
+        const params = new URLSearchParams({ error: 'access_denied', error_description: 'No user authentication configured', state });
+        res.redirect(302, `${redirectUri}?${params}`);
+        return;
+      }
+
+      const user = await this.options.validateUser(req);
+      if (!user) {
+        const params = new URLSearchParams({ error: 'access_denied', error_description: 'User authentication failed', state });
+        res.redirect(302, `${redirectUri}?${params}`);
+        return;
+      }
+
+      // Generate and store authorization code
+      const code = randomBytes(32).toString('hex');
+      const expiresIn = this.options.authCodeExpiresIn ?? 300;
+
+      await this.store.storeAuthCode({
+        code,
+        client_id: clientId,
+        user_id: user.id,
+        redirect_uri: redirectUri,
+        code_challenge: codeChallenge,
+        code_challenge_method: method,
+        scope: scope ?? '',
+        resource,
+        expires_at: Date.now() + expiresIn * 1000,
+      });
+
+      const params = new URLSearchParams({ code, state });
+      res.redirect(302, `${redirectUri}?${params}`);
+    }
 
     @Post('token')
     async token(@Body() body: any): Promise<TokenResponse> {

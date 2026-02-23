@@ -11,4 +11,6 @@ export interface McpAuthModuleOptions {
   enableDynamicRegistration?: boolean;
   store?: IOAuthStore;
   scopes?: string[];
+  validateUser?: (req: unknown) => Promise<{ id: string; [key: string]: unknown } | null>;
+  authCodeExpiresIn?: number; // seconds, default 300 (5 min)
 }
