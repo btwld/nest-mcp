@@ -1,0 +1,21 @@
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm', 'cjs'],
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  splitting: false,
+  treeshake: true,
+  external: [
+    '@btwld/mcp-common',
+    '@btwld/mcp-server',
+    '@btwld/mcp-client',
+    '@modelcontextprotocol/sdk',
+    '@nestjs/common',
+    '@nestjs/core',
+    'rxjs',
+    'reflect-metadata',
+  ],
+});
