@@ -1,0 +1,274 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+  const MockClient = vi.fn().mockImplementation(() => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    callTool: vi.fn().mockResolvedValue({ content: [] }),
+    readResource: vi.fn().mockResolvedValue({ contents: [] }),
+    listTools: vi.fn().mockResolvedValue({ tools: [] }),
+    listResources: vi.fn().mockResolvedValue({ resources: [] }),
+    getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
+    listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+    ping: vi.fn().mockResolvedValue({}),
+    getServerCapabilities: vi.fn().mockReturnValue({}),
+    getServerVersion: vi.fn().mockReturnValue({ name: 'test', version: '1.0' }),
+  }));
+  return { Client: MockClient };
+});
+
+vi.mock('./transport/client-transport.factory', () => ({
+  createClientTransport: vi.fn().mockReturnValue({
+    onclose: null,
+    onerror: null,
+    close: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
+import { McpClient } from './mcp-client.service';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { createClientTransport } from './transport/client-transport.factory';
+import type { McpClientConnection } from './interfaces/client-options.interface';
+
+const MockedClient = vi.mocked(Client);
+const mockedCreateTransport = vi.mocked(createClientTransport);
+
+function createConnection(overrides?: Partial<McpClientConnection>): McpClientConnection {
+  return {
+    name: 'test-server',
+    transport: 'sse',
+    url: 'http://localhost:3000/sse',
+    ...overrides,
+  } as McpClientConnection;
+}
+
+describe('McpClient', () => {
+  let mcpClient: McpClient;
+  let connection: McpClientConnection;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Reset the transport mock to return a fresh object each call
+    mockedCreateTransport.mockReturnValue({
+      onclose: null,
+      onerror: null,
+      close: vi.fn().mockResolvedValue(undefined),
+    } as any);
+
+    connection = createConnection();
+    mcpClient = new McpClient('test-server', connection);
+  });
+
+  describe('connect', () => {
+    it('should create transport and connect the SDK client', async () => {
+      await mcpClient.connect();
+
+      expect(mockedCreateTransport).toHaveBeenCalledWith(connection);
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.connect).toHaveBeenCalled();
+      expect(mcpClient.isConnected()).toBe(true);
+    });
+
+    it('should be a no-op if already connected', async () => {
+      await mcpClient.connect();
+      await mcpClient.connect();
+
+      expect(mockedCreateTransport).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw and remain disconnected if client.connect fails', async () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.connect.mockRejectedValueOnce(new Error('connection refused'));
+
+      await expect(mcpClient.connect()).rejects.toThrow('connection refused');
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+  });
+
+  describe('disconnect', () => {
+    it('should close transport and set connected to false', async () => {
+      await mcpClient.connect();
+      const transport = mockedCreateTransport.mock.results[0].value;
+
+      await mcpClient.disconnect();
+
+      expect(transport.close).toHaveBeenCalled();
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+
+    it('should not throw if transport.close fails', async () => {
+      await mcpClient.connect();
+      const transport = mockedCreateTransport.mock.results[0].value;
+      transport.close.mockRejectedValueOnce(new Error('close error'));
+
+      await expect(mcpClient.disconnect()).resolves.toBeUndefined();
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+
+    it('should handle disconnect when not connected', async () => {
+      await expect(mcpClient.disconnect()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('isConnected', () => {
+    it('should return false initially', () => {
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+
+    it('should return true after connect', async () => {
+      await mcpClient.connect();
+      expect(mcpClient.isConnected()).toBe(true);
+    });
+  });
+
+  describe('delegation methods', () => {
+    beforeEach(async () => {
+      await mcpClient.connect();
+    });
+
+    it('should delegate callTool to the SDK client', async () => {
+      const params = { name: 'my-tool', arguments: {} };
+      await mcpClient.callTool(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.callTool).toHaveBeenCalledWith(params, undefined, undefined);
+    });
+
+    it('should delegate readResource to the SDK client', async () => {
+      const params = { uri: 'file:///test' };
+      await mcpClient.readResource(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.readResource).toHaveBeenCalledWith(params, undefined);
+    });
+
+    it('should delegate listTools to the SDK client', async () => {
+      await mcpClient.listTools();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.listTools).toHaveBeenCalledWith(undefined, undefined);
+    });
+
+    it('should delegate listResources to the SDK client', async () => {
+      await mcpClient.listResources();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.listResources).toHaveBeenCalledWith(undefined, undefined);
+    });
+
+    it('should delegate getPrompt to the SDK client', async () => {
+      const params = { name: 'my-prompt' };
+      await mcpClient.getPrompt(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.getPrompt).toHaveBeenCalledWith(params, undefined);
+    });
+
+    it('should delegate listPrompts to the SDK client', async () => {
+      await mcpClient.listPrompts();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.listPrompts).toHaveBeenCalledWith(undefined, undefined);
+    });
+
+    it('should delegate ping to the SDK client', async () => {
+      await mcpClient.ping();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.ping).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  describe('throws when not connected', () => {
+    it('should throw on callTool if not connected', async () => {
+      await expect(mcpClient.callTool({ name: 'tool' })).rejects.toThrow(
+        'McpClient "test-server" is not connected',
+      );
+    });
+
+    it('should throw on readResource if not connected', async () => {
+      await expect(mcpClient.readResource({ uri: 'file:///x' })).rejects.toThrow(
+        'is not connected',
+      );
+    });
+
+    it('should throw on ping if not connected', async () => {
+      await expect(mcpClient.ping()).rejects.toThrow('is not connected');
+    });
+  });
+
+  describe('handleDisconnect', () => {
+    it('should set connected to false when transport closes', async () => {
+      await mcpClient.connect();
+      expect(mcpClient.isConnected()).toBe(true);
+
+      // Trigger onclose callback
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+  });
+
+  describe('attemptReconnect', () => {
+    it('should reconnect successfully after disconnect with reconnect options', async () => {
+      const connWithReconnect = createConnection({
+        reconnect: { maxAttempts: 2, delay: 1 },
+      });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      await mcpClient.connect();
+      expect(mcpClient.isConnected()).toBe(true);
+
+      // Trigger disconnect via onclose
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      // After reconnect, should be connected again
+      expect(mcpClient.isConnected()).toBe(true);
+    });
+
+    it('should fail reconnection after max attempts exhausted', async () => {
+      const connWithReconnect = createConnection({
+        reconnect: { maxAttempts: 2, delay: 1 },
+      });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      await mcpClient.connect();
+
+      // Make all future client.connect calls fail
+      MockedClient.mockImplementation(() => ({
+        connect: vi.fn().mockRejectedValue(new Error('fail')),
+        callTool: vi.fn(),
+        readResource: vi.fn(),
+        listTools: vi.fn(),
+        listResources: vi.fn(),
+        getPrompt: vi.fn(),
+        listPrompts: vi.fn(),
+        ping: vi.fn(),
+        getServerCapabilities: vi.fn(),
+        getServerVersion: vi.fn(),
+      } as any));
+
+      // Trigger disconnect
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      expect(mcpClient.isConnected()).toBe(false);
+    });
+  });
+
+  describe('getServerCapabilities / getServerVersion', () => {
+    it('should delegate getServerCapabilities', () => {
+      const result = mcpClient.getServerCapabilities();
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.getServerCapabilities).toHaveBeenCalled();
+    });
+
+    it('should delegate getServerVersion', () => {
+      const result = mcpClient.getServerVersion();
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.getServerVersion).toHaveBeenCalled();
+    });
+  });
+});
