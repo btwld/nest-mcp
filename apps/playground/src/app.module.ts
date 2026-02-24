@@ -1,4 +1,4 @@
-import { McpAuthModule, McpModule, McpTransportType } from '@btwld/mcp-server';
+import { McpModule, McpTransportType } from '@btwld/mcp-server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
 import { DynamicRegistrationService } from './dynamic-registration.service';
@@ -43,18 +43,6 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
         enabled: true,
         endpoint: '/metrics',
       },
-    }),
-
-    // OAuth 2.1 authentication
-    McpAuthModule.forRoot({
-      jwtSecret: 'playground-jwt-secret-change-in-production-min-32-chars',
-      issuer: 'mcp-playground',
-      audience: 'mcp-playground-api',
-      accessTokenExpiresIn: '1h',
-      refreshTokenExpiresIn: '7d',
-      serverUrl: 'http://localhost:3000',
-      enableDynamicRegistration: true,
-      scopes: ['tools:read', 'tools:write', 'admin:read', 'analytics:read'],
     }),
 
     // Feature module

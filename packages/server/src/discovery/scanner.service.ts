@@ -4,17 +4,17 @@ import {
   MCP_RESOURCE_TEMPLATE_METADATA,
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { DiscoveryService, type ModulesContainer } from '@nestjs/core';
-import type { McpRegistryService } from './registry.service';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { DiscoveryService, ModulesContainer } from '@nestjs/core';
+import { McpRegistryService } from './registry.service';
 
 @Injectable()
 export class McpScannerService implements OnModuleInit {
   private readonly logger = new Logger(McpScannerService.name);
 
   constructor(
-    private readonly modulesContainer: ModulesContainer,
-    private readonly registry: McpRegistryService,
+    @Inject(ModulesContainer) private readonly modulesContainer: ModulesContainer,
+    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
   ) {}
 
   onModuleInit(): void {

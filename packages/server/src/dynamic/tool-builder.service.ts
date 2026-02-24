@@ -1,7 +1,8 @@
 import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@btwld/mcp-common';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
-import type { McpRegistryService, RegisteredTool } from '../discovery/registry.service';
+import { McpRegistryService } from '../discovery/registry.service';
+import type { RegisteredTool } from '../discovery/registry.service';
 
 export interface DynamicToolConfig {
   name: string;
@@ -23,7 +24,7 @@ export interface DynamicToolConfig {
 export class McpToolBuilder {
   private readonly logger = new Logger(McpToolBuilder.name);
 
-  constructor(private readonly registry: McpRegistryService) {}
+  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
 
   register(config: DynamicToolConfig): void {
     const handlerWrapper = {
@@ -38,7 +39,7 @@ export class McpToolBuilder {
       outputSchema: config.outputSchema,
       annotations: config.annotations,
       methodName: config.name,
-      target: handlerWrapper.constructor,
+      target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,
       instance: handlerWrapper,
       requiredScopes: config.scopes,
       requiredRoles: config.roles,

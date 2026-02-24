@@ -1,4 +1,4 @@
-import { extractZodDescriptions, zodToJsonSchema } from '@btwld/mcp-common';
+import { extractZodDescriptions } from '@btwld/mcp-common';
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RegisteredPrompt, RegisteredTool } from '../discovery/registry.service';
@@ -31,11 +31,18 @@ function registerTools(
   ctx: McpExecutionContext,
 ): void {
   for (const tool of registry.getAllTools()) {
-    const inputSchema = tool.inputSchema ?? (tool.parameters ? getInputSchema(tool) : {});
-    (server as Record<string, unknown> as { tool: (...args: unknown[]) => void }).tool(
+    // Use registerTool() with named config to avoid overload ambiguity
+    // The SDK's tool() method uses isZodRawShapeCompat() to distinguish params
+    // from annotations, which fails for pre-converted JSON schema objects.
+    (
+      server as Record<string, unknown> as { registerTool: (...args: unknown[]) => void }
+    ).registerTool(
       tool.name,
-      tool.description,
-      inputSchema,
+      {
+        description: tool.description,
+        inputSchema: tool.parameters,
+        annotations: tool.annotations,
+      },
       async (args: Record<string, unknown>) => {
         return pipeline.callTool(tool.name, args, ctx);
       },
@@ -96,11 +103,6 @@ function registerPrompts(
       },
     );
   }
-}
-
-function getInputSchema(tool: RegisteredTool): Record<string, unknown> {
-  if (!tool.parameters) return {};
-  return zodToJsonSchema(tool.parameters);
 }
 
 function getPromptArgs(

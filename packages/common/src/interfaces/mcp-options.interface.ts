@@ -54,9 +54,12 @@ export interface McpModuleOptions {
 }
 
 export interface McpModuleAsyncOptions {
-  imports?: unknown[];
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS DynamicModule requires broad module types
+  imports?: any[];
   transport: McpTransportType;
   transportOptions?: TransportOptions;
-  useFactory: (...args: unknown[]) => McpModuleOptions | Promise<McpModuleOptions>;
-  inject?: unknown[];
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
+  useFactory: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types
+  inject?: any[];
 }

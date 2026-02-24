@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -7,10 +8,10 @@ import {
   DEFAULT_PING_INTERVAL,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from '../../constants/module.constants';
-import type { McpRegistryService } from '../../discovery/registry.service';
-import type { McpContextFactory } from '../../execution/context.factory';
-import type { McpExecutorService } from '../../execution/executor.service';
-import type { ExecutionPipelineService } from '../../execution/pipeline.service';
+import { McpRegistryService } from '../../discovery/registry.service';
+import { McpContextFactory } from '../../execution/context.factory';
+import { McpExecutorService } from '../../execution/executor.service';
+import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
 
@@ -23,17 +24,17 @@ export class SseService implements OnModuleDestroy {
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
-    private readonly registry: McpRegistryService,
-    private readonly executor: McpExecutorService,
-    private readonly pipeline: ExecutionPipelineService,
-    private readonly contextFactory: McpContextFactory,
+    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
+    @Inject(McpExecutorService) private readonly executor: McpExecutorService,
+    @Inject(ExecutionPipelineService) private readonly pipeline: ExecutionPipelineService,
+    @Inject(McpContextFactory) private readonly contextFactory: McpContextFactory,
   ) {}
 
   async createConnection(req: unknown, res: unknown): Promise<void> {
     const messagesEndpoint =
       this.options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
 
-    const transport = new SSEServerTransport(messagesEndpoint, res as Response);
+    const transport = new SSEServerTransport(messagesEndpoint, res as unknown as ServerResponse);
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options);
@@ -76,7 +77,8 @@ export class SseService implements OnModuleDestroy {
     const sessionId = url.searchParams.get('sessionId');
 
     if (!sessionId || !this.transports.has(sessionId)) {
-      const resObj = res as Record<string, ((...args: unknown[]) => unknown) | undefined>;
+      // biome-ignore lint/suspicious/noExplicitAny: HTTP response shape varies by framework
+      const resObj = res as any;
       resObj.status?.(404)?.json?.({ error: 'Session not found' }) ??
         resObj.code?.(404)?.send?.({ error: 'Session not found' });
       return;
@@ -84,7 +86,10 @@ export class SseService implements OnModuleDestroy {
 
     const transport = this.transports.get(sessionId);
     if (transport) {
-      await transport.handlePostMessage(req as Request, res as Response);
+      await transport.handlePostMessage(
+        req as unknown as IncomingMessage,
+        res as unknown as ServerResponse,
+      );
     }
   }
 

@@ -10,7 +10,7 @@ export function Tool(options: ToolOptions): MethodDecorator {
       outputSchema: options.outputSchema,
       annotations: options.annotations,
       methodName: String(propertyKey),
-      target: target.constructor,
+      target: target.constructor as abstract new (...args: unknown[]) => unknown,
     };
 
     Reflect.defineMetadata(MCP_TOOL_METADATA, metadata, target, propertyKey);

@@ -1,7 +1,8 @@
 import type { McpExecutionContext, PromptGetResult } from '@btwld/mcp-common';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ZodObject, ZodRawShape } from 'zod';
-import type { McpRegistryService, RegisteredPrompt } from '../discovery/registry.service';
+import { McpRegistryService } from '../discovery/registry.service';
+import type { RegisteredPrompt } from '../discovery/registry.service';
 
 export interface DynamicPromptConfig {
   name: string;
@@ -14,7 +15,7 @@ export interface DynamicPromptConfig {
 export class McpPromptBuilder {
   private readonly logger = new Logger(McpPromptBuilder.name);
 
-  constructor(private readonly registry: McpRegistryService) {}
+  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
 
   register(config: DynamicPromptConfig): void {
     const handlerWrapper = {
@@ -26,7 +27,7 @@ export class McpPromptBuilder {
       description: config.description,
       parameters: config.parameters,
       methodName: config.name,
-      target: handlerWrapper.constructor,
+      target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,
       instance: handlerWrapper,
     };
 

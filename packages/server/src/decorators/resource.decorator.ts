@@ -9,7 +9,7 @@ export function Resource(options: ResourceOptions): MethodDecorator {
       description: options.description,
       mimeType: options.mimeType,
       methodName: String(propertyKey),
-      target: target.constructor,
+      target: target.constructor as abstract new (...args: unknown[]) => unknown,
     };
 
     Reflect.defineMetadata(MCP_RESOURCE_METADATA, metadata, target, propertyKey);

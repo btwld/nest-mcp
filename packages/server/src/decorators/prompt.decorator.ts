@@ -8,7 +8,7 @@ export function Prompt(options: PromptOptions): MethodDecorator {
       description: options.description,
       parameters: options.parameters,
       methodName: String(propertyKey),
-      target: target.constructor,
+      target: target.constructor as abstract new (...args: unknown[]) => unknown,
     };
 
     Reflect.defineMetadata(MCP_PROMPT_METADATA, metadata, target, propertyKey);

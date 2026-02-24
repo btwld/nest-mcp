@@ -1,6 +1,7 @@
 import type { McpExecutionContext, ResourceReadResult } from '@btwld/mcp-common';
-import { Injectable, Logger } from '@nestjs/common';
-import type { McpRegistryService, RegisteredResource } from '../discovery/registry.service';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { McpRegistryService } from '../discovery/registry.service';
+import type { RegisteredResource } from '../discovery/registry.service';
 
 export interface DynamicResourceConfig {
   uri: string;
@@ -14,7 +15,7 @@ export interface DynamicResourceConfig {
 export class McpResourceBuilder {
   private readonly logger = new Logger(McpResourceBuilder.name);
 
-  constructor(private readonly registry: McpRegistryService) {}
+  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
 
   register(config: DynamicResourceConfig): void {
     const handlerWrapper = {
@@ -27,7 +28,7 @@ export class McpResourceBuilder {
       description: config.description,
       mimeType: config.mimeType,
       methodName: config.name,
-      target: handlerWrapper.constructor,
+      target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,
       instance: handlerWrapper,
     };
 

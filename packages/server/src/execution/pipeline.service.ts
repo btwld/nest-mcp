@@ -9,28 +9,29 @@ import type {
 import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
-import type { McpRegistryService, RegisteredTool } from '../discovery/registry.service';
-import type { MiddlewareService } from '../middleware/middleware.service';
-import type { MetricsService } from '../observability/metrics.service';
-import type { CircuitBreakerService } from '../resilience/circuit-breaker.service';
-import type { RateLimiterService } from '../resilience/rate-limiter.service';
-import type { RetryService } from '../resilience/retry.service';
-import type { McpExecutorService } from './executor.service';
+import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
+import { McpRegistryService } from '../discovery/registry.service';
+import type { RegisteredTool } from '../discovery/registry.service';
+import { MiddlewareService } from '../middleware/middleware.service';
+import { MetricsService } from '../observability/metrics.service';
+import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
+import { RateLimiterService } from '../resilience/rate-limiter.service';
+import { RetryService } from '../resilience/retry.service';
+import { McpExecutorService } from './executor.service';
 
 @Injectable()
 export class ExecutionPipelineService {
   private readonly logger = new Logger(ExecutionPipelineService.name);
 
   constructor(
-    private readonly executor: McpExecutorService,
-    private readonly registry: McpRegistryService,
-    private readonly authGuard: ToolAuthGuardService,
-    private readonly middlewareService: MiddlewareService,
-    private readonly rateLimiter: RateLimiterService,
-    private readonly circuitBreaker: CircuitBreakerService,
-    private readonly retry: RetryService,
-    private readonly metrics: MetricsService,
+    @Inject(McpExecutorService) private readonly executor: McpExecutorService,
+    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
+    @Inject(ToolAuthGuardService) private readonly authGuard: ToolAuthGuardService,
+    @Inject(MiddlewareService) private readonly middlewareService: MiddlewareService,
+    @Inject(RateLimiterService) private readonly rateLimiter: RateLimiterService,
+    @Inject(CircuitBreakerService) private readonly circuitBreaker: CircuitBreakerService,
+    @Inject(RetryService) private readonly retry: RetryService,
+    @Inject(MetricsService) private readonly metrics: MetricsService,
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
   ) {}
 

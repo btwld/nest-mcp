@@ -28,8 +28,8 @@ export class WeatherTools {
   })
   @RateLimit({ max: 60, window: '1m' })
   @Retry({ maxAttempts: 2, backoff: 'exponential' })
-  @CircuitBreaker({ threshold: 3, resetTimeout: 30000 })
-  @UseMiddleware([timingMiddleware])
+  @CircuitBreaker({ errorThreshold: 3, halfOpenTimeout: 30000 })
+  @UseMiddleware(timingMiddleware)
   async getWeather(args: { city: string; units?: string }, ctx: McpExecutionContext) {
     await ctx.reportProgress({ progress: 0.5, total: 1 });
 

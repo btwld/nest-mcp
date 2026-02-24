@@ -48,13 +48,13 @@ export class DynamicRegistrationService implements OnModuleInit {
       parameters: z.object({
         name: z.string().describe('Name to greet'),
       }),
-      handler: async (args: { name: string }) => ({
+      handler: async (args: Record<string, unknown>) => ({
         messages: [
           {
             role: 'user' as const,
             content: {
               type: 'text' as const,
-              text: `Generate a creative greeting for ${args.name}`,
+              text: `Generate a creative greeting for ${args.name as string}`,
             },
           },
         ],

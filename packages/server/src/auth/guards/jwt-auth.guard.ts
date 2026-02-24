@@ -1,10 +1,10 @@
 import type { McpGuard, McpGuardContext } from '@btwld/mcp-common';
-import { Injectable } from '@nestjs/common';
-import type { JwtTokenService } from '../services/jwt-token.service';
+import { Inject, Injectable } from '@nestjs/common';
+import { JwtTokenService } from '../services/jwt-token.service';
 
 @Injectable()
 export class JwtAuthGuard implements McpGuard {
-  constructor(private readonly jwtService: JwtTokenService) {}
+  constructor(@Inject(JwtTokenService) private readonly jwtService: JwtTokenService) {}
 
   async canActivate(context: McpGuardContext): Promise<boolean> {
     const request = context.request as { headers?: { authorization?: string } } | undefined;

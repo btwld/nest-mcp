@@ -9,15 +9,15 @@ import {
   matchUriTemplate,
   zodToJsonSchema,
 } from '@btwld/mcp-common';
-import { Injectable, Logger } from '@nestjs/common';
-import type { McpRegistryService } from '../discovery/registry.service';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
 
 @Injectable()
 export class McpExecutorService {
   private readonly logger = new Logger(McpExecutorService.name);
 
-  constructor(private readonly registry: McpRegistryService) {}
+  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
 
   // ---- Tools ----
 
@@ -59,7 +59,10 @@ export class McpExecutorService {
     }
 
     try {
-      const result = await tool.instance[tool.methodName](validatedArgs, ctx);
+      const handler = tool.instance[tool.methodName] as
+        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+        Function;
+      const result = await handler(validatedArgs, ctx);
       return this.normalizeToolResult(result);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
@@ -120,7 +123,10 @@ export class McpExecutorService {
     // Try exact match first
     const resource = this.registry.getResource(uri);
     if (resource) {
-      const result = await resource.instance[resource.methodName](new URL(uri), ctx);
+      const handler = resource.instance[resource.methodName] as
+        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+        Function;
+      const result = await handler(new URL(uri), ctx);
       return this.normalizeResourceResult(result, uri);
     }
 
@@ -128,11 +134,10 @@ export class McpExecutorService {
     for (const template of this.registry.getAllResourceTemplates()) {
       const match = matchUriTemplate(template.uriTemplate, uri);
       if (match) {
-        const result = await template.instance[template.methodName](
-          new URL(uri),
-          match.params,
-          ctx,
-        );
+        const handler = template.instance[template.methodName] as
+          // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+          Function;
+        const result = await handler(new URL(uri), match.params, ctx);
         return this.normalizeResourceResult(result, uri);
       }
     }
@@ -199,7 +204,10 @@ export class McpExecutorService {
       validatedArgs = parsed.data as Record<string, unknown>;
     }
 
-    const result = await prompt.instance[prompt.methodName](validatedArgs, ctx);
+    const handler = prompt.instance[prompt.methodName] as
+      // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+      Function;
+    const result = await handler(validatedArgs, ctx);
 
     if (result && typeof result === 'object' && 'messages' in result) {
       return result as PromptGetResult;

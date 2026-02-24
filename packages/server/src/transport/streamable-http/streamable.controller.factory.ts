@@ -2,18 +2,21 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Post,
   Req,
   Res,
   type Type,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-import type { StreamableHttpService } from './streamable.service';
+import { StreamableHttpService } from './streamable.service';
 
 export function createStreamableHttpController(endpoint: string): Type<unknown> {
   @Controller({ path: endpoint, version: VERSION_NEUTRAL })
   class StreamableHttpController {
-    constructor(private readonly streamableService: StreamableHttpService) {}
+    constructor(
+      @Inject(StreamableHttpService) private readonly streamableService: StreamableHttpService,
+    ) {}
 
     @Post()
     async handlePost(@Req() req: unknown, @Res() res: unknown): Promise<void> {

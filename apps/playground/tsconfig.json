@@ -4,6 +4,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },

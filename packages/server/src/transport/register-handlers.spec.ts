@@ -13,6 +13,7 @@ describe('registerHandlers', () => {
   beforeEach(() => {
     mockServer = {
       tool: vi.fn(),
+      registerTool: vi.fn(),
       resource: vi.fn(),
       prompt: vi.fn(),
     };
@@ -42,87 +43,42 @@ describe('registerHandlers', () => {
   it('registers nothing when registry is empty', () => {
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.tool).not.toHaveBeenCalled();
+    expect(mockServer.registerTool).not.toHaveBeenCalled();
     expect(mockServer.resource).not.toHaveBeenCalled();
     expect(mockServer.prompt).not.toHaveBeenCalled();
   });
 
-  it('registers tools with name, description, schema, and callback', () => {
+  it('registers tools via registerTool with config object', () => {
     const schema = z.object({ city: z.string().describe('City name') });
     mockRegistry.getAllTools.mockReturnValue([
-      { name: 'get_weather', description: 'Get weather', parameters: schema },
+      {
+        name: 'get_weather',
+        description: 'Get weather',
+        parameters: schema,
+        annotations: { readOnlyHint: true },
+      },
     ]);
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.tool).toHaveBeenCalledTimes(1);
-    const [name, desc, inputSchema, callback] = mockServer.tool.mock.calls[0];
+    expect(mockServer.registerTool).toHaveBeenCalledTimes(1);
+    const [name, config, callback] = mockServer.registerTool.mock.calls[0];
     expect(name).toBe('get_weather');
-    expect(desc).toBe('Get weather');
-    expect(inputSchema).toEqual({
-      type: 'object',
-      properties: {
-        city: { type: 'string', description: 'City name' },
-      },
-      required: ['city'],
-    });
+    expect(config.description).toBe('Get weather');
+    expect(config.inputSchema).toBe(schema);
+    expect(config.annotations).toEqual({ readOnlyHint: true });
     expect(typeof callback).toBe('function');
   });
 
-  it('registers tools with empty schema when no parameters', () => {
+  it('registers tools with undefined inputSchema when no parameters', () => {
     mockRegistry.getAllTools.mockReturnValue([
       { name: 'ping', description: 'Ping', parameters: null },
     ]);
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const [, , inputSchema] = mockServer.tool.mock.calls[0];
-    expect(inputSchema).toEqual({});
-  });
-
-  it('prefers pre-converted inputSchema over Zod parameters', () => {
-    const preConverted = {
-      type: 'object',
-      properties: { query: { type: 'string' } },
-    };
-    const zodSchema = z.object({ name: z.string() });
-
-    mockRegistry.getAllTools.mockReturnValue([
-      { name: 'search', description: 'Search', parameters: zodSchema, inputSchema: preConverted },
-    ]);
-
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
-
-    const [, , inputSchema] = mockServer.tool.mock.calls[0];
-    expect(inputSchema).toEqual(preConverted);
-  });
-
-  it('uses inputSchema when parameters is undefined', () => {
-    const preConverted = {
-      type: 'object',
-      properties: { city: { type: 'string' } },
-      required: ['city'],
-    };
-
-    mockRegistry.getAllTools.mockReturnValue([
-      { name: 'weather', description: 'Weather', parameters: undefined, inputSchema: preConverted },
-    ]);
-
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
-
-    const [, , inputSchema] = mockServer.tool.mock.calls[0];
-    expect(inputSchema).toEqual(preConverted);
-  });
-
-  it('falls back to empty schema when neither inputSchema nor parameters are set', () => {
-    mockRegistry.getAllTools.mockReturnValue([
-      { name: 'noop', description: 'No-op', parameters: undefined, inputSchema: undefined },
-    ]);
-
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
-
-    const [, , inputSchema] = mockServer.tool.mock.calls[0];
-    expect(inputSchema).toEqual({});
+    const [, config] = mockServer.registerTool.mock.calls[0];
+    expect(config.inputSchema).toBeNull();
   });
 
   it('registers resources with name, uri, mimeType metadata, and callback', () => {
@@ -205,7 +161,7 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const callback = mockServer.tool.mock.calls[0][3];
+    const callback = mockServer.registerTool.mock.calls[0][2];
     const result = await callback({ message: 'hi' });
     expect(mockPipeline.callTool).toHaveBeenCalledWith('echo', { message: 'hi' }, ctx);
     expect(result).toEqual({ content: [{ type: 'text', text: 'hi' }] });

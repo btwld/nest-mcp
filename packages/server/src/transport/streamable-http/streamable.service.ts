@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import type { McpRegistryService } from '../../discovery/registry.service';
-import type { McpContextFactory } from '../../execution/context.factory';
-import type { McpExecutorService } from '../../execution/executor.service';
-import type { ExecutionPipelineService } from '../../execution/pipeline.service';
+import { McpRegistryService } from '../../discovery/registry.service';
+import { McpContextFactory } from '../../execution/context.factory';
+import { McpExecutorService } from '../../execution/executor.service';
+import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
 
@@ -32,10 +33,10 @@ export class StreamableHttpService implements OnModuleDestroy {
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
-    private readonly registry: McpRegistryService,
-    private readonly executor: McpExecutorService,
-    private readonly pipeline: ExecutionPipelineService,
-    private readonly contextFactory: McpContextFactory,
+    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
+    @Inject(McpExecutorService) private readonly executor: McpExecutorService,
+    @Inject(ExecutionPipelineService) private readonly pipeline: ExecutionPipelineService,
+    @Inject(McpContextFactory) private readonly contextFactory: McpContextFactory,
   ) {}
 
   get isStateless(): boolean {
@@ -77,7 +78,10 @@ export class StreamableHttpService implements OnModuleDestroy {
 
     const transport = this.transports.get(sessionId);
     if (transport) {
-      await transport.handleRequest(req as Request, res as Response);
+      await transport.handleRequest(
+        req as unknown as IncomingMessage,
+        res as unknown as ServerResponse,
+      );
     }
   }
 
@@ -107,7 +111,10 @@ export class StreamableHttpService implements OnModuleDestroy {
       server.close();
     });
 
-    await transport.handleRequest(req as Request, res as Response);
+    await transport.handleRequest(
+      req as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+    );
   }
 
   private async handleStatefulPost(req: unknown, res: unknown): Promise<void> {
@@ -117,7 +124,10 @@ export class StreamableHttpService implements OnModuleDestroy {
     if (existingSessionId && this.transports.has(existingSessionId)) {
       const transport = this.transports.get(existingSessionId);
       if (transport) {
-        await transport.handleRequest(req as Request, res as Response);
+        await transport.handleRequest(
+          req as unknown as IncomingMessage,
+          res as unknown as ServerResponse,
+        );
       }
       return;
     }
@@ -134,7 +144,10 @@ export class StreamableHttpService implements OnModuleDestroy {
 
     const server = this.createAndConnectServer(transport, 'pending');
 
-    await transport.handleRequest(req as Request, res as Response);
+    await transport.handleRequest(
+      req as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+    );
 
     const sessionId = transport.sessionId;
     if (sessionId) {

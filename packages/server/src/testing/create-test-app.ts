@@ -17,8 +17,10 @@ export interface McpTestApp {
 }
 
 export interface CreateTestAppOptions {
-  providers: unknown[];
-  imports?: unknown[];
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS DI requires broad provider/module types
+  providers: any[];
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS DI requires broad module types
+  imports?: any[];
 }
 
 export async function createMcpTestApp(options: CreateTestAppOptions): Promise<McpTestApp> {
