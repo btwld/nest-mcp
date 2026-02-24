@@ -15,20 +15,22 @@ export function buildServerCapabilities(
 ): ServerCapabilities {
   const capabilities: ServerCapabilities = {};
 
-  if (registry.hasTools) {
+  // Enable capabilities if the registry has handlers OR if options explicitly declare them.
+  // The options check supports gateway/dynamic patterns where tools are registered after init.
+  if (registry.hasTools || options.capabilities?.tools) {
     capabilities.tools = {
       listChanged: options.capabilities?.tools?.listChanged ?? true,
     };
   }
 
-  if (registry.hasResources || registry.hasResourceTemplates) {
+  if (registry.hasResources || registry.hasResourceTemplates || options.capabilities?.resources) {
     capabilities.resources = {
       subscribe: options.capabilities?.resources?.subscribe ?? false,
       listChanged: options.capabilities?.resources?.listChanged ?? true,
     };
   }
 
-  if (registry.hasPrompts) {
+  if (registry.hasPrompts || options.capabilities?.prompts) {
     capabilities.prompts = {
       listChanged: options.capabilities?.prompts?.listChanged ?? true,
     };

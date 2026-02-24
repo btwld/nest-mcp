@@ -1,9 +1,17 @@
 import { extractZodDescriptions } from '@btwld/mcp-common';
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import type { RegisteredPrompt, RegisteredTool } from '../discovery/registry.service';
 import type { McpRegistryService } from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
+
+/**
+ * Permissive schema that accepts any arguments. Used for dynamically-registered
+ * tools (e.g. gateway-proxied tools) that only have JSON schemas, not Zod schemas.
+ * The MCP SDK requires a Zod schema to pass arguments to the handler callback.
+ */
+const PASSTHROUGH_SCHEMA = z.object({}).passthrough();
 
 /**
  * Registers all tools, resources, resource templates, and prompts from the
@@ -34,13 +42,14 @@ function registerTools(
     // Use registerTool() with named config to avoid overload ambiguity
     // The SDK's tool() method uses isZodRawShapeCompat() to distinguish params
     // from annotations, which fails for pre-converted JSON schema objects.
-    (
-      server as Record<string, unknown> as { registerTool: (...args: unknown[]) => void }
-    ).registerTool(
+    (server as unknown as { registerTool: (...args: unknown[]) => void }).registerTool(
       tool.name,
       {
         description: tool.description,
-        inputSchema: tool.parameters,
+        // Use Zod schema for validation, or a permissive passthrough schema
+        // for dynamically-registered tools that only have JSON schemas.
+        // A schema is always required so the SDK passes args to the callback.
+        inputSchema: tool.parameters ?? PASSTHROUGH_SCHEMA,
         annotations: tool.annotations,
       },
       async (args: Record<string, unknown>) => {
@@ -57,7 +66,7 @@ function registerResources(
   ctx: McpExecutionContext,
 ): void {
   for (const resource of registry.getAllResources()) {
-    (server as Record<string, unknown> as { resource: (...args: unknown[]) => void }).resource(
+    (server as unknown as { resource: (...args: unknown[]) => void }).resource(
       resource.name,
       resource.uri,
       resource.mimeType ? { mimeType: resource.mimeType } : {},
@@ -75,7 +84,7 @@ function registerResourceTemplates(
   ctx: McpExecutionContext,
 ): void {
   for (const template of registry.getAllResourceTemplates()) {
-    (server as Record<string, unknown> as { resource: (...args: unknown[]) => void }).resource(
+    (server as unknown as { resource: (...args: unknown[]) => void }).resource(
       template.name,
       template.uriTemplate,
       template.mimeType ? { mimeType: template.mimeType } : {},
@@ -94,7 +103,7 @@ function registerPrompts(
 ): void {
   for (const prompt of registry.getAllPrompts()) {
     const promptArgs = prompt.parameters ? getPromptArgs(prompt) : {};
-    (server as Record<string, unknown> as { prompt: (...args: unknown[]) => void }).prompt(
+    (server as unknown as { prompt: (...args: unknown[]) => void }).prompt(
       prompt.name,
       prompt.description,
       promptArgs,
@@ -113,7 +122,7 @@ function getPromptArgs(
   const args: Record<string, { description: string; required: boolean }> = {};
   for (const desc of descriptions) {
     args[desc.name] = {
-      description: desc.description,
+      description: desc.description ?? '',
       required: desc.required,
     };
   }

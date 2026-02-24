@@ -9,7 +9,8 @@ import {
   matchUriTemplate,
   zodToJsonSchema,
 } from '@btwld/mcp-common';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
 
@@ -17,7 +18,7 @@ import type { RegisteredTool } from '../discovery/registry.service';
 export class McpExecutorService {
   private readonly logger = new Logger(McpExecutorService.name);
 
-  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
+  constructor(private readonly registry: McpRegistryService) {}
 
   // ---- Tools ----
 

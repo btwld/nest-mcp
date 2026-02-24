@@ -1,13 +1,5 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  Post,
-  Req,
-  Res,
-  type Type,
-  VERSION_NEUTRAL,
-} from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, type Type, VERSION_NEUTRAL } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { SseService } from './sse.service';
 
 export function createSseController(
@@ -16,7 +8,7 @@ export function createSseController(
 ): Type<unknown>[] {
   @Controller({ path: sseEndpoint, version: VERSION_NEUTRAL })
   class SseController {
-    constructor(@Inject(SseService) private readonly sseService: SseService) {}
+    constructor(private readonly sseService: SseService) {}
 
     @Get()
     async handleSse(@Req() req: unknown, @Res() res: unknown): Promise<void> {
@@ -26,7 +18,7 @@ export function createSseController(
 
   @Controller({ path: messagesEndpoint, version: VERSION_NEUTRAL })
   class SseMessagesController {
-    constructor(@Inject(SseService) private readonly sseService: SseService) {}
+    constructor(private readonly sseService: SseService) {}
 
     @Post()
     async handleMessage(@Req() req: unknown, @Res() res: unknown): Promise<void> {

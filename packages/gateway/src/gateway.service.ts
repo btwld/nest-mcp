@@ -1,13 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ResponseCacheService } from './cache/response-cache.service';
-import type { PolicyEngineService } from './policies/policy-engine.service';
-import type { RouterService } from './routing/router.service';
-import type { ToolAggregatorService } from './routing/tool-aggregator.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResponseCacheService } from './cache/response-cache.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { PolicyEngineService } from './policies/policy-engine.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { RouterService } from './routing/router.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ToolAggregatorService } from './routing/tool-aggregator.service';
 import type { AggregatedTool } from './routing/tool-aggregator.service';
-import type { RequestTransformService } from './transform/request-transform.service';
-import type { ResponseTransformService } from './transform/response-transform.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { RequestTransformService } from './transform/request-transform.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResponseTransformService } from './transform/response-transform.service';
 import type { ToolCallResponse } from './transform/response-transform.service';
-import type { UpstreamManagerService } from './upstream/upstream-manager.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { UpstreamManagerService } from './upstream/upstream-manager.service';
 
 export interface GatewayCallToolResult {
   content: unknown[];

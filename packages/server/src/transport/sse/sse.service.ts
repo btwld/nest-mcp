@@ -8,9 +8,13 @@ import {
   DEFAULT_PING_INTERVAL,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from '../../constants/module.constants';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../../discovery/registry.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpContextFactory } from '../../execution/context.factory';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpExecutorService } from '../../execution/executor.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
@@ -24,10 +28,10 @@ export class SseService implements OnModuleDestroy {
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
-    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
-    @Inject(McpExecutorService) private readonly executor: McpExecutorService,
-    @Inject(ExecutionPipelineService) private readonly pipeline: ExecutionPipelineService,
-    @Inject(McpContextFactory) private readonly contextFactory: McpContextFactory,
+    private readonly registry: McpRegistryService,
+    private readonly executor: McpExecutorService,
+    private readonly pipeline: ExecutionPipelineService,
+    private readonly contextFactory: McpContextFactory,
   ) {}
 
   async createConnection(req: unknown, res: unknown): Promise<void> {

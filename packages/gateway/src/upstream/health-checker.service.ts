@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import type { UpstreamManagerService } from './upstream-manager.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { UpstreamManagerService } from './upstream-manager.service';
 import type { UpstreamConfig } from './upstream.interface';
 
 @Injectable()

@@ -1,6 +1,7 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpModuleOptions, ToolContent } from '@btwld/mcp-common';
-import { McpModule, type McpToolBuilder } from '@btwld/mcp-server';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { McpModule, McpToolBuilder } from '@btwld/mcp-server';
 import {
   type DynamicModule,
   Inject,

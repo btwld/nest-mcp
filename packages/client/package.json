@@ -4,23 +4,16 @@
   "description": "NestJS MCP Client - Connect to and consume MCP servers from NestJS",
   "license": "MIT",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -45,7 +38,6 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "typescript": "^5.7.0",
-    "tsup": "^8.3.0",
     "vitest": "^2.1.0"
   }
 }

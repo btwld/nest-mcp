@@ -1,6 +1,7 @@
 import type { McpExecutionContext, PromptGetResult } from '@btwld/mcp-common';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { ZodObject, ZodRawShape } from 'zod';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredPrompt } from '../discovery/registry.service';
 
@@ -15,7 +16,7 @@ export interface DynamicPromptConfig {
 export class McpPromptBuilder {
   private readonly logger = new Logger(McpPromptBuilder.name);
 
-  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
+  constructor(private readonly registry: McpRegistryService) {}
 
   register(config: DynamicPromptConfig): void {
     const handlerWrapper = {

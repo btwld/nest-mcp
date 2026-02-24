@@ -1,5 +1,6 @@
 import type { McpExecutionContext, ResourceReadResult } from '@btwld/mcp-common';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredResource } from '../discovery/registry.service';
 
@@ -15,7 +16,7 @@ export interface DynamicResourceConfig {
 export class McpResourceBuilder {
   private readonly logger = new Logger(McpResourceBuilder.name);
 
-  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
+  constructor(private readonly registry: McpRegistryService) {}
 
   register(config: DynamicResourceConfig): void {
     const handlerWrapper = {

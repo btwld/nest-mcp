@@ -1,11 +1,12 @@
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService, UpstreamManagerService } from '@btwld/mcp-gateway';
-import { Controller, Get, Inject, Param } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 
 @Controller('gateway')
 export class GatewayStatusController {
   constructor(
-    @Inject(UpstreamManagerService) private readonly upstreamManager: UpstreamManagerService,
-    @Inject(PolicyEngineService) private readonly policyEngine: PolicyEngineService,
+    private readonly upstreamManager: UpstreamManagerService,
+    private readonly policyEngine: PolicyEngineService,
   ) {}
 
   @Get('status')

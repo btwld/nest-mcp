@@ -1,6 +1,7 @@
 import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@btwld/mcp-common';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
 
@@ -24,7 +25,7 @@ export interface DynamicToolConfig {
 export class McpToolBuilder {
   private readonly logger = new Logger(McpToolBuilder.name);
 
-  constructor(@Inject(McpRegistryService) private readonly registry: McpRegistryService) {}
+  constructor(private readonly registry: McpRegistryService) {}
 
   register(config: DynamicToolConfig): void {
     const handlerWrapper = {

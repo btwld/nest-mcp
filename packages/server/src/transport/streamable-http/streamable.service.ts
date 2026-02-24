@@ -6,9 +6,13 @@ import { McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../../discovery/registry.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpContextFactory } from '../../execution/context.factory';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpExecutorService } from '../../execution/executor.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
@@ -33,10 +37,10 @@ export class StreamableHttpService implements OnModuleDestroy {
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
-    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
-    @Inject(McpExecutorService) private readonly executor: McpExecutorService,
-    @Inject(ExecutionPipelineService) private readonly pipeline: ExecutionPipelineService,
-    @Inject(McpContextFactory) private readonly contextFactory: McpContextFactory,
+    private readonly registry: McpRegistryService,
+    private readonly executor: McpExecutorService,
+    private readonly pipeline: ExecutionPipelineService,
+    private readonly contextFactory: McpContextFactory,
   ) {}
 
   get isStateless(): boolean {

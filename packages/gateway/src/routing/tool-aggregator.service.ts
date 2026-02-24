@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { UpstreamManagerService } from '../upstream/upstream-manager.service';
-import type { RouterService } from './router.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { UpstreamManagerService } from '../upstream/upstream-manager.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { RouterService } from './router.service';
 
 export interface AggregatedTool {
   name: string;

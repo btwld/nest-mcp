@@ -70,7 +70,7 @@ describe('registerHandlers', () => {
     expect(typeof callback).toBe('function');
   });
 
-  it('registers tools with undefined inputSchema when no parameters', () => {
+  it('registers tools with passthrough schema when no parameters', () => {
     mockRegistry.getAllTools.mockReturnValue([
       { name: 'ping', description: 'Ping', parameters: null },
     ]);
@@ -78,7 +78,10 @@ describe('registerHandlers', () => {
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
     const [, config] = mockServer.registerTool.mock.calls[0];
-    expect(config.inputSchema).toBeNull();
+    // When no Zod schema is provided, a passthrough schema is used so the SDK
+    // always passes arguments to the handler callback.
+    expect(config.inputSchema).toBeDefined();
+    expect(typeof config.inputSchema.safeParseAsync).toBe('function');
   });
 
   it('registers resources with name, uri, mimeType metadata, and callback', () => {

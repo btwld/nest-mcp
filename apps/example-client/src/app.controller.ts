@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import type { AppService } from './app.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { AppService } from './app.service';
 
 @Controller()
 export class AppController {

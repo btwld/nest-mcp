@@ -14,7 +14,9 @@ import {
 } from '@nestjs/common';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { OAuthClient, TokenPayload, TokenResponse } from '../interfaces/oauth-types.interface';
+// biome-ignore lint/style/useImportType: OAuthClientService needed as value for emitDecoratorMetadata
 import { MCP_OAUTH_STORE, OAuthClientService } from '../services/client.service';
+// biome-ignore lint/style/useImportType: JwtTokenService needed as value for emitDecoratorMetadata
 import { JwtTokenService, MCP_AUTH_OPTIONS } from '../services/jwt-token.service';
 import type { IOAuthStore } from '../stores/oauth-store.interface';
 
@@ -24,8 +26,8 @@ export function createOAuthController(basePath: string): Type<unknown> {
     constructor(
       @Inject(MCP_AUTH_OPTIONS)
       private readonly options: McpAuthModuleOptions,
-      @Inject(JwtTokenService) private readonly jwtService: JwtTokenService,
-      @Inject(OAuthClientService) private readonly clientService: OAuthClientService,
+      private readonly jwtService: JwtTokenService,
+      private readonly clientService: OAuthClientService,
       @Inject(MCP_OAUTH_STORE) private readonly store: IOAuthStore,
     ) {}
 

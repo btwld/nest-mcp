@@ -4,8 +4,10 @@ import {
   MCP_RESOURCE_TEMPLATE_METADATA,
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
-import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: ModulesContainer needed as value for emitDecoratorMetadata
 import { DiscoveryService, ModulesContainer } from '@nestjs/core';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from './registry.service';
 
 @Injectable()
@@ -13,8 +15,8 @@ export class McpScannerService implements OnModuleInit {
   private readonly logger = new Logger(McpScannerService.name);
 
   constructor(
-    @Inject(ModulesContainer) private readonly modulesContainer: ModulesContainer,
-    @Inject(McpRegistryService) private readonly registry: McpRegistryService,
+    private readonly modulesContainer: ModulesContainer,
+    private readonly registry: McpRegistryService,
   ) {}
 
   onModuleInit(): void {
