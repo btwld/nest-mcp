@@ -1,6 +1,6 @@
 import 'reflect-metadata';
+import { CircuitBreakerState, MCP_CIRCUIT_OPEN, McpError } from '@btwld/mcp-common';
 import { CircuitBreakerService } from './circuit-breaker.service';
-import { McpError, MCP_CIRCUIT_OPEN, CircuitBreakerState } from '@btwld/mcp-common';
 
 describe('CircuitBreakerService', () => {
   let service: CircuitBreakerService;
@@ -31,10 +31,14 @@ describe('CircuitBreakerService', () => {
     await service.execute('tool-a', defaultConfig, async () => 'ok');
     await service.execute('tool-a', defaultConfig, async () => 'ok');
     await expect(
-      service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+      service.execute('tool-a', defaultConfig, async () => {
+        throw new Error('fail');
+      }),
     ).rejects.toThrow('fail');
     await expect(
-      service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+      service.execute('tool-a', defaultConfig, async () => {
+        throw new Error('fail');
+      }),
     ).rejects.toThrow('fail');
 
     expect(service.getState('tool-a')).toBe(CircuitBreakerState.CLOSED);
@@ -45,7 +49,9 @@ describe('CircuitBreakerService', () => {
     // 5 failures out of 5 requests
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', defaultConfig, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 
@@ -56,7 +62,9 @@ describe('CircuitBreakerService', () => {
     // Open the circuit
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', defaultConfig, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 
@@ -76,7 +84,9 @@ describe('CircuitBreakerService', () => {
     // Open the circuit
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
     expect(service.getState('tool-a')).toBe(CircuitBreakerState.OPEN);
@@ -95,7 +105,9 @@ describe('CircuitBreakerService', () => {
     // Open the circuit
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 
@@ -113,7 +125,9 @@ describe('CircuitBreakerService', () => {
     // Open the circuit
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 
@@ -122,7 +136,9 @@ describe('CircuitBreakerService', () => {
 
     // Failure in HALF_OPEN goes back to OPEN
     await expect(
-      service.execute('tool-a', config, async () => { throw new Error('still failing'); }),
+      service.execute('tool-a', config, async () => {
+        throw new Error('still failing');
+      }),
     ).rejects.toThrow('still failing');
     expect(service.getState('tool-a')).toBe(CircuitBreakerState.OPEN);
   });
@@ -133,7 +149,9 @@ describe('CircuitBreakerService', () => {
     // 5 failures out of 5 requests, but minRequests is 10
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 

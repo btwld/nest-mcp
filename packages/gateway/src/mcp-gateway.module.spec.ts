@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpRegistryService } from '../../server/src/discovery/registry.service';
 import { McpToolBuilder } from '../../server/src/dynamic/tool-builder.service';
 
@@ -31,8 +31,8 @@ describe('Gateway tool registration with inputSchema', () => {
 
     const tool = registry.getTool('upstream-weather');
     expect(tool).toBeDefined();
-    expect(tool!.inputSchema).toEqual(inputSchema);
-    expect(tool!.parameters).toBeUndefined();
+    expect(tool?.inputSchema).toEqual(inputSchema);
+    expect(tool?.parameters).toBeUndefined();
   });
 
   it('stores inputSchema on the registered tool in the registry', () => {
@@ -68,7 +68,8 @@ describe('Gateway tool registration with inputSchema', () => {
       handler,
     });
 
-    const tool = registry.getTool('proxy-tool')!;
+    const tool = registry.getTool('proxy-tool');
+    if (!tool) throw new Error('Tool not found');
     const result = await tool.instance[tool.methodName]({ key: 'val' });
     expect(handler).toHaveBeenCalledWith({ key: 'val' });
     expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });

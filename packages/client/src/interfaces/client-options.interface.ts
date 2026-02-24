@@ -1,4 +1,4 @@
-import type { ModuleMetadata } from '@nestjs/common';
+import type { InjectionToken, ModuleMetadata } from '@nestjs/common';
 
 export type McpClientTransportType = 'streamable-http' | 'sse' | 'stdio';
 
@@ -49,6 +49,6 @@ export interface McpClientModuleOptions {
 }
 
 export interface McpClientModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
-  useFactory: (...args: any[]) => McpClientModuleOptions | Promise<McpClientModuleOptions>;
-  inject?: any[];
+  useFactory: (...args: unknown[]) => McpClientModuleOptions | Promise<McpClientModuleOptions>;
+  inject?: InjectionToken[];
 }

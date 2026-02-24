@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-export interface RequestTransformFn {
-  (request: ToolCallRequest): ToolCallRequest | Promise<ToolCallRequest>;
-}
+export type RequestTransformFn = (
+  request: ToolCallRequest,
+) => ToolCallRequest | Promise<ToolCallRequest>;
 
 export interface ToolCallRequest {
   toolName: string;

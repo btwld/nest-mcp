@@ -15,9 +15,8 @@ export interface SseTransportOptions {
   pingInterval?: number;
 }
 
-export interface StdioTransportOptions {
-  // stdio doesn't need additional config for server-side
-}
+// biome-ignore lint/complexity/noBannedTypes: empty options interface for future extensibility
+export type StdioTransportOptions = {};
 
 export interface TransportOptions {
   streamableHttp?: StreamableHttpTransportOptions;

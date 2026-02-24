@@ -1,14 +1,14 @@
 import 'reflect-metadata';
 import {
-  MCP_PUBLIC_METADATA,
-  MCP_SCOPES_METADATA,
-  MCP_ROLES_METADATA,
   MCP_GUARDS_METADATA,
+  MCP_PUBLIC_METADATA,
+  MCP_ROLES_METADATA,
+  MCP_SCOPES_METADATA,
 } from '@btwld/mcp-common';
-import { Public } from './public.decorator';
-import { Scopes } from './scopes.decorator';
-import { Roles } from './roles.decorator';
 import { Guards } from './guards.decorator';
+import { Public } from './public.decorator';
+import { Roles } from './roles.decorator';
+import { Scopes } from './scopes.decorator';
 
 describe('Auth decorators', () => {
   describe('@Public', () => {
@@ -20,11 +20,7 @@ describe('Auth decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_PUBLIC_METADATA,
-        TestService.prototype,
-        'openMethod',
-      );
+      const value = Reflect.getMetadata(MCP_PUBLIC_METADATA, TestService.prototype, 'openMethod');
 
       expect(value).toBe(true);
     });
@@ -39,11 +35,7 @@ describe('Auth decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_SCOPES_METADATA,
-        TestService.prototype,
-        'scopedMethod',
-      );
+      const value = Reflect.getMetadata(MCP_SCOPES_METADATA, TestService.prototype, 'scopedMethod');
 
       expect(value).toEqual(['read', 'write', 'admin']);
     });

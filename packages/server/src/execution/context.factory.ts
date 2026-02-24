@@ -1,5 +1,10 @@
+import type {
+  McpAuthenticatedUser,
+  McpExecutionContext,
+  McpProgress,
+  McpTransportType,
+} from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
-import type { McpExecutionContext, McpProgress, McpTransportType } from '@btwld/mcp-common';
 
 @Injectable()
 export class McpContextFactory {
@@ -7,7 +12,7 @@ export class McpContextFactory {
     sessionId: string;
     transport: McpTransportType;
     request?: unknown;
-    user?: any;
+    user?: McpAuthenticatedUser;
     progressCallback?: (progress: McpProgress) => Promise<void>;
     signal?: AbortSignal;
   }): McpExecutionContext {

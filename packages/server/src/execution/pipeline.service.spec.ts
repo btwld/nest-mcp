@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import { ExecutionPipelineService } from './pipeline.service';
-import { ToolExecutionError, MCP_OPTIONS } from '@btwld/mcp-common';
+import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { mockMcpContext } from '../testing/mock-context';
-import type { McpModuleOptions, McpExecutionContext } from '@btwld/mcp-common';
+import { ExecutionPipelineService } from './pipeline.service';
 
 describe('ExecutionPipelineService', () => {
   let pipeline: ExecutionPipelineService;
@@ -43,25 +43,38 @@ describe('ExecutionPipelineService', () => {
     };
 
     middlewareService = {
-      executeChain: vi.fn().mockImplementation((_mw: any, _ctx: any, _args: any, handler: () => Promise<unknown>) => handler()),
+      executeChain: vi
+        .fn()
+        .mockImplementation(
+          (_mw: unknown, _ctx: unknown, _args: unknown, handler: () => Promise<unknown>) =>
+            handler(),
+        ),
     };
 
     rateLimiter = { checkLimit: vi.fn().mockResolvedValue(undefined) };
-    circuitBreaker = { execute: vi.fn().mockImplementation((_n: any, _c: any, fn: () => Promise<unknown>) => fn()) };
-    retry = { execute: vi.fn().mockImplementation((_n: any, _c: any, fn: () => Promise<unknown>) => fn()) };
+    circuitBreaker = {
+      execute: vi
+        .fn()
+        .mockImplementation((_n: unknown, _c: unknown, fn: () => Promise<unknown>) => fn()),
+    };
+    retry = {
+      execute: vi
+        .fn()
+        .mockImplementation((_n: unknown, _c: unknown, fn: () => Promise<unknown>) => fn()),
+    };
     metrics = { recordCall: vi.fn() };
 
     options = {} as McpModuleOptions;
 
     pipeline = new ExecutionPipelineService(
-      executor as any,
-      registry as any,
-      authGuard as any,
-      middlewareService as any,
-      rateLimiter as any,
-      circuitBreaker as any,
-      retry as any,
-      metrics as any,
+      executor as unknown as ConstructorParameters<typeof ExecutionPipelineService>[0],
+      registry as unknown as ConstructorParameters<typeof ExecutionPipelineService>[1],
+      authGuard as unknown as ConstructorParameters<typeof ExecutionPipelineService>[2],
+      middlewareService as unknown as ConstructorParameters<typeof ExecutionPipelineService>[3],
+      rateLimiter as unknown as ConstructorParameters<typeof ExecutionPipelineService>[4],
+      circuitBreaker as unknown as ConstructorParameters<typeof ExecutionPipelineService>[5],
+      retry as unknown as ConstructorParameters<typeof ExecutionPipelineService>[6],
+      metrics as unknown as ConstructorParameters<typeof ExecutionPipelineService>[7],
       options,
     );
   });
@@ -120,7 +133,11 @@ describe('ExecutionPipelineService', () => {
 
     it('checks rate limit when rateLimit config is present on tool', async () => {
       const rateLimitConfig = { max: 10, window: '1m' };
-      registry.getTool.mockReturnValue({ name: 'limited', isPublic: true, rateLimit: rateLimitConfig });
+      registry.getTool.mockReturnValue({
+        name: 'limited',
+        isPublic: true,
+        rateLimit: rateLimitConfig,
+      });
 
       await pipeline.callTool('limited', {}, ctx);
 
@@ -185,7 +202,12 @@ describe('ExecutionPipelineService', () => {
     });
 
     it('calls authGuard when resource is found in registry', async () => {
-      registry.getResource.mockReturnValue({ uri: 'file:///x', name: 'x', methodName: 'get', instance: {} });
+      registry.getResource.mockReturnValue({
+        uri: 'file:///x',
+        name: 'x',
+        methodName: 'get',
+        instance: {},
+      });
 
       await pipeline.readResource('file:///x', ctx);
 

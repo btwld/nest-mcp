@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@nestjs/common', () => ({
   Inject: vi.fn().mockReturnValue(() => {}),
 }));
 
-import { getMcpClientToken, InjectMcpClient } from './inject-mcp-client.decorator';
 import { Inject } from '@nestjs/common';
+import { InjectMcpClient, getMcpClientToken } from './inject-mcp-client.decorator';
 
 describe('InjectMcpClient decorator', () => {
   describe('getMcpClientToken', () => {

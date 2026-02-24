@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
 import type { McpExecutionContext, ResourceReadResult } from '@btwld/mcp-common';
-import { McpRegistryService, type RegisteredResource } from '../discovery/registry.service';
+import { Injectable, Logger } from '@nestjs/common';
+import type { McpRegistryService, RegisteredResource } from '../discovery/registry.service';
 
 export interface DynamicResourceConfig {
   uri: string;

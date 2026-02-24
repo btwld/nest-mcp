@@ -6,7 +6,10 @@ describe('RetryService', () => {
 
   beforeEach(() => {
     service = new RetryService();
-    vi.spyOn(RetryService.prototype as any, 'sleep').mockResolvedValue(undefined);
+    vi.spyOn(
+      RetryService.prototype as unknown as Record<string, unknown>,
+      'sleep',
+    ).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -18,7 +21,7 @@ describe('RetryService', () => {
     const result = await service.execute('tool-a', { maxAttempts: 3, backoff: 'fixed' }, fn);
     expect(result).toBe('ok');
     expect(fn).toHaveBeenCalledTimes(1);
-    expect((service as any).sleep).not.toHaveBeenCalled();
+    expect((service as unknown as Record<string, unknown>).sleep).not.toHaveBeenCalled();
   });
 
   it('retries up to maxAttempts and throws last error', async () => {
@@ -31,7 +34,9 @@ describe('RetryService', () => {
 
   it('uses fixed backoff with same delay each time', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
-    const sleepSpy = (service as any).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
 
     await expect(
       service.execute('tool-a', { maxAttempts: 4, backoff: 'fixed', initialDelay: 200 }, fn),
@@ -46,7 +51,9 @@ describe('RetryService', () => {
 
   it('uses linear backoff with initialDelay * attempt', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
-    const sleepSpy = (service as any).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
 
     await expect(
       service.execute('tool-a', { maxAttempts: 4, backoff: 'linear', initialDelay: 100 }, fn),
@@ -63,7 +70,9 @@ describe('RetryService', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // jitter factor = 0.75 + 0.5*0.5 = 1.0
 
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
-    const sleepSpy = (service as any).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
 
     await expect(
       service.execute(
@@ -87,7 +96,9 @@ describe('RetryService', () => {
 
   it('does not sleep after last failed attempt', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
-    const sleepSpy = (service as any).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
 
     await expect(
       service.execute('tool-a', { maxAttempts: 2, backoff: 'fixed', initialDelay: 100 }, fn),

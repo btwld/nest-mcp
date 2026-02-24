@@ -1,6 +1,10 @@
 import type { ZodType } from 'zod';
-import type { RateLimitConfig, RetryConfig, CircuitBreakerConfig } from './mcp-resilience.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
+import type {
+  CircuitBreakerConfig,
+  RateLimitConfig,
+  RetryConfig,
+} from './mcp-resilience.interface';
 
 export interface ToolAnnotations {
   title?: string;
@@ -29,7 +33,7 @@ export interface ToolMetadata {
   isPublic?: boolean;
   requiredScopes?: string[];
   requiredRoles?: string[];
-  guards?: Function[];
+  guards?: Array<abstract new (...args: unknown[]) => unknown>;
   // Resilience
   rateLimit?: RateLimitConfig;
   retry?: RetryConfig;
@@ -38,7 +42,7 @@ export interface ToolMetadata {
   middleware?: McpMiddleware[];
   // Internal
   methodName: string;
-  target: Function;
+  target: abstract new (...args: unknown[]) => unknown;
 }
 
 export interface ToolCallResult {
@@ -47,11 +51,7 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
-export type ToolContent =
-  | TextContent
-  | ImageContent
-  | AudioContent
-  | EmbeddedResource;
+export type ToolContent = TextContent | ImageContent | AudioContent | EmbeddedResource;
 
 export interface TextContent {
   type: 'text';

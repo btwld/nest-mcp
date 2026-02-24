@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { z } from 'zod';
 import { MCP_PROMPT_METADATA } from '@btwld/mcp-common';
+import { z } from 'zod';
 import { Prompt } from './prompt.decorator';
 
 describe('Prompt decorator', () => {
@@ -18,11 +18,7 @@ describe('Prompt decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_PROMPT_METADATA,
-      TestService.prototype,
-      'summarize',
-    );
+    const metadata = Reflect.getMetadata(MCP_PROMPT_METADATA, TestService.prototype, 'summarize');
 
     expect(metadata).toBeDefined();
     expect(metadata.name).toBe('summarize');
@@ -40,11 +36,7 @@ describe('Prompt decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_PROMPT_METADATA,
-      TestService.prototype,
-      'greet',
-    );
+    const metadata = Reflect.getMetadata(MCP_PROMPT_METADATA, TestService.prototype, 'greet');
 
     expect(metadata.name).toBe('greet');
   });
@@ -57,11 +49,7 @@ describe('Prompt decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_PROMPT_METADATA,
-      TestService.prototype,
-      'simple',
-    );
+    const metadata = Reflect.getMetadata(MCP_PROMPT_METADATA, TestService.prototype, 'simple');
 
     expect(metadata.name).toBe('simple');
     expect(metadata.description).toBe('No params prompt');

@@ -1,5 +1,5 @@
+import type { McpExecutionContext, McpMiddleware } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
-import type { McpMiddleware, McpExecutionContext } from '@btwld/mcp-common';
 
 @Injectable()
 export class MiddlewareService {

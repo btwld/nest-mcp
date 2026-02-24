@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import { UpstreamManagerService } from './upstream-manager.service';
+import type { UpstreamManagerService } from './upstream-manager.service';
 import type { UpstreamConfig } from './upstream.interface';
 
 @Injectable()

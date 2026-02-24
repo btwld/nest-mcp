@@ -2,13 +2,13 @@ export class MockMcpClient {
   readonly name: string;
   private _connected = false;
 
-  private _callToolResult: any = { content: [] };
-  private _readResourceResult: any = { contents: [] };
-  private _listToolsResult: any = { tools: [] };
-  private _listResourcesResult: any = { resources: [] };
-  private _getPromptResult: any = { messages: [] };
-  private _listPromptsResult: any = { prompts: [] };
-  private _pingResult: any = {};
+  private _callToolResult: unknown = { content: [] };
+  private _readResourceResult: unknown = { contents: [] };
+  private _listToolsResult: unknown = { tools: [] };
+  private _listResourcesResult: unknown = { resources: [] };
+  private _getPromptResult: unknown = { messages: [] };
+  private _listPromptsResult: unknown = { prompts: [] };
+  private _pingResult: unknown = {};
 
   constructor(name = 'mock') {
     this.name = name;
@@ -26,31 +26,31 @@ export class MockMcpClient {
     return this._connected;
   }
 
-  async callTool(_params: any, _options?: any) {
+  async callTool(_params: unknown, _options?: unknown) {
     return this._callToolResult;
   }
 
-  async readResource(_params: any, _options?: any) {
+  async readResource(_params: unknown, _options?: unknown) {
     return this._readResourceResult;
   }
 
-  async listTools(_params?: any, _options?: any) {
+  async listTools(_params?: unknown, _options?: unknown) {
     return this._listToolsResult;
   }
 
-  async listResources(_params?: any, _options?: any) {
+  async listResources(_params?: unknown, _options?: unknown) {
     return this._listResourcesResult;
   }
 
-  async getPrompt(_params: any, _options?: any) {
+  async getPrompt(_params: unknown, _options?: unknown) {
     return this._getPromptResult;
   }
 
-  async listPrompts(_params?: any, _options?: any) {
+  async listPrompts(_params?: unknown, _options?: unknown) {
     return this._listPromptsResult;
   }
 
-  async ping(_options?: any) {
+  async ping(_options?: unknown) {
     return this._pingResult;
   }
 
@@ -63,36 +63,36 @@ export class MockMcpClient {
   }
 
   getClient() {
-    return null as any;
+    return null as unknown;
   }
 
   // Helpers for setting mock return values
-  setCallToolResult(result: any): this {
+  setCallToolResult(result: unknown): this {
     this._callToolResult = result;
     return this;
   }
 
-  setReadResourceResult(result: any): this {
+  setReadResourceResult(result: unknown): this {
     this._readResourceResult = result;
     return this;
   }
 
-  setListToolsResult(result: any): this {
+  setListToolsResult(result: unknown): this {
     this._listToolsResult = result;
     return this;
   }
 
-  setListResourcesResult(result: any): this {
+  setListResourcesResult(result: unknown): this {
     this._listResourcesResult = result;
     return this;
   }
 
-  setGetPromptResult(result: any): this {
+  setGetPromptResult(result: unknown): this {
     this._getPromptResult = result;
     return this;
   }
 
-  setListPromptsResult(result: any): this {
+  setListPromptsResult(result: unknown): this {
     this._listPromptsResult = result;
     return this;
   }

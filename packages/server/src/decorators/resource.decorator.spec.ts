@@ -16,11 +16,7 @@ describe('Resource decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_RESOURCE_METADATA,
-      TestService.prototype,
-      'getConfig',
-    );
+    const metadata = Reflect.getMetadata(MCP_RESOURCE_METADATA, TestService.prototype, 'getConfig');
 
     expect(metadata).toBeDefined();
     expect(metadata.uri).toBe('file:///config.json');
@@ -39,11 +35,7 @@ describe('Resource decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_RESOURCE_METADATA,
-      TestService.prototype,
-      'readData',
-    );
+    const metadata = Reflect.getMetadata(MCP_RESOURCE_METADATA, TestService.prototype, 'readData');
 
     expect(metadata.name).toBe('readData');
     expect(metadata.uri).toBe('file:///data.txt');

@@ -1,24 +1,25 @@
+import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
 import {
-  DynamicModule,
-  Module,
+  type DynamicModule,
   Logger,
+  Module,
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
+import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 import type {
-  McpClientModuleOptions,
   McpClientModuleAsyncOptions,
+  McpClientModuleOptions,
 } from './interfaces/client-options.interface';
 import { McpClient } from './mcp-client.service';
-import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 
 @Module({})
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes for DI
 export class McpClientModule {
   private static readonly logger = new Logger('McpClientModule');
 
   static forRoot(options: McpClientModuleOptions): DynamicModule {
-    const connectionProviders = this.createConnectionProviders(options);
+    const connectionProviders = McpClientModule.createConnectionProviders(options);
 
     const connectionsAggregateProvider = {
       provide: 'MCP_CLIENT_CONNECTIONS',
@@ -100,9 +101,9 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
     for (const client of this.clients) {
       try {
         await client.connect();
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.error(
-          `Failed to connect client "${client.name}": ${err.message}`,
+          `Failed to connect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
@@ -112,9 +113,9 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
     for (const client of this.clients) {
       try {
         await client.disconnect();
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.error(
-          `Failed to disconnect client "${client.name}": ${err.message}`,
+          `Failed to disconnect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }

@@ -1,7 +1,7 @@
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
 interface ManagedUpstream {

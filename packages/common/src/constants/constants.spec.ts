@@ -1,28 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  MCP_TOOL_METADATA,
-  MCP_RESOURCE_METADATA,
-  MCP_RESOURCE_TEMPLATE_METADATA,
-  MCP_PROMPT_METADATA,
-} from './metadata-keys';
-import {
-  MCP_OPTIONS,
-  MCP_SERVER_INSTANCE,
-  MCP_REGISTRY,
-  MCP_TRANSPORT,
-} from './injection-tokens';
-import {
-  JSON_RPC_PARSE_ERROR,
+  JSON_RPC_INTERNAL_ERROR,
+  JSON_RPC_INVALID_PARAMS,
   JSON_RPC_INVALID_REQUEST,
   JSON_RPC_METHOD_NOT_FOUND,
-  JSON_RPC_INVALID_PARAMS,
-  JSON_RPC_INTERNAL_ERROR,
-  MCP_TOOL_NOT_FOUND,
-  MCP_RESOURCE_NOT_FOUND,
+  JSON_RPC_PARSE_ERROR,
   MCP_AUTHENTICATION_ERROR,
   MCP_AUTHORIZATION_ERROR,
+  MCP_RESOURCE_NOT_FOUND,
+  MCP_TOOL_NOT_FOUND,
   MCP_TRANSPORT_ERROR,
 } from './error-codes';
+import { MCP_OPTIONS, MCP_REGISTRY, MCP_SERVER_INSTANCE, MCP_TRANSPORT } from './injection-tokens';
+import {
+  MCP_PROMPT_METADATA,
+  MCP_RESOURCE_METADATA,
+  MCP_RESOURCE_TEMPLATE_METADATA,
+  MCP_TOOL_METADATA,
+} from './metadata-keys';
 import { JSONRPC_VERSION, LATEST_PROTOCOL_VERSION, MCP_METHODS } from './protocol';
 
 describe('metadata keys', () => {
@@ -43,12 +38,7 @@ describe('metadata keys', () => {
 
 describe('injection tokens', () => {
   it('should be unique symbols', () => {
-    const tokens = [
-      MCP_OPTIONS,
-      MCP_SERVER_INSTANCE,
-      MCP_REGISTRY,
-      MCP_TRANSPORT,
-    ];
+    const tokens = [MCP_OPTIONS, MCP_SERVER_INSTANCE, MCP_REGISTRY, MCP_TRANSPORT];
     const unique = new Set(tokens);
     expect(unique.size).toBe(tokens.length);
     for (const token of tokens) {

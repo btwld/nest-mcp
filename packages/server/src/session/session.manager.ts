@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
-  DEFAULT_SESSION_TIMEOUT,
-  DEFAULT_MAX_CONCURRENT_SESSIONS,
   DEFAULT_CLEANUP_INTERVAL,
+  DEFAULT_MAX_CONCURRENT_SESSIONS,
+  DEFAULT_SESSION_TIMEOUT,
 } from '../constants/module.constants';
 
 export interface McpSession {

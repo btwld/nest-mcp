@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  OAuthClient,
-  AuthorizationCode,
-} from '../interfaces/oauth-types.interface';
+import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-types.interface';
 import type { IOAuthStore } from './oauth-store.interface';
 
 @Injectable()

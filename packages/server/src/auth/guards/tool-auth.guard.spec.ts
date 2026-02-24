@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import { ToolAuthGuardService } from './tool-auth.guard';
 import { AuthorizationError } from '@btwld/mcp-common';
 import type { McpGuardContext } from '@btwld/mcp-common';
 import type { RegisteredTool } from '../../discovery/registry.service';
+import { ToolAuthGuardService } from './tool-auth.guard';
 
 describe('ToolAuthGuardService', () => {
   let guard: ToolAuthGuardService;
@@ -93,7 +93,9 @@ describe('ToolAuthGuardService', () => {
       const context = makeContext({ user: { roles: ['viewer'] } });
 
       await expect(guard.checkAuthorization(tool, context)).rejects.toThrow(AuthorizationError);
-      await expect(guard.checkAuthorization(tool, context)).rejects.toThrow('requires one of roles');
+      await expect(guard.checkAuthorization(tool, context)).rejects.toThrow(
+        'requires one of roles',
+      );
     });
 
     it('throws when user has no roles', async () => {
@@ -113,7 +115,9 @@ describe('ToolAuthGuardService', () => {
         canActivate = canActivate;
       }
 
-      const tool = makeTool({ guards: [AllowGuard as any] });
+      const tool = makeTool({
+        guards: [AllowGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
       await expect(guard.checkAuthorization(tool, makeContext())).resolves.toBeUndefined();
       expect(canActivate).toHaveBeenCalled();
     });
@@ -125,9 +129,15 @@ describe('ToolAuthGuardService', () => {
         }
       }
 
-      const tool = makeTool({ guards: [DenyGuard as any] });
-      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow(AuthorizationError);
-      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow('authorization denied by guard');
+      const tool = makeTool({
+        guards: [DenyGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
+      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow(
+        AuthorizationError,
+      );
+      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow(
+        'authorization denied by guard',
+      );
     });
 
     it('handles async guards', async () => {
@@ -137,7 +147,9 @@ describe('ToolAuthGuardService', () => {
         }
       }
 
-      const tool = makeTool({ guards: [AsyncGuard as any] });
+      const tool = makeTool({
+        guards: [AsyncGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
       await expect(guard.checkAuthorization(tool, makeContext())).resolves.toBeUndefined();
     });
 
@@ -152,8 +164,15 @@ describe('ToolAuthGuardService', () => {
         canActivate = secondGuard;
       }
 
-      const tool = makeTool({ guards: [DenyGuard as any, SecondGuard as any] });
-      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow(AuthorizationError);
+      const tool = makeTool({
+        guards: [
+          DenyGuard as unknown as abstract new (...a: unknown[]) => unknown,
+          SecondGuard as unknown as abstract new (...a: unknown[]) => unknown,
+        ],
+      });
+      await expect(guard.checkAuthorization(tool, makeContext())).rejects.toThrow(
+        AuthorizationError,
+      );
       expect(secondGuard).not.toHaveBeenCalled();
     });
 
@@ -164,7 +183,9 @@ describe('ToolAuthGuardService', () => {
       }
 
       const context = makeContext({ user: { id: 'user-1' }, toolName: 'test-tool' });
-      const tool = makeTool({ guards: [InspectGuard as any] });
+      const tool = makeTool({
+        guards: [InspectGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
 
       await guard.checkAuthorization(tool, context);
 

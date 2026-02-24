@@ -1,12 +1,12 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { DiscoveryService, ModulesContainer } from '@nestjs/core';
-import { McpRegistryService } from './registry.service';
 import {
-  MCP_TOOL_METADATA,
+  MCP_PROMPT_METADATA,
   MCP_RESOURCE_METADATA,
   MCP_RESOURCE_TEMPLATE_METADATA,
-  MCP_PROMPT_METADATA,
+  MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { DiscoveryService, type ModulesContainer } from '@nestjs/core';
+import type { McpRegistryService } from './registry.service';
 
 @Injectable()
 export class McpScannerService implements OnModuleInit {
@@ -41,7 +41,7 @@ export class McpScannerService implements OnModuleInit {
     );
   }
 
-  private hasAnyMcpDecorator(instance: any): boolean {
+  private hasAnyMcpDecorator(instance: unknown): boolean {
     const prototype = Object.getPrototypeOf(instance);
     const methodNames = Object.getOwnPropertyNames(prototype).filter(
       (name) => name !== 'constructor',

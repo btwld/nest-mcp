@@ -15,13 +15,10 @@ export function parseUriTemplate(template: string): {
   paramNames: string[];
 } {
   const paramNames: string[] = [];
-  const regexStr = template.replace(
-    /\{([^}]+)\}/g,
-    (_match, paramName: string) => {
-      paramNames.push(paramName);
-      return '([^/]+)';
-    },
-  );
+  const regexStr = template.replace(/\{([^}]+)\}/g, (_match, paramName: string) => {
+    paramNames.push(paramName);
+    return '([^/]+)';
+  });
   return {
     regex: new RegExp(`^${regexStr}$`),
     paramNames,
@@ -31,10 +28,7 @@ export function parseUriTemplate(template: string): {
 /**
  * Match a URI against a template and extract parameters.
  */
-export function matchUriTemplate(
-  template: string,
-  uri: string,
-): UriTemplateMatch | null {
+export function matchUriTemplate(template: string, uri: string): UriTemplateMatch | null {
   const { regex, paramNames } = parseUriTemplate(template);
   const match = uri.match(regex);
 
@@ -51,10 +45,7 @@ export function matchUriTemplate(
 /**
  * Expand a URI template with given parameters.
  */
-export function expandUriTemplate(
-  template: string,
-  params: Record<string, string>,
-): string {
+export function expandUriTemplate(template: string, params: Record<string, string>): string {
   return template.replace(/\{([^}]+)\}/g, (_match, paramName: string) => {
     const value = params[paramName];
     if (value === undefined) {

@@ -11,7 +11,7 @@ export interface ResourceMetadata {
   description?: string;
   mimeType?: string;
   methodName: string;
-  target: Function;
+  target: abstract new (...args: unknown[]) => unknown;
 }
 
 export interface ResourceTemplateOptions {
@@ -27,7 +27,7 @@ export interface ResourceTemplateMetadata {
   description?: string;
   mimeType?: string;
   methodName: string;
-  target: Function;
+  target: abstract new (...args: unknown[]) => unknown;
 }
 
 export interface ResourceContent {

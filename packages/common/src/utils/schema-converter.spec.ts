@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { zodToJsonSchema, extractZodDescriptions } from './schema-converter';
+import { extractZodDescriptions, zodToJsonSchema } from './schema-converter';
 
 describe('zodToJsonSchema', () => {
   it('should convert ZodString to JSON Schema', () => {
@@ -122,8 +122,10 @@ describe('zodToJsonSchema', () => {
     const schema = z.object({
       name: z.string().describe('The user name'),
     });
-    const result = zodToJsonSchema(schema);
-    expect((result as any).properties.name).toEqual({
+    const result = zodToJsonSchema(schema) as {
+      properties: Record<string, unknown>;
+    };
+    expect(result.properties.name).toEqual({
       type: 'string',
       description: 'The user name',
     });
@@ -209,8 +211,6 @@ describe('extractZodDescriptions', () => {
       role: z.string().default('user'),
     });
     const result = extractZodDescriptions(schema);
-    expect(result).toEqual([
-      { name: 'role', description: undefined, required: false },
-    ]);
+    expect(result).toEqual([{ name: 'role', description: undefined, required: false }]);
   });
 });

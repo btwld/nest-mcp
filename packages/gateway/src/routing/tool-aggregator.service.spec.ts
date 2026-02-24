@@ -1,6 +1,6 @@
-import { ToolAggregatorService } from './tool-aggregator.service';
 import type { UpstreamManagerService } from '../upstream/upstream-manager.service';
 import type { RouterService } from './router.service';
+import { ToolAggregatorService } from './tool-aggregator.service';
 
 describe('ToolAggregatorService', () => {
   let service: ToolAggregatorService;

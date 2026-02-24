@@ -1,14 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@nestjs/common', () => ({
   SetMetadata: vi.fn().mockReturnValue(() => {}),
 }));
 
-import {
-  MCP_NOTIFICATION_METADATA,
-  OnMcpNotification,
-} from './on-notification.decorator';
 import { SetMetadata } from '@nestjs/common';
+import { MCP_NOTIFICATION_METADATA, OnMcpNotification } from './on-notification.decorator';
 
 describe('OnMcpNotification decorator', () => {
   it('should export MCP_NOTIFICATION_METADATA as a Symbol', () => {

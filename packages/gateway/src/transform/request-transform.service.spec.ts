@@ -31,8 +31,8 @@ describe('RequestTransformService', () => {
     });
 
     it('should chain multiple transforms in order', async () => {
-      service.register((req) => ({ ...req, toolName: req.toolName + '_1' }));
-      service.register((req) => ({ ...req, toolName: req.toolName + '_2' }));
+      service.register((req) => ({ ...req, toolName: `${req.toolName}_1` }));
+      service.register((req) => ({ ...req, toolName: `${req.toolName}_2` }));
 
       const result = await service.apply(baseRequest);
 
@@ -41,7 +41,7 @@ describe('RequestTransformService', () => {
 
     it('should support async transforms', async () => {
       service.register(async (req) => {
-        return { ...req, toolName: 'async_' + req.toolName };
+        return { ...req, toolName: `async_${req.toolName}` };
       });
 
       const result = await service.apply(baseRequest);

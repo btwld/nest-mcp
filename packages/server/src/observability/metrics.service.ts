@@ -70,6 +70,6 @@ export class MetricsService {
       lines.push(`mcp_tool_duration_ms_avg{tool="${m.name}"} ${m.avgDurationMs.toFixed(2)}`);
     }
 
-    return lines.join('\n') + '\n';
+    return `${lines.join('\n')}\n`;
   }
 }

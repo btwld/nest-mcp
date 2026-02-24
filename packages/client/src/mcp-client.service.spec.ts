@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   const MockClient = vi.fn().mockImplementation(() => ({
@@ -24,10 +24,10 @@ vi.mock('./transport/client-transport.factory', () => ({
   }),
 }));
 
-import { McpClient } from './mcp-client.service';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { createClientTransport } from './transport/client-transport.factory';
 import type { McpClientConnection } from './interfaces/client-options.interface';
+import { McpClient } from './mcp-client.service';
+import { createClientTransport } from './transport/client-transport.factory';
 
 const MockedClient = vi.mocked(Client);
 const mockedCreateTransport = vi.mocked(createClientTransport);
@@ -53,7 +53,7 @@ describe('McpClient', () => {
       onclose: null,
       onerror: null,
       close: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    } as unknown as ReturnType<typeof createClientTransport>);
 
     connection = createConnection();
     mcpClient = new McpClient('test-server', connection);
@@ -237,18 +237,21 @@ describe('McpClient', () => {
       await mcpClient.connect();
 
       // Make all future client.connect calls fail
-      MockedClient.mockImplementation(() => ({
-        connect: vi.fn().mockRejectedValue(new Error('fail')),
-        callTool: vi.fn(),
-        readResource: vi.fn(),
-        listTools: vi.fn(),
-        listResources: vi.fn(),
-        getPrompt: vi.fn(),
-        listPrompts: vi.fn(),
-        ping: vi.fn(),
-        getServerCapabilities: vi.fn(),
-        getServerVersion: vi.fn(),
-      } as any));
+      MockedClient.mockImplementation(
+        () =>
+          ({
+            connect: vi.fn().mockRejectedValue(new Error('fail')),
+            callTool: vi.fn(),
+            readResource: vi.fn(),
+            listTools: vi.fn(),
+            listResources: vi.fn(),
+            getPrompt: vi.fn(),
+            listPrompts: vi.fn(),
+            ping: vi.fn(),
+            getServerCapabilities: vi.fn(),
+            getServerVersion: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
 
       // Trigger disconnect
       const transport = mockedCreateTransport.mock.results[0].value;

@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
 import {
-  McpError,
-  MCP_CIRCUIT_OPEN,
-  CircuitBreakerState,
   type CircuitBreakerConfig,
+  CircuitBreakerState,
+  MCP_CIRCUIT_OPEN,
+  McpError,
 } from '@btwld/mcp-common';
+import { Injectable, Logger } from '@nestjs/common';
 
 interface CircuitState {
   state: CircuitBreakerState;
@@ -38,10 +38,7 @@ export class CircuitBreakerService {
         circuit.successes = 0;
         this.logger.log(`Circuit ${toolName}: OPEN → HALF_OPEN`);
       } else {
-        throw new McpError(
-          `Circuit breaker is OPEN for '${toolName}'`,
-          MCP_CIRCUIT_OPEN,
-        );
+        throw new McpError(`Circuit breaker is OPEN for '${toolName}'`, MCP_CIRCUIT_OPEN);
       }
     }
 
@@ -107,7 +104,9 @@ export class CircuitBreakerService {
     ) {
       circuit.state = CircuitBreakerState.OPEN;
       circuit.nextRetryTime = Date.now() + halfOpenTimeout;
-      this.logger.warn(`Circuit ${toolName}: CLOSED → OPEN (${circuit.failures}/${circuit.totalRequests} failures)`);
+      this.logger.warn(
+        `Circuit ${toolName}: CLOSED → OPEN (${circuit.failures}/${circuit.totalRequests} failures)`,
+      );
     }
   }
 

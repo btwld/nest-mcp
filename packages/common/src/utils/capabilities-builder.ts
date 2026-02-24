@@ -1,5 +1,5 @@
-import type { ServerCapabilities } from '../types/capabilities.types';
 import type { McpModuleOptions } from '../interfaces/mcp-options.interface';
+import type { ServerCapabilities } from '../types/capabilities.types';
 
 /**
  * Build server capabilities from module options and registered handlers.

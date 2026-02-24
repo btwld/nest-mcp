@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { McpClientHealthIndicator } from './mcp-client.health';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { McpClient } from '../mcp-client.service';
 import { MockMcpClient } from '../testing/mock-client';
+import { McpClientHealthIndicator } from './mcp-client.health';
 
 describe('McpClientHealthIndicator', () => {
   let healthIndicator: McpClientHealthIndicator;
@@ -12,7 +13,7 @@ describe('McpClientHealthIndicator', () => {
 
   describe('check()', () => {
     it('should return "down" when client is not connected', async () => {
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.status).toBe('down');
@@ -22,7 +23,7 @@ describe('McpClientHealthIndicator', () => {
 
     it('should return "up" when client is connected and ping succeeds', async () => {
       await mockClient.connect();
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.status).toBe('up');
@@ -35,7 +36,7 @@ describe('McpClientHealthIndicator', () => {
       mockClient.ping = async () => {
         throw new Error('ping timeout');
       };
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.status).toBe('down');
@@ -46,8 +47,8 @@ describe('McpClientHealthIndicator', () => {
     it('should include serverVersion when available', async () => {
       await mockClient.connect();
       mockClient.getServerVersion = () =>
-        ({ name: 'my-server', version: '2.0.0' }) as any;
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+        ({ name: 'my-server', version: '2.0.0' }) as unknown as undefined;
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.connections[0].serverVersion).toEqual({
@@ -58,7 +59,7 @@ describe('McpClientHealthIndicator', () => {
 
     it('should not include serverVersion when getServerVersion returns undefined', async () => {
       await mockClient.connect();
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.connections[0].serverVersion).toBeUndefined();
@@ -69,7 +70,10 @@ describe('McpClientHealthIndicator', () => {
       const client2 = new MockMcpClient('server-b');
       await client1.connect();
 
-      healthIndicator = new McpClientHealthIndicator([client1 as any, client2 as any]);
+      healthIndicator = new McpClientHealthIndicator([
+        client1 as unknown as McpClient,
+        client2 as unknown as McpClient,
+      ]);
       const result = await healthIndicator.check();
 
       expect(result.status).toBe('down'); // Not all connected
@@ -86,7 +90,10 @@ describe('McpClientHealthIndicator', () => {
       await client1.connect();
       await client2.connect();
 
-      healthIndicator = new McpClientHealthIndicator([client1 as any, client2 as any]);
+      healthIndicator = new McpClientHealthIndicator([
+        client1 as unknown as McpClient,
+        client2 as unknown as McpClient,
+      ]);
       const result = await healthIndicator.check();
 
       expect(result.status).toBe('up');
@@ -101,7 +108,7 @@ describe('McpClientHealthIndicator', () => {
     });
 
     it('should include client name in the connection status', async () => {
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       const result = await healthIndicator.check();
 
       expect(result.connections[0].name).toBe('test-server');
@@ -111,7 +118,7 @@ describe('McpClientHealthIndicator', () => {
       const pingFn = vi.fn();
       mockClient.ping = pingFn;
 
-      healthIndicator = new McpClientHealthIndicator([mockClient as any]);
+      healthIndicator = new McpClientHealthIndicator([mockClient as unknown as McpClient]);
       await healthIndicator.check();
 
       expect(pingFn).not.toHaveBeenCalled();

@@ -1,17 +1,17 @@
-import type { ZodObject } from 'zod';
+import type { ZodObject, ZodRawShape } from 'zod';
 
 export interface PromptOptions {
   name?: string;
   description: string;
-  parameters?: ZodObject<any>;
+  parameters?: ZodObject<ZodRawShape>;
 }
 
 export interface PromptMetadata {
   name: string;
   description: string;
-  parameters?: ZodObject<any>;
+  parameters?: ZodObject<ZodRawShape>;
   methodName: string;
-  target: Function;
+  target: abstract new (...args: unknown[]) => unknown;
 }
 
 export interface PromptArgument {

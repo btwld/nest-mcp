@@ -1,26 +1,33 @@
-import { DynamicModule, Module, Logger, type OnApplicationBootstrap, type Provider, type Type } from '@nestjs/common';
-import type { McpModuleOptions, McpModuleAsyncOptions } from '@btwld/mcp-common';
+import type { McpModuleAsyncOptions, McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import {
+  type DynamicModule,
+  Logger,
+  Module,
+  type OnApplicationBootstrap,
+  type Provider,
+  type Type,
+} from '@nestjs/common';
 
 // Discovery
 import { McpRegistryService } from './discovery/registry.service';
 import { McpScannerService } from './discovery/scanner.service';
 
+import { McpContextFactory } from './execution/context.factory';
 // Execution
 import { McpExecutorService } from './execution/executor.service';
 import { ExecutionPipelineService } from './execution/pipeline.service';
-import { McpContextFactory } from './execution/context.factory';
 
+import { createSseController } from './transport/sse/sse.controller.factory';
+import { SseService } from './transport/sse/sse.service';
+import { StdioService } from './transport/stdio/stdio.service';
+import { createStreamableHttpController } from './transport/streamable-http/streamable.controller.factory';
 // Transport
 import { StreamableHttpService } from './transport/streamable-http/streamable.service';
-import { createStreamableHttpController } from './transport/streamable-http/streamable.controller.factory';
-import { SseService } from './transport/sse/sse.service';
-import { createSseController } from './transport/sse/sse.controller.factory';
-import { StdioService } from './transport/stdio/stdio.service';
 
+import { CircuitBreakerService } from './resilience/circuit-breaker.service';
 // Resilience
 import { RateLimiterService } from './resilience/rate-limiter.service';
-import { CircuitBreakerService } from './resilience/circuit-breaker.service';
 import { RetryService } from './resilience/retry.service';
 
 // Middleware
@@ -32,10 +39,10 @@ import { ToolAuthGuardService } from './auth/guards/tool-auth.guard';
 // Session
 import { SessionManager } from './session/session.manager';
 
+import { McpPromptBuilder } from './dynamic/prompt-builder.service';
+import { McpResourceBuilder } from './dynamic/resource-builder.service';
 // Dynamic
 import { McpToolBuilder } from './dynamic/tool-builder.service';
-import { McpResourceBuilder } from './dynamic/resource-builder.service';
-import { McpPromptBuilder } from './dynamic/prompt-builder.service';
 
 // Observability
 import { MetricsService } from './observability/metrics.service';
@@ -50,6 +57,7 @@ import {
 } from './constants/module.constants';
 
 @Module({})
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes
 export class McpModule {
   private static readonly logger = new Logger('McpModule');
 
@@ -76,16 +84,14 @@ export class McpModule {
 
     // Streamable HTTP transport
     if (options.transport === McpTransportType.STREAMABLE_HTTP) {
-      const endpoint =
-        options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+      const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
       controllers.push(createStreamableHttpController(endpoint));
     }
 
     // SSE transport
     if (options.transport === McpTransportType.SSE) {
-      const sseEndpoint =
-        options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+      const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
       const messagesEndpoint =
         options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
       providers.push(SseService);
@@ -143,16 +149,14 @@ export class McpModule {
 
     // Streamable HTTP transport
     if (options.transport === McpTransportType.STREAMABLE_HTTP) {
-      const endpoint =
-        options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+      const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
       controllers.push(createStreamableHttpController(endpoint));
     }
 
     // SSE transport
     if (options.transport === McpTransportType.SSE) {
-      const sseEndpoint =
-        options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+      const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
       const messagesEndpoint =
         options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
       providers.push(SseService);

@@ -1,43 +1,43 @@
-import { Injectable, Logger } from '@nestjs/common';
 import type {
-  ToolMetadata,
-  ResourceMetadata,
-  ResourceTemplateMetadata,
-  PromptMetadata,
-  RateLimitConfig,
-  RetryConfig,
   CircuitBreakerConfig,
   McpMiddleware,
+  PromptMetadata,
+  RateLimitConfig,
+  ResourceMetadata,
+  ResourceTemplateMetadata,
+  RetryConfig,
+  ToolMetadata,
 } from '@btwld/mcp-common';
 import {
-  MCP_TOOL_METADATA,
-  MCP_RESOURCE_METADATA,
-  MCP_RESOURCE_TEMPLATE_METADATA,
-  MCP_PROMPT_METADATA,
-  MCP_PUBLIC_METADATA,
-  MCP_SCOPES_METADATA,
-  MCP_ROLES_METADATA,
+  MCP_CIRCUIT_BREAKER_METADATA,
   MCP_GUARDS_METADATA,
   MCP_MIDDLEWARE_METADATA,
+  MCP_PROMPT_METADATA,
+  MCP_PUBLIC_METADATA,
   MCP_RATE_LIMIT_METADATA,
+  MCP_RESOURCE_METADATA,
+  MCP_RESOURCE_TEMPLATE_METADATA,
   MCP_RETRY_METADATA,
-  MCP_CIRCUIT_BREAKER_METADATA,
+  MCP_ROLES_METADATA,
+  MCP_SCOPES_METADATA,
+  MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
+import { Injectable, Logger } from '@nestjs/common';
 
 export interface RegisteredTool extends ToolMetadata {
-  instance: any;
+  instance: Record<string, unknown>;
 }
 
 export interface RegisteredResource extends ResourceMetadata {
-  instance: any;
+  instance: Record<string, unknown>;
 }
 
 export interface RegisteredResourceTemplate extends ResourceTemplateMetadata {
-  instance: any;
+  instance: Record<string, unknown>;
 }
 
 export interface RegisteredPrompt extends PromptMetadata {
-  instance: any;
+  instance: Record<string, unknown>;
 }
 
 @Injectable()
@@ -68,8 +68,8 @@ export class McpRegistryService {
   /**
    * Scan a provider instance for decorated methods and register them.
    */
-  registerProvider(instance: any): void {
-    if (!instance || !instance.constructor) return;
+  registerProvider(instance: unknown): void {
+    if (!instance || !(instance as Record<string, unknown>).constructor) return;
 
     const prototype = Object.getPrototypeOf(instance);
     const methodNames = Object.getOwnPropertyNames(prototype).filter(
@@ -77,14 +77,18 @@ export class McpRegistryService {
     );
 
     for (const methodName of methodNames) {
-      this.scanToolMetadata(instance, prototype, methodName);
-      this.scanResourceMetadata(instance, prototype, methodName);
-      this.scanResourceTemplateMetadata(instance, prototype, methodName);
-      this.scanPromptMetadata(instance, prototype, methodName);
+      this.scanToolMetadata(instance as Record<string, unknown>, prototype, methodName);
+      this.scanResourceMetadata(instance as Record<string, unknown>, prototype, methodName);
+      this.scanResourceTemplateMetadata(instance as Record<string, unknown>, prototype, methodName);
+      this.scanPromptMetadata(instance as Record<string, unknown>, prototype, methodName);
     }
   }
 
-  private scanToolMetadata(instance: any, prototype: any, methodName: string): void {
+  private scanToolMetadata(
+    instance: Record<string, unknown>,
+    prototype: object,
+    methodName: string,
+  ): void {
     const metadata: ToolMetadata | undefined = Reflect.getMetadata(
       MCP_TOOL_METADATA,
       prototype,
@@ -114,7 +118,11 @@ export class McpRegistryService {
     this.logger.log(`Registered tool: ${enriched.name}`);
   }
 
-  private scanResourceMetadata(instance: any, prototype: any, methodName: string): void {
+  private scanResourceMetadata(
+    instance: Record<string, unknown>,
+    prototype: object,
+    methodName: string,
+  ): void {
     const metadata: ResourceMetadata | undefined = Reflect.getMetadata(
       MCP_RESOURCE_METADATA,
       prototype,
@@ -127,7 +135,11 @@ export class McpRegistryService {
     this.logger.log(`Registered resource: ${registered.uri}`);
   }
 
-  private scanResourceTemplateMetadata(instance: any, prototype: any, methodName: string): void {
+  private scanResourceTemplateMetadata(
+    instance: Record<string, unknown>,
+    prototype: object,
+    methodName: string,
+  ): void {
     const metadata: ResourceTemplateMetadata | undefined = Reflect.getMetadata(
       MCP_RESOURCE_TEMPLATE_METADATA,
       prototype,
@@ -140,7 +152,11 @@ export class McpRegistryService {
     this.logger.log(`Registered resource template: ${registered.uriTemplate}`);
   }
 
-  private scanPromptMetadata(instance: any, prototype: any, methodName: string): void {
+  private scanPromptMetadata(
+    instance: Record<string, unknown>,
+    prototype: object,
+    methodName: string,
+  ): void {
     const metadata: PromptMetadata | undefined = Reflect.getMetadata(
       MCP_PROMPT_METADATA,
       prototype,

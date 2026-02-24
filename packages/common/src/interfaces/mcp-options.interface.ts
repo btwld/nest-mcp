@@ -1,6 +1,10 @@
-import type { McpTransportType, TransportOptions } from './mcp-transport.interface';
-import type { RateLimitConfig, RetryConfig, CircuitBreakerConfig } from './mcp-resilience.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
+import type {
+  CircuitBreakerConfig,
+  RateLimitConfig,
+  RetryConfig,
+} from './mcp-resilience.interface';
+import type { McpTransportType, TransportOptions } from './mcp-transport.interface';
 
 export interface McpModuleOptions {
   name: string;
@@ -12,7 +16,7 @@ export interface McpModuleOptions {
   transportOptions?: TransportOptions;
 
   // Auth
-  guards?: Function[];
+  guards?: Array<abstract new (...args: unknown[]) => unknown>;
   allowUnauthenticatedAccess?: boolean;
 
   // Resilience (global defaults)
@@ -50,9 +54,9 @@ export interface McpModuleOptions {
 }
 
 export interface McpModuleAsyncOptions {
-  imports?: any[];
+  imports?: unknown[];
   transport: McpTransportType;
   transportOptions?: TransportOptions;
-  useFactory: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;
-  inject?: any[];
+  useFactory: (...args: unknown[]) => McpModuleOptions | Promise<McpModuleOptions>;
+  inject?: unknown[];
 }

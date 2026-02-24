@@ -40,9 +40,9 @@ export class McpClientHealthIndicator {
               version: version.version,
             };
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           status.connected = false;
-          status.error = err.message;
+          status.error = err instanceof Error ? err.message : String(err);
         }
       }
 

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import type { McpGuardContext } from '@btwld/mcp-common';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
@@ -10,10 +10,12 @@ describe('JwtAuthGuard', () => {
     jwtService = {
       validateToken: vi.fn(),
     };
-    guard = new JwtAuthGuard(jwtService as any);
+    guard = new JwtAuthGuard(
+      jwtService as unknown as ConstructorParameters<typeof JwtAuthGuard>[0],
+    );
   });
 
-  function makeContext(request?: any): McpGuardContext {
+  function makeContext(request?: unknown): McpGuardContext {
     return {
       sessionId: 'test-session',
       metadata: {},

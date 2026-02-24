@@ -1,5 +1,5 @@
 export interface McpAuthConfig {
-  guards?: Function[];
+  guards?: Array<abstract new (...args: unknown[]) => unknown>;
   allowUnauthenticatedAccess?: boolean;
 }
 

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
+import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-types.interface';
 import { MemoryOAuthStore } from './memory-store.service';
-import type { OAuthClient, AuthorizationCode } from '../interfaces/oauth-types.interface';
 
 describe('MemoryOAuthStore', () => {
   let store: MemoryOAuthStore;
@@ -57,7 +57,7 @@ describe('MemoryOAuthStore', () => {
       await store.storeClient(client2);
 
       const retrieved = await store.getClient('abc');
-      expect(retrieved!.client_name).toBe('Second');
+      expect(retrieved?.client_name).toBe('Second');
     });
   });
 

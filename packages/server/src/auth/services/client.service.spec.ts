@@ -1,7 +1,8 @@
 import 'reflect-metadata';
-import { OAuthClientService } from './client.service';
-import type { IOAuthStore } from '../stores/oauth-store.interface';
+import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { OAuthClient } from '../interfaces/oauth-types.interface';
+import type { IOAuthStore } from '../stores/oauth-store.interface';
+import { OAuthClientService } from './client.service';
 
 describe('OAuthClientService', () => {
   let service: OAuthClientService;
@@ -27,7 +28,7 @@ describe('OAuthClientService', () => {
     };
 
     service = new OAuthClientService(
-      { jwtSecret: 'secret' } as any,
+      { jwtSecret: 'secret' } as unknown as McpAuthModuleOptions,
       store as unknown as IOAuthStore,
     );
   });

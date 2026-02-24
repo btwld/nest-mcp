@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import * as jwt from 'jsonwebtoken';
-import { JwtTokenService } from './jwt-token.service';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
+import { JwtTokenService } from './jwt-token.service';
 
 describe('JwtTokenService', () => {
   const secret = 'test-jwt-secret-key-for-unit-tests';
@@ -31,7 +31,7 @@ describe('JwtTokenService', () => {
       const service = createService();
       const result = service.generateTokenPair('user-1', 'client-1', 'read write');
 
-      const decoded = jwt.decode(result.access_token) as any;
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
       expect(decoded.scope).toBe('read write');
     });
 
@@ -39,7 +39,7 @@ describe('JwtTokenService', () => {
       const service = createService({ issuer: 'https://my-issuer.com' });
       const result = service.generateTokenPair('user-1', 'client-1');
 
-      const decoded = jwt.decode(result.access_token) as any;
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
       expect(decoded.iss).toBe('https://my-issuer.com');
     });
 
@@ -47,7 +47,7 @@ describe('JwtTokenService', () => {
       const service = createService({ serverUrl: 'https://server.com' });
       const result = service.generateTokenPair('user-1', 'client-1');
 
-      const decoded = jwt.decode(result.access_token) as any;
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
       expect(decoded.iss).toBe('https://server.com');
     });
 
@@ -55,19 +55,19 @@ describe('JwtTokenService', () => {
       const service = createService();
       const result = service.generateTokenPair('user-1', 'client-1');
 
-      const decoded = jwt.decode(result.access_token) as any;
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
       expect(decoded.iss).toBe('http://localhost:3000');
     });
 
     it('sets audience from options or defaults to mcp-client', () => {
       const serviceCustom = createService({ audience: 'my-audience' });
       const resultCustom = serviceCustom.generateTokenPair('user-1', 'client-1');
-      const decodedCustom = jwt.decode(resultCustom.access_token) as any;
+      const decodedCustom = jwt.decode(resultCustom.access_token) as Record<string, unknown>;
       expect(decodedCustom.aud).toBe('my-audience');
 
       const serviceDefault = createService();
       const resultDefault = serviceDefault.generateTokenPair('user-1', 'client-1');
-      const decodedDefault = jwt.decode(resultDefault.access_token) as any;
+      const decodedDefault = jwt.decode(resultDefault.access_token) as Record<string, unknown>;
       expect(decodedDefault.aud).toBe('mcp-client');
     });
 
@@ -75,7 +75,7 @@ describe('JwtTokenService', () => {
       const service = createService();
       const result = service.generateTokenPair('user-42', 'client-99');
 
-      const decoded = jwt.decode(result.access_token) as any;
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
       expect(decoded.sub).toBe('user-42');
       expect(decoded.azp).toBe('client-99');
       expect(decoded.type).toBe('access');
@@ -85,7 +85,7 @@ describe('JwtTokenService', () => {
       const service = createService();
       const result = service.generateTokenPair('user-42', 'client-99');
 
-      const decoded = jwt.decode(result.refresh_token) as any;
+      const decoded = jwt.decode(result.refresh_token) as Record<string, unknown>;
       expect(decoded.sub).toBe('user-42');
       expect(decoded.client_id).toBe('client-99');
       expect(decoded.type).toBe('refresh');

@@ -12,43 +12,43 @@ describe('MetricsService', () => {
     service.recordCall('tool-a', 100, true);
     const metric = service.getToolMetrics('tool-a');
     expect(metric).toBeDefined();
-    expect(metric!.totalCalls).toBe(1);
-    expect(metric!.name).toBe('tool-a');
+    expect(metric?.totalCalls).toBe(1);
+    expect(metric?.name).toBe('tool-a');
   });
 
   it('increments successCount on success', () => {
     service.recordCall('tool-a', 100, true);
     service.recordCall('tool-a', 200, true);
     const metric = service.getToolMetrics('tool-a');
-    expect(metric!.successCount).toBe(2);
-    expect(metric!.errorCount).toBe(0);
+    expect(metric?.successCount).toBe(2);
+    expect(metric?.errorCount).toBe(0);
   });
 
   it('increments errorCount on failure', () => {
     service.recordCall('tool-a', 100, false);
     service.recordCall('tool-a', 200, true);
     const metric = service.getToolMetrics('tool-a');
-    expect(metric!.successCount).toBe(1);
-    expect(metric!.errorCount).toBe(1);
+    expect(metric?.successCount).toBe(1);
+    expect(metric?.errorCount).toBe(1);
   });
 
   it('calculates avgDurationMs correctly', () => {
     service.recordCall('tool-a', 100, true);
     service.recordCall('tool-a', 300, true);
     const metric = service.getToolMetrics('tool-a');
-    expect(metric!.totalDurationMs).toBe(400);
-    expect(metric!.avgDurationMs).toBe(200);
+    expect(metric?.totalDurationMs).toBe(400);
+    expect(metric?.avgDurationMs).toBe(200);
   });
 
   it('updates lastCalledAt', () => {
     vi.useFakeTimers();
     const now = Date.now();
     service.recordCall('tool-a', 50, true);
-    expect(service.getToolMetrics('tool-a')!.lastCalledAt).toBe(now);
+    expect(service.getToolMetrics('tool-a')?.lastCalledAt).toBe(now);
 
     vi.advanceTimersByTime(1000);
     service.recordCall('tool-a', 50, true);
-    expect(service.getToolMetrics('tool-a')!.lastCalledAt).toBe(now + 1000);
+    expect(service.getToolMetrics('tool-a')?.lastCalledAt).toBe(now + 1000);
     vi.useRealTimers();
   });
 
@@ -77,7 +77,9 @@ describe('MetricsService', () => {
     expect(output).toContain('# TYPE mcp_tool_errors_total counter');
     expect(output).toContain('mcp_tool_errors_total{tool="tool-a"} 1');
 
-    expect(output).toContain('# HELP mcp_tool_duration_ms_avg Average tool call duration in milliseconds');
+    expect(output).toContain(
+      '# HELP mcp_tool_duration_ms_avg Average tool call duration in milliseconds',
+    );
     expect(output).toContain('# TYPE mcp_tool_duration_ms_avg gauge');
     expect(output).toContain('mcp_tool_duration_ms_avg{tool="tool-a"} 150.00');
 

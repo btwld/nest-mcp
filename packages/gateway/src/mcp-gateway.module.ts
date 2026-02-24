@@ -1,31 +1,31 @@
+import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import type { McpModuleOptions, ToolContent } from '@btwld/mcp-common';
+import { McpModule, type McpToolBuilder } from '@btwld/mcp-server';
 import {
-  DynamicModule,
+  type DynamicModule,
   Inject,
-  Module,
   Logger,
+  Module,
   type OnApplicationBootstrap,
 } from '@nestjs/common';
-import { McpModule, McpToolBuilder } from '@btwld/mcp-server';
-import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import type { McpModuleOptions } from '@btwld/mcp-common';
 
+import { HealthCheckerService } from './upstream/health-checker.service';
 // Upstream
 import { UpstreamManagerService } from './upstream/upstream-manager.service';
-import { HealthCheckerService } from './upstream/health-checker.service';
 import type { UpstreamConfig } from './upstream/upstream.interface';
 
+import type { RoutingConfig } from './routing/route-config.interface';
 // Routing
 import { RouterService } from './routing/router.service';
 import { ToolAggregatorService } from './routing/tool-aggregator.service';
-import type { RoutingConfig } from './routing/route-config.interface';
 
 // Policies
 import { PolicyEngineService } from './policies/policy-engine.service';
 import type { PoliciesConfig } from './policies/policy.interface';
 
+import type { CacheConfig } from './cache/cache.interface';
 // Cache
 import { ResponseCacheService } from './cache/response-cache.service';
-import type { CacheConfig } from './cache/cache.interface';
 
 // Transform
 import { RequestTransformService } from './transform/request-transform.service';
@@ -100,14 +100,10 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     );
 
     // Configure policies
-    this.policyEngine.configure(
-      this.options.policies ?? { defaultEffect: 'allow', rules: [] },
-    );
+    this.policyEngine.configure(this.options.policies ?? { defaultEffect: 'allow', rules: [] });
 
     // Configure cache
-    this.responseCache.configure(
-      this.options.cache ?? { enabled: false, defaultTtl: 60000 },
-    );
+    this.responseCache.configure(this.options.cache ?? { enabled: false, defaultTtl: 60000 });
 
     // Connect to all upstreams
     await this.upstreamManager.connectAll(this.options.upstreams);
@@ -132,7 +128,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         handler: async (args: Record<string, unknown>) => {
           const result = await this.gatewayService.callTool(tool.name, args);
           return {
-            content: result.content as any[],
+            content: result.content as ToolContent[],
             isError: result.isError,
           };
         },

@@ -32,8 +32,8 @@ describe('ResponseTransformService', () => {
     });
 
     it('should chain multiple transforms in order', async () => {
-      service.register((res) => ({ ...res, toolName: res.toolName + '_1' }));
-      service.register((res) => ({ ...res, toolName: res.toolName + '_2' }));
+      service.register((res) => ({ ...res, toolName: `${res.toolName}_1` }));
+      service.register((res) => ({ ...res, toolName: `${res.toolName}_2` }));
 
       const result = await service.apply(baseResponse);
 

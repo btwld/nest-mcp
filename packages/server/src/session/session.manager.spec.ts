@@ -26,7 +26,7 @@ describe('SessionManager', () => {
     manager.createSession('sess-1');
     const session = manager.getSession('sess-1');
     expect(session).toBeDefined();
-    expect(session!.id).toBe('sess-1');
+    expect(session?.id).toBe('sess-1');
   });
 
   it('getSession returns undefined for non-existent session', () => {
@@ -50,7 +50,7 @@ describe('SessionManager', () => {
     vi.advanceTimersByTime(5000);
 
     const session = manager.getSession('sess-1');
-    expect(session!.lastActivityAt).toBe(createTime + 5000);
+    expect(session?.lastActivityAt).toBe(createTime + 5000);
   });
 
   it('removeSession removes session and getActiveSessions counts correctly', () => {

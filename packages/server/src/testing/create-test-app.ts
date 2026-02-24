@@ -1,10 +1,10 @@
+import type { PromptGetResult, ResourceReadResult, ToolCallResult } from '@btwld/mcp-common';
+import { McpTransportType } from '@btwld/mcp-common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
-import type { ToolCallResult, ResourceReadResult, PromptGetResult } from '@btwld/mcp-common';
-import { McpTransportType } from '@btwld/mcp-common';
 import { McpRegistryService } from '../discovery/registry.service';
-import { McpExecutorService } from '../execution/executor.service';
 import { McpContextFactory } from '../execution/context.factory';
+import { McpExecutorService } from '../execution/executor.service';
 
 export interface McpTestApp {
   callTool(name: string, args?: Record<string, unknown>): Promise<ToolCallResult>;
@@ -17,19 +17,14 @@ export interface McpTestApp {
 }
 
 export interface CreateTestAppOptions {
-  providers: any[];
-  imports?: any[];
+  providers: unknown[];
+  imports?: unknown[];
 }
 
 export async function createMcpTestApp(options: CreateTestAppOptions): Promise<McpTestApp> {
   const moduleBuilder = Test.createTestingModule({
     imports: options.imports ?? [],
-    providers: [
-      McpRegistryService,
-      McpExecutorService,
-      McpContextFactory,
-      ...options.providers,
-    ],
+    providers: [McpRegistryService, McpExecutorService, McpContextFactory, ...options.providers],
   });
 
   const moduleRef: TestingModule = await moduleBuilder.compile();

@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RouterService } from './routing/router.service';
-import { ToolAggregatorService } from './routing/tool-aggregator.service';
-import { UpstreamManagerService } from './upstream/upstream-manager.service';
-import { PolicyEngineService } from './policies/policy-engine.service';
-import { ResponseCacheService } from './cache/response-cache.service';
-import { RequestTransformService } from './transform/request-transform.service';
-import { ResponseTransformService } from './transform/response-transform.service';
+import type { ResponseCacheService } from './cache/response-cache.service';
+import type { PolicyEngineService } from './policies/policy-engine.service';
+import type { RouterService } from './routing/router.service';
+import type { ToolAggregatorService } from './routing/tool-aggregator.service';
 import type { AggregatedTool } from './routing/tool-aggregator.service';
+import type { RequestTransformService } from './transform/request-transform.service';
+import type { ResponseTransformService } from './transform/response-transform.service';
 import type { ToolCallResponse } from './transform/response-transform.service';
+import type { UpstreamManagerService } from './upstream/upstream-manager.service';
 
 export interface GatewayCallToolResult {
   content: unknown[];
@@ -36,10 +36,7 @@ export class GatewayService {
     return this.toolAggregator.getCachedTools();
   }
 
-  async callTool(
-    toolName: string,
-    args: Record<string, unknown>,
-  ): Promise<GatewayCallToolResult> {
+  async callTool(toolName: string, args: Record<string, unknown>): Promise<GatewayCallToolResult> {
     // Evaluate policy
     const policy = this.policyEngine.evaluate(toolName);
 
@@ -71,9 +68,7 @@ export class GatewayService {
     const route = this.router.resolve(toolName);
     if (!route) {
       return {
-        content: [
-          { type: 'text', text: `No upstream found for tool "${toolName}"` },
-        ],
+        content: [{ type: 'text', text: `No upstream found for tool "${toolName}"` }],
         isError: true,
       };
     }
@@ -87,7 +82,7 @@ export class GatewayService {
     }
 
     // Apply request transforms
-    let request = await this.requestTransform.apply({
+    const request = await this.requestTransform.apply({
       toolName: route.originalToolName,
       arguments: args,
       upstreamName: route.upstreamName,
@@ -150,9 +145,7 @@ export class GatewayService {
       this.logger.error(`Error calling tool "${toolName}" on "${route.upstreamName}": ${message}`);
 
       return {
-        content: [
-          { type: 'text', text: `Error forwarding to upstream: ${message}` },
-        ],
+        content: [{ type: 'text', text: `Error forwarding to upstream: ${message}` }],
         isError: true,
       };
     }

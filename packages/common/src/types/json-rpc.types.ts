@@ -1,4 +1,4 @@
-import { JSONRPC_VERSION } from '../constants/protocol';
+import type { JSONRPC_VERSION } from '../constants/protocol';
 
 export type ProgressToken = string | number;
 export type Cursor = string;

@@ -1,16 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
 import {
   type McpExecutionContext,
-  type ToolCallResult,
-  type ResourceReadResult,
   type PromptGetResult,
+  type ResourceReadResult,
+  type ToolCallResult,
   ToolExecutionError,
   ValidationError,
+  extractZodDescriptions,
   matchUriTemplate,
   zodToJsonSchema,
-  extractZodDescriptions,
 } from '@btwld/mcp-common';
-import { McpRegistryService } from '../discovery/registry.service';
+import { Injectable, Logger } from '@nestjs/common';
+import type { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
 
 @Injectable()
@@ -42,6 +42,7 @@ export class McpExecutorService {
     }
 
     // Validate input
+    let validatedArgs: Record<string, unknown> = args;
     if (tool.parameters) {
       const parsed = tool.parameters.safeParse(args);
       if (!parsed.success) {
@@ -54,11 +55,11 @@ export class McpExecutorService {
           })),
         );
       }
-      args = parsed.data;
+      validatedArgs = parsed.data as Record<string, unknown>;
     }
 
     try {
-      const result = await tool.instance[tool.methodName](args, ctx);
+      const result = await tool.instance[tool.methodName](validatedArgs, ctx);
       return this.normalizeToolResult(result);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
@@ -78,7 +79,7 @@ export class McpExecutorService {
     }
 
     // Already in ToolCallResult format
-    if (typeof result === 'object' && 'content' in (result as any)) {
+    if (typeof result === 'object' && 'content' in (result as Record<string, unknown>)) {
       return result as ToolCallResult;
     }
 
@@ -115,10 +116,7 @@ export class McpExecutorService {
     }));
   }
 
-  async readResource(
-    uri: string,
-    ctx: McpExecutionContext,
-  ): Promise<ResourceReadResult> {
+  async readResource(uri: string, ctx: McpExecutionContext): Promise<ResourceReadResult> {
     // Try exact match first
     const resource = this.registry.getResource(uri);
     if (resource) {
@@ -143,7 +141,7 @@ export class McpExecutorService {
   }
 
   private normalizeResourceResult(result: unknown, uri: string): ResourceReadResult {
-    if (result && typeof result === 'object' && 'contents' in (result as any)) {
+    if (result && typeof result === 'object' && 'contents' in (result as Record<string, unknown>)) {
       return result as ResourceReadResult;
     }
 
@@ -185,6 +183,7 @@ export class McpExecutorService {
     }
 
     // Validate parameters
+    let validatedArgs: Record<string, unknown> = args;
     if (prompt.parameters) {
       const parsed = prompt.parameters.safeParse(args);
       if (!parsed.success) {
@@ -197,10 +196,10 @@ export class McpExecutorService {
           })),
         );
       }
-      args = parsed.data;
+      validatedArgs = parsed.data as Record<string, unknown>;
     }
 
-    const result = await prompt.instance[prompt.methodName](args, ctx);
+    const result = await prompt.instance[prompt.methodName](validatedArgs, ctx);
 
     if (result && typeof result === 'object' && 'messages' in result) {
       return result as PromptGetResult;

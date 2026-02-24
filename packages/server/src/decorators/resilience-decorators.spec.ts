@@ -1,15 +1,15 @@
 import 'reflect-metadata';
 import {
+  MCP_CIRCUIT_BREAKER_METADATA,
   MCP_MIDDLEWARE_METADATA,
   MCP_RATE_LIMIT_METADATA,
   MCP_RETRY_METADATA,
-  MCP_CIRCUIT_BREAKER_METADATA,
 } from '@btwld/mcp-common';
 import type { McpMiddleware } from '@btwld/mcp-common';
-import { UseMiddleware } from './use-middleware.decorator';
+import { CircuitBreaker } from './circuit-breaker.decorator';
 import { RateLimit } from './rate-limit.decorator';
 import { Retry } from './retry.decorator';
-import { CircuitBreaker } from './circuit-breaker.decorator';
+import { UseMiddleware } from './use-middleware.decorator';
 
 describe('Resilience decorators', () => {
   describe('@UseMiddleware', () => {
@@ -25,11 +25,7 @@ describe('Resilience decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_MIDDLEWARE_METADATA,
-        TestService.prototype,
-        'myMethod',
-      );
+      const value = Reflect.getMetadata(MCP_MIDDLEWARE_METADATA, TestService.prototype, 'myMethod');
 
       expect(value).toHaveLength(3);
       expect(value[0]).toBe(mw1);
@@ -71,11 +67,7 @@ describe('Resilience decorators', () => {
         }
       }
 
-      const config = Reflect.getMetadata(
-        MCP_RETRY_METADATA,
-        TestService.prototype,
-        'retryable',
-      );
+      const config = Reflect.getMetadata(MCP_RETRY_METADATA, TestService.prototype, 'retryable');
 
       expect(config).toEqual({
         maxAttempts: 3,

@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { ZodObject } from 'zod';
 import type { McpExecutionContext, PromptGetResult } from '@btwld/mcp-common';
-import { McpRegistryService, type RegisteredPrompt } from '../discovery/registry.service';
+import { Injectable, Logger } from '@nestjs/common';
+import type { ZodObject, ZodRawShape } from 'zod';
+import type { McpRegistryService, RegisteredPrompt } from '../discovery/registry.service';
 
 export interface DynamicPromptConfig {
   name: string;
   description: string;
-  parameters?: ZodObject<any>;
-  handler: (args: any, ctx: McpExecutionContext) => Promise<PromptGetResult>;
+  parameters?: ZodObject<ZodRawShape>;
+  handler: (args: Record<string, unknown>, ctx: McpExecutionContext) => Promise<PromptGetResult>;
 }
 
 @Injectable()

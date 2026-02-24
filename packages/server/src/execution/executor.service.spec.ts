@@ -1,10 +1,15 @@
 import 'reflect-metadata';
-import { z } from 'zod';
-import { McpExecutorService } from './executor.service';
-import { McpRegistryService } from '../discovery/registry.service';
 import { ToolExecutionError, ValidationError } from '@btwld/mcp-common';
+import { z } from 'zod';
+import { McpRegistryService } from '../discovery/registry.service';
+import type {
+  RegisteredPrompt,
+  RegisteredResource,
+  RegisteredResourceTemplate,
+  RegisteredTool,
+} from '../discovery/registry.service';
 import { mockMcpContext } from '../testing/mock-context';
-import type { RegisteredTool, RegisteredResource, RegisteredResourceTemplate, RegisteredPrompt } from '../discovery/registry.service';
+import { McpExecutorService } from './executor.service';
 
 describe('McpExecutorService', () => {
   let registry: McpRegistryService;
@@ -119,7 +124,9 @@ describe('McpExecutorService', () => {
 
     it('throws ToolExecutionError when tool not found', async () => {
       await expect(executor.callTool('missing', {}, ctx)).rejects.toThrow(ToolExecutionError);
-      await expect(executor.callTool('missing', {}, ctx)).rejects.toThrow("Tool 'missing' not found");
+      await expect(executor.callTool('missing', {}, ctx)).rejects.toThrow(
+        "Tool 'missing' not found",
+      );
     });
 
     it('throws ValidationError on bad input', async () => {
@@ -133,7 +140,9 @@ describe('McpExecutorService', () => {
         parameters: schema,
       } as RegisteredTool);
 
-      await expect(executor.callTool('count', { count: 'not-a-number' }, ctx)).rejects.toThrow(ValidationError);
+      await expect(executor.callTool('count', { count: 'not-a-number' }, ctx)).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it('passes parsed/coerced args to handler', async () => {
@@ -274,7 +283,7 @@ describe('McpExecutorService', () => {
 
     it('reads a template-match resource', async () => {
       const handler = vi.fn().mockResolvedValue('user data');
-      registry['resourceTemplates'].set('file:///users/{userId}', {
+      registry.resourceTemplates.set('file:///users/{userId}', {
         uriTemplate: 'file:///users/{userId}',
         name: 'user',
         methodName: 'getUser',
@@ -283,13 +292,21 @@ describe('McpExecutorService', () => {
       } as RegisteredResourceTemplate);
 
       const result = await executor.readResource('file:///users/42', ctx);
-      expect(handler).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ userId: '42' }), ctx);
+      expect(handler).toHaveBeenCalledWith(
+        expect.any(URL),
+        expect.objectContaining({ userId: '42' }),
+        ctx,
+      );
       expect(result).toEqual({ contents: [{ uri: 'file:///users/42', text: 'user data' }] });
     });
 
     it('throws on resource not found', async () => {
-      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow(ToolExecutionError);
-      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow('Resource not found');
+      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow(
+        ToolExecutionError,
+      );
+      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow(
+        'Resource not found',
+      );
     });
 
     it('passes through result with contents property', async () => {
@@ -395,12 +412,17 @@ describe('McpExecutorService', () => {
         parameters: schema,
       } as RegisteredPrompt);
 
-      await expect(executor.getPrompt('greet', { name: 123 as any }, ctx)).rejects.toThrow(ValidationError);
+      // biome-ignore lint/suspicious/noExplicitAny: intentionally passing wrong type for validation test
+      await expect(executor.getPrompt('greet', { name: 123 as any }, ctx)).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it('throws when prompt not found', async () => {
       await expect(executor.getPrompt('missing', {}, ctx)).rejects.toThrow(ToolExecutionError);
-      await expect(executor.getPrompt('missing', {}, ctx)).rejects.toThrow("Prompt 'missing' not found");
+      await expect(executor.getPrompt('missing', {}, ctx)).rejects.toThrow(
+        "Prompt 'missing' not found",
+      );
     });
 
     it('throws when handler does not return messages', async () => {

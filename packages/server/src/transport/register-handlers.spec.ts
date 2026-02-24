@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z } from 'zod';
-import { registerHandlers } from './register-handlers';
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { registerHandlers } from './register-handlers';
 
 describe('registerHandlers', () => {
-  let mockServer: any;
-  let mockRegistry: any;
-  let mockPipeline: any;
+  let mockServer: Record<string, ReturnType<typeof vi.fn>>;
+  let mockRegistry: Record<string, ReturnType<typeof vi.fn>>;
+  let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
   let ctx: McpExecutionContext;
 
   beforeEach(() => {

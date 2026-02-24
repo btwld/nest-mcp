@@ -1,11 +1,11 @@
+import type { ResponseCacheService } from './cache/response-cache.service';
 import { GatewayService } from './gateway.service';
+import type { PolicyEngineService } from './policies/policy-engine.service';
 import type { RouterService } from './routing/router.service';
 import type { ToolAggregatorService } from './routing/tool-aggregator.service';
-import type { UpstreamManagerService } from './upstream/upstream-manager.service';
-import type { PolicyEngineService } from './policies/policy-engine.service';
-import type { ResponseCacheService } from './cache/response-cache.service';
 import type { RequestTransformService } from './transform/request-transform.service';
 import type { ResponseTransformService } from './transform/response-transform.service';
+import type { UpstreamManagerService } from './upstream/upstream-manager.service';
 
 describe('GatewayService', () => {
   let service: GatewayService;
@@ -63,7 +63,15 @@ describe('GatewayService', () => {
 
   describe('listTools', () => {
     it('should delegate to toolAggregator.aggregateAll', async () => {
-      const expected = [{ name: 'gh_list', description: 'test', inputSchema: {}, upstreamName: 'github', originalName: 'list' }];
+      const expected = [
+        {
+          name: 'gh_list',
+          description: 'test',
+          inputSchema: {},
+          upstreamName: 'github',
+          originalName: 'list',
+        },
+      ];
       toolAggregator.aggregateAll.mockResolvedValue(expected);
 
       const result = await service.listTools();
@@ -103,7 +111,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('gh_dangerous', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('denied by policy');
+      expect((result.content[0] as { text: string }).text).toContain('denied by policy');
     });
 
     it('should return require_approval error when policy requires approval', async () => {
@@ -112,7 +120,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('gh_risky', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('requires approval');
+      expect((result.content[0] as { text: string }).text).toContain('requires approval');
     });
 
     it('should return error when no route is found', async () => {
@@ -121,7 +129,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('unknown', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('No upstream found');
+      expect((result.content[0] as { text: string }).text).toContain('No upstream found');
     });
 
     it('should return cached result on cache hit', async () => {
@@ -142,7 +150,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('gh_listRepos', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('not connected');
+      expect((result.content[0] as { text: string }).text).toContain('not connected');
     });
 
     it('should return error when upstream is unhealthy', async () => {
@@ -153,7 +161,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('gh_listRepos', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('unhealthy');
+      expect((result.content[0] as { text: string }).text).toContain('unhealthy');
     });
 
     it('should execute full call flow: policy -> route -> cache miss -> transform -> call -> transform -> cache set', async () => {
@@ -167,7 +175,11 @@ describe('GatewayService', () => {
       expect(requestTransform.apply).toHaveBeenCalled();
       expect(mockClient.callTool).toHaveBeenCalled();
       expect(responseTransform.apply).toHaveBeenCalled();
-      expect(responseCache.set).toHaveBeenCalledWith('cache-key', expect.any(Object), 'gh_listRepos');
+      expect(responseCache.set).toHaveBeenCalledWith(
+        'cache-key',
+        expect.any(Object),
+        'gh_listRepos',
+      );
       expect(result.isError).toBeFalsy();
     });
 
@@ -194,7 +206,7 @@ describe('GatewayService', () => {
       const result = await service.callTool('gh_listRepos', {});
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as any).text).toContain('network error');
+      expect((result.content[0] as { text: string }).text).toContain('network error');
     });
   });
 });

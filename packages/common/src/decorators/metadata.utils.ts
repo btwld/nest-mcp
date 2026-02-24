@@ -29,7 +29,7 @@ export function getMethodMetadata<T>(
 export function setClassMetadata<T>(
   metadataKey: symbol,
   value: T,
-  target: Function,
+  target: abstract new (...args: unknown[]) => unknown,
 ): void {
   Reflect.defineMetadata(metadataKey, value, target);
 }
@@ -39,7 +39,7 @@ export function setClassMetadata<T>(
  */
 export function getClassMetadata<T>(
   metadataKey: symbol,
-  target: Function,
+  target: abstract new (...args: unknown[]) => unknown,
 ): T | undefined {
   return Reflect.getMetadata(metadataKey, target);
 }

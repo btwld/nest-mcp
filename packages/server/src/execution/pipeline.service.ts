@@ -1,22 +1,22 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
 import type {
   McpExecutionContext,
   McpGuardContext,
   McpMiddleware,
-  ToolCallResult,
-  ResourceReadResult,
   PromptGetResult,
+  ResourceReadResult,
+  ToolCallResult,
 } from '@btwld/mcp-common';
 import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
 import type { McpModuleOptions } from '@btwld/mcp-common';
-import { McpExecutorService } from './executor.service';
-import { McpRegistryService } from '../discovery/registry.service';
-import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
-import { MiddlewareService } from '../middleware/middleware.service';
-import { RateLimiterService } from '../resilience/rate-limiter.service';
-import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
-import { RetryService } from '../resilience/retry.service';
-import { MetricsService } from '../observability/metrics.service';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
+import type { McpRegistryService, RegisteredTool } from '../discovery/registry.service';
+import type { MiddlewareService } from '../middleware/middleware.service';
+import type { MetricsService } from '../observability/metrics.service';
+import type { CircuitBreakerService } from '../resilience/circuit-breaker.service';
+import type { RateLimiterService } from '../resilience/rate-limiter.service';
+import type { RetryService } from '../resilience/retry.service';
+import type { McpExecutorService } from './executor.service';
 
 @Injectable()
 export class ExecutionPipelineService {
@@ -62,39 +62,34 @@ export class ExecutionPipelineService {
     let success = true;
 
     try {
-      const result = await this.middlewareService.executeChain(
-        middleware,
-        ctx,
-        args,
-        async () => {
-          // Rate limiting
-          const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
-          if (rateLimitConfig) {
-            await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
-          }
+      const result = await this.middlewareService.executeChain(middleware, ctx, args, async () => {
+        // Rate limiting
+        const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
+        if (rateLimitConfig) {
+          await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
+        }
 
-          // Resolve resilience configs
-          const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
-          const retryConfig = tool.retry ?? this.options.resilience?.retry;
+        // Resolve resilience configs
+        const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
+        const retryConfig = tool.retry ?? this.options.resilience?.retry;
 
-          // Build execution function
-          let executionFn = () => this.executor.callTool(name, args, ctx);
+        // Build execution function
+        let executionFn = () => this.executor.callTool(name, args, ctx);
 
-          // Wrap with retry if configured
-          if (retryConfig) {
-            const innerFn = executionFn;
-            executionFn = () => this.retry.execute(name, retryConfig, innerFn);
-          }
+        // Wrap with retry if configured
+        if (retryConfig) {
+          const innerFn = executionFn;
+          executionFn = () => this.retry.execute(name, retryConfig, innerFn);
+        }
 
-          // Wrap with circuit breaker if configured
-          if (cbConfig) {
-            const innerFn = executionFn;
-            executionFn = () => this.circuitBreaker.execute(name, cbConfig, innerFn);
-          }
+        // Wrap with circuit breaker if configured
+        if (cbConfig) {
+          const innerFn = executionFn;
+          executionFn = () => this.circuitBreaker.execute(name, cbConfig, innerFn);
+        }
 
-          return executionFn();
-        },
-      );
+        return executionFn();
+      });
 
       return result as ToolCallResult;
     } catch (error) {
@@ -108,10 +103,7 @@ export class ExecutionPipelineService {
 
   // ---- Resources ----
 
-  async readResource(
-    uri: string,
-    ctx: McpExecutionContext,
-  ): Promise<ResourceReadResult> {
+  async readResource(uri: string, ctx: McpExecutionContext): Promise<ResourceReadResult> {
     // Try to find resource for auth check
     const resource = this.registry.getResource(uri);
 
@@ -119,7 +111,7 @@ export class ExecutionPipelineService {
       const guardContext = this.buildGuardContext(ctx, { resourceUri: uri });
       // Resources use the same auth guard with a tool-like shape
       await this.authGuard.checkAuthorization(
-        { ...resource, name: resource.uri, isPublic: false } as any,
+        { ...resource, name: resource.uri, isPublic: false } as unknown as RegisteredTool,
         guardContext,
       );
     }
@@ -127,11 +119,8 @@ export class ExecutionPipelineService {
     // Collect middleware: global only (resources don't have per-item middleware)
     const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    return this.middlewareService.executeChain(
-      middleware,
-      ctx,
-      { uri },
-      () => this.executor.readResource(uri, ctx),
+    return this.middlewareService.executeChain(middleware, ctx, { uri }, () =>
+      this.executor.readResource(uri, ctx),
     ) as Promise<ResourceReadResult>;
   }
 
@@ -148,7 +137,7 @@ export class ExecutionPipelineService {
     if (prompt) {
       const guardContext = this.buildGuardContext(ctx, { promptName: name });
       await this.authGuard.checkAuthorization(
-        { ...prompt, isPublic: false } as any,
+        { ...prompt, isPublic: false } as unknown as RegisteredTool,
         guardContext,
       );
     }
@@ -156,11 +145,8 @@ export class ExecutionPipelineService {
     // Collect middleware: global only (prompts don't have per-item middleware)
     const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    return this.middlewareService.executeChain(
-      middleware,
-      ctx,
-      args,
-      () => this.executor.getPrompt(name, args, ctx),
+    return this.middlewareService.executeChain(middleware, ctx, args, () =>
+      this.executor.getPrompt(name, args, ctx),
     ) as Promise<PromptGetResult>;
   }
 

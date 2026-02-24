@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { McpContextFactory } from './context.factory';
 import { McpTransportType } from '@btwld/mcp-common';
+import { McpContextFactory } from './context.factory';
 
 describe('McpContextFactory', () => {
   let factory: McpContextFactory;

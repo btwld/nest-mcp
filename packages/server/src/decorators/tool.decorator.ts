@@ -1,5 +1,5 @@
 import { MCP_TOOL_METADATA } from '@btwld/mcp-common';
-import type { ToolOptions, ToolMetadata } from '@btwld/mcp-common';
+import type { ToolMetadata, ToolOptions } from '@btwld/mcp-common';
 
 export function Tool(options: ToolOptions): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

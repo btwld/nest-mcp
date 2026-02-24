@@ -1,7 +1,7 @@
+import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
-import type { ToolAnnotations, McpExecutionContext, ToolCallResult } from '@btwld/mcp-common';
-import { McpRegistryService, type RegisteredTool } from '../discovery/registry.service';
+import type { McpRegistryService, RegisteredTool } from '../discovery/registry.service';
 
 export interface DynamicToolConfig {
   name: string;
@@ -10,7 +10,10 @@ export interface DynamicToolConfig {
   inputSchema?: Record<string, unknown>;
   outputSchema?: ZodType;
   annotations?: ToolAnnotations;
-  handler: (args: any, ctx: McpExecutionContext) => Promise<ToolCallResult | string | unknown>;
+  handler: (
+    args: Record<string, unknown>,
+    ctx: McpExecutionContext,
+  ) => Promise<ToolCallResult | string | unknown>;
   scopes?: string[];
   roles?: string[];
   isPublic?: boolean;

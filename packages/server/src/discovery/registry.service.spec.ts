@@ -1,19 +1,19 @@
 import 'reflect-metadata';
-import { McpRegistryService } from './registry.service';
 import {
-  Tool,
-  Resource,
-  ResourceTemplate,
+  CircuitBreaker,
+  Guards,
   Prompt,
   Public,
-  Scopes,
-  Roles,
-  Guards,
   RateLimit,
+  Resource,
+  ResourceTemplate,
   Retry,
-  CircuitBreaker,
+  Roles,
+  Scopes,
+  Tool,
 } from '../decorators';
-import type { RegisteredTool, RegisteredResource, RegisteredPrompt } from './registry.service';
+import { McpRegistryService } from './registry.service';
+import type { RegisteredPrompt, RegisteredResource, RegisteredTool } from './registry.service';
 
 // --- Test fixture classes ---
 
@@ -104,13 +104,13 @@ describe('McpRegistryService', () => {
 
       const myTool = registry.getTool('myTool');
       expect(myTool).toBeDefined();
-      expect(myTool!.description).toBe('A test tool');
-      expect(myTool!.methodName).toBe('myTool');
-      expect(myTool!.instance).toBe(instance);
+      expect(myTool?.description).toBe('A test tool');
+      expect(myTool?.methodName).toBe('myTool');
+      expect(myTool?.instance).toBe(instance);
 
       const namedTool = registry.getTool('custom-name');
       expect(namedTool).toBeDefined();
-      expect(namedTool!.description).toBe('Named tool');
+      expect(namedTool?.description).toBe('Named tool');
     });
 
     it('scans @Resource methods and registers them', () => {
@@ -122,9 +122,9 @@ describe('McpRegistryService', () => {
 
       const resource = registry.getResource('file:///config.json');
       expect(resource).toBeDefined();
-      expect(resource!.name).toBe('config');
-      expect(resource!.mimeType).toBe('application/json');
-      expect(resource!.instance).toBe(instance);
+      expect(resource?.name).toBe('config');
+      expect(resource?.mimeType).toBe('application/json');
+      expect(resource?.instance).toBe(instance);
     });
 
     it('scans @ResourceTemplate methods and registers them', () => {
@@ -136,8 +136,8 @@ describe('McpRegistryService', () => {
 
       const tmpl = registry.getResourceTemplate('file:///users/{userId}');
       expect(tmpl).toBeDefined();
-      expect(tmpl!.name).toBe('user');
-      expect(tmpl!.instance).toBe(instance);
+      expect(tmpl?.name).toBe('user');
+      expect(tmpl?.instance).toBe(instance);
     });
 
     it('scans @Prompt methods and registers them', () => {
@@ -149,8 +149,8 @@ describe('McpRegistryService', () => {
 
       const prompt = registry.getPrompt('greet');
       expect(prompt).toBeDefined();
-      expect(prompt!.description).toBe('A greeting prompt');
-      expect(prompt!.instance).toBe(instance);
+      expect(prompt?.description).toBe('A greeting prompt');
+      expect(prompt?.instance).toBe(instance);
     });
 
     it('enriches tool metadata with auth decorators', () => {
@@ -159,9 +159,9 @@ describe('McpRegistryService', () => {
 
       const tool = registry.getTool('custom-name');
       expect(tool).toBeDefined();
-      expect(tool!.isPublic).toBe(true);
-      expect(tool!.requiredScopes).toEqual(['read', 'write']);
-      expect(tool!.requiredRoles).toEqual(['admin']);
+      expect(tool?.isPublic).toBe(true);
+      expect(tool?.requiredScopes).toEqual(['read', 'write']);
+      expect(tool?.requiredRoles).toEqual(['admin']);
     });
 
     it('enriches tool metadata with resilience decorators', () => {
@@ -170,14 +170,14 @@ describe('McpRegistryService', () => {
 
       const tool = registry.getTool('resilientTool');
       expect(tool).toBeDefined();
-      expect(tool!.rateLimit).toEqual({ max: 10, window: '1m', perUser: true });
-      expect(tool!.retry).toEqual({
+      expect(tool?.rateLimit).toEqual({ max: 10, window: '1m', perUser: true });
+      expect(tool?.retry).toEqual({
         maxAttempts: 3,
         backoff: 'exponential',
         initialDelay: 100,
         maxDelay: 5000,
       });
-      expect(tool!.circuitBreaker).toEqual({
+      expect(tool?.circuitBreaker).toEqual({
         errorThreshold: 5,
         timeWindow: 60000,
       });
@@ -185,14 +185,17 @@ describe('McpRegistryService', () => {
 
     it('warns on duplicate tool names', () => {
       const instance = new DuplicateTools();
-      const warnSpy = vi.spyOn((registry as any).logger, 'warn');
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: () => void } }).logger,
+        'warn',
+      );
 
       registry.registerProvider(instance);
 
       expect(warnSpy).toHaveBeenCalledWith('Duplicate tool name: dup. Overwriting.');
       // The second one overwrites the first
       const tool = registry.getTool('dup');
-      expect(tool!.description).toBe('second');
+      expect(tool?.description).toBe('second');
     });
 
     it('skips null/undefined instances', () => {

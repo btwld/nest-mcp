@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   const MockClient = vi.fn().mockImplementation(() => ({
@@ -25,37 +25,56 @@ vi.mock('./transport/client-transport.factory', () => ({
   }),
 }));
 
-import { McpClientModule, McpClientBootstrap } from './mcp-client.module';
-import { McpClient } from './mcp-client.service';
 import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
 import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
+import type {
+  McpClientSseConnection,
+  McpClientStdioConnection,
+} from './interfaces/client-options.interface';
+import { McpClientBootstrap, McpClientModule } from './mcp-client.module';
+import type { McpClient } from './mcp-client.service';
+
+interface DynamicProvider {
+  provide: unknown;
+  useFactory?: (...args: unknown[]) => unknown;
+  useValue?: unknown;
+  inject?: unknown[];
+}
 
 describe('McpClientModule', () => {
   describe('forRoot', () => {
     it('includes McpClientBootstrap provider', () => {
       const mod = McpClientModule.forRoot({
         connections: [
-          { name: 'server-a', transport: 'sse', url: 'http://localhost:3000/sse' } as any,
+          {
+            name: 'server-a',
+            transport: 'sse',
+            url: 'http://localhost:3000/sse',
+          } satisfies McpClientSseConnection,
         ],
       });
 
-      const bootstrapProvider = (mod.providers as any[]).find(
-        (p: any) => p.provide === McpClientBootstrap,
+      const bootstrapProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p.provide === McpClientBootstrap,
       );
       expect(bootstrapProvider).toBeDefined();
-      expect(bootstrapProvider.useFactory).toBeTypeOf('function');
-      expect(bootstrapProvider.inject).toContain('MCP_CLIENT_CONNECTIONS');
+      expect(bootstrapProvider?.useFactory).toBeTypeOf('function');
+      expect(bootstrapProvider?.inject).toContain('MCP_CLIENT_CONNECTIONS');
     });
 
     it('includes MCP_CLIENT_CONNECTIONS aggregate provider', () => {
       const mod = McpClientModule.forRoot({
         connections: [
-          { name: 'server-a', transport: 'sse', url: 'http://localhost:3000/sse' } as any,
+          {
+            name: 'server-a',
+            transport: 'sse',
+            url: 'http://localhost:3000/sse',
+          } satisfies McpClientSseConnection,
         ],
       });
 
-      const connectionsProvider = (mod.providers as any[]).find(
-        (p: any) => p.provide === 'MCP_CLIENT_CONNECTIONS',
+      const connectionsProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p.provide === 'MCP_CLIENT_CONNECTIONS',
       );
       expect(connectionsProvider).toBeDefined();
     });
@@ -63,16 +82,24 @@ describe('McpClientModule', () => {
     it('creates per-connection providers', () => {
       const mod = McpClientModule.forRoot({
         connections: [
-          { name: 'server-a', transport: 'sse', url: 'http://localhost:3000/sse' } as any,
-          { name: 'server-b', transport: 'stdio', command: 'node' } as any,
+          {
+            name: 'server-a',
+            transport: 'sse',
+            url: 'http://localhost:3000/sse',
+          } satisfies McpClientSseConnection,
+          {
+            name: 'server-b',
+            transport: 'stdio',
+            command: 'node',
+          } satisfies McpClientStdioConnection,
         ],
       });
 
       const tokenA = getMcpClientToken('server-a');
       const tokenB = getMcpClientToken('server-b');
 
-      const providerA = (mod.providers as any[]).find((p: any) => p.provide === tokenA);
-      const providerB = (mod.providers as any[]).find((p: any) => p.provide === tokenB);
+      const providerA = (mod.providers as DynamicProvider[]).find((p) => p.provide === tokenA);
+      const providerB = (mod.providers as DynamicProvider[]).find((p) => p.provide === tokenB);
 
       expect(providerA).toBeDefined();
       expect(providerB).toBeDefined();
@@ -84,30 +111,38 @@ describe('McpClientModule', () => {
       const mod = McpClientModule.forRootAsync({
         useFactory: () => ({
           connections: [
-            { name: 'server-a', transport: 'sse', url: 'http://localhost:3000/sse' } as any,
+            {
+              name: 'server-a',
+              transport: 'sse',
+              url: 'http://localhost:3000/sse',
+            } satisfies McpClientSseConnection,
           ],
         }),
       });
 
-      const bootstrapProvider = (mod.providers as any[]).find(
-        (p: any) => p.provide === McpClientBootstrap,
+      const bootstrapProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p.provide === McpClientBootstrap,
       );
       expect(bootstrapProvider).toBeDefined();
-      expect(bootstrapProvider.useFactory).toBeTypeOf('function');
-      expect(bootstrapProvider.inject).toContain('MCP_CLIENT_CONNECTIONS');
+      expect(bootstrapProvider?.useFactory).toBeTypeOf('function');
+      expect(bootstrapProvider?.inject).toContain('MCP_CLIENT_CONNECTIONS');
     });
 
     it('includes MCP_CLIENT_CONNECTIONS provider', () => {
       const mod = McpClientModule.forRootAsync({
         useFactory: () => ({
           connections: [
-            { name: 'server-a', transport: 'sse', url: 'http://localhost:3000/sse' } as any,
+            {
+              name: 'server-a',
+              transport: 'sse',
+              url: 'http://localhost:3000/sse',
+            } satisfies McpClientSseConnection,
           ],
         }),
       });
 
-      const connectionsProvider = (mod.providers as any[]).find(
-        (p: any) => p.provide === 'MCP_CLIENT_CONNECTIONS',
+      const connectionsProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p.provide === 'MCP_CLIENT_CONNECTIONS',
       );
       expect(connectionsProvider).toBeDefined();
     });
@@ -120,8 +155,16 @@ describe('McpClientBootstrap', () => {
 
   beforeEach(() => {
     mockClients = [
-      { name: 'a', connect: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn().mockResolvedValue(undefined) } as any,
-      { name: 'b', connect: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn().mockResolvedValue(undefined) } as any,
+      {
+        name: 'a',
+        connect: vi.fn().mockResolvedValue(undefined),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      } as unknown as McpClient,
+      {
+        name: 'b',
+        connect: vi.fn().mockResolvedValue(undefined),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      } as unknown as McpClient,
     ];
     bootstrap = new McpClientBootstrap(mockClients);
   });
@@ -141,7 +184,7 @@ describe('McpClientBootstrap', () => {
   });
 
   it('continues connecting remaining clients if one fails', async () => {
-    (mockClients[0].connect as any).mockRejectedValue(new Error('fail'));
+    vi.mocked(mockClients[0].connect).mockRejectedValue(new Error('fail'));
 
     await bootstrap.onApplicationBootstrap();
 
@@ -150,7 +193,7 @@ describe('McpClientBootstrap', () => {
   });
 
   it('continues disconnecting remaining clients if one fails', async () => {
-    (mockClients[0].disconnect as any).mockRejectedValue(new Error('fail'));
+    vi.mocked(mockClients[0].disconnect).mockRejectedValue(new Error('fail'));
 
     await bootstrap.onApplicationShutdown();
 

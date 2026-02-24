@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { McpRegistryService } from '../discovery/registry.service';
 import { McpExecutorService } from '../execution/executor.service';
-import { McpToolBuilder } from './tool-builder.service';
-import { McpResourceBuilder } from './resource-builder.service';
-import { McpPromptBuilder } from './prompt-builder.service';
 import { mockMcpContext } from '../testing/mock-context';
+import { McpPromptBuilder } from './prompt-builder.service';
+import { McpResourceBuilder } from './resource-builder.service';
+import { McpToolBuilder } from './tool-builder.service';
 
 describe('Dynamic Builders', () => {
   let registry: McpRegistryService;
@@ -29,8 +29,8 @@ describe('Dynamic Builders', () => {
 
       const tool = registry.getTool('dynamic-tool');
       expect(tool).toBeDefined();
-      expect(tool!.name).toBe('dynamic-tool');
-      expect(tool!.description).toBe('A dynamic tool');
+      expect(tool?.name).toBe('dynamic-tool');
+      expect(tool?.description).toBe('A dynamic tool');
     });
 
     it('unregister removes tool from registry', () => {
@@ -58,8 +58,9 @@ describe('Dynamic Builders', () => {
         handler,
       });
 
-      const tool = registry.getTool('delegated-tool')!;
-      const result = await tool.instance[tool.methodName]({ key: 'val' }, mockMcpContext());
+      const tool = registry.getTool('delegated-tool');
+      expect(tool).toBeDefined();
+      const result = await tool?.instance[tool.methodName]({ key: 'val' }, mockMcpContext());
       expect(handler).toHaveBeenCalledWith({ key: 'val' }, expect.any(Object));
       expect(result).toBe('tool-result');
     });
@@ -83,9 +84,9 @@ describe('Dynamic Builders', () => {
 
       const resource = registry.getResource('file:///data.json');
       expect(resource).toBeDefined();
-      expect(resource!.name).toBe('data-resource');
-      expect(resource!.uri).toBe('file:///data.json');
-      expect(resource!.mimeType).toBe('application/json');
+      expect(resource?.name).toBe('data-resource');
+      expect(resource?.uri).toBe('file:///data.json');
+      expect(resource?.mimeType).toBe('application/json');
     });
 
     it('unregister removes resource from registry', () => {
@@ -113,9 +114,10 @@ describe('Dynamic Builders', () => {
         handler,
       });
 
-      const resource = registry.getResource('file:///test.txt')!;
+      const resource = registry.getResource('file:///test.txt');
+      expect(resource).toBeDefined();
       const testUri = new URL('file:///test.txt');
-      const result = await resource.instance[resource.methodName](testUri, mockMcpContext());
+      const result = await resource?.instance[resource.methodName](testUri, mockMcpContext());
       expect(handler).toHaveBeenCalledWith(testUri, expect.any(Object));
       expect(result).toBe('resource-data');
     });
@@ -139,8 +141,8 @@ describe('Dynamic Builders', () => {
 
       const prompt = registry.getPrompt('dynamic-prompt');
       expect(prompt).toBeDefined();
-      expect(prompt!.name).toBe('dynamic-prompt');
-      expect(prompt!.description).toBe('A dynamic prompt');
+      expect(prompt?.name).toBe('dynamic-prompt');
+      expect(prompt?.description).toBe('A dynamic prompt');
     });
 
     it('unregister removes prompt from registry', () => {
@@ -173,8 +175,9 @@ describe('Dynamic Builders', () => {
         handler,
       });
 
-      const prompt = registry.getPrompt('test-prompt')!;
-      const result = await prompt.instance[prompt.methodName]({ arg: 'val' }, mockMcpContext());
+      const prompt = registry.getPrompt('test-prompt');
+      expect(prompt).toBeDefined();
+      const result = await prompt?.instance[prompt.methodName]({ arg: 'val' }, mockMcpContext());
       expect(handler).toHaveBeenCalledWith({ arg: 'val' }, expect.any(Object));
       expect(result).toEqual(promptResult);
     });
@@ -189,7 +192,7 @@ describe('Dynamic Builders', () => {
       toolBuilder.register({
         name: 'greet',
         description: 'Greets a user',
-        handler: async (args: any) => `Hello, ${args.name}!`,
+        handler: async (args: Record<string, unknown>) => `Hello, ${args.name}!`,
       });
 
       const result = await executor.callTool('greet', { name: 'World' }, ctx);
@@ -219,9 +222,12 @@ describe('Dynamic Builders', () => {
       promptBuilder.register({
         name: 'summarize',
         description: 'Summarize text',
-        handler: async (args: any) => ({
+        handler: async (args: Record<string, unknown>) => ({
           messages: [
-            { role: 'user' as const, content: { type: 'text' as const, text: `Summarize: ${args.text}` } },
+            {
+              role: 'user' as const,
+              content: { type: 'text' as const, text: `Summarize: ${args.text}` },
+            },
           ],
         }),
       });

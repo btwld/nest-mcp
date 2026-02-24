@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { z } from 'zod';
 import { MCP_TOOL_METADATA } from '@btwld/mcp-common';
+import { z } from 'zod';
 import { Tool } from './tool.decorator';
 
 describe('Tool decorator', () => {
@@ -12,11 +12,7 @@ describe('Tool decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'myTool',
-    );
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'myTool');
 
     expect(metadata).toBeDefined();
     expect(metadata.name).toBe('myTool');
@@ -33,11 +29,7 @@ describe('Tool decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'autoNamed',
-    );
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'autoNamed');
 
     expect(metadata.name).toBe('autoNamed');
   });
@@ -50,11 +42,7 @@ describe('Tool decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'methodName',
-    );
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'methodName');
 
     expect(metadata.name).toBe('custom-name');
     expect(metadata.methodName).toBe('methodName');
@@ -81,11 +69,7 @@ describe('Tool decorator', () => {
       }
     }
 
-    const metadata = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'schemaMethod',
-    );
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'schemaMethod');
 
     expect(metadata.parameters).toBe(params);
     expect(metadata.outputSchema).toBe(output);
@@ -105,16 +89,8 @@ describe('Tool decorator', () => {
       }
     }
 
-    const metaA = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'toolA',
-    );
-    const metaB = Reflect.getMetadata(
-      MCP_TOOL_METADATA,
-      TestService.prototype,
-      'toolB',
-    );
+    const metaA = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'toolA');
+    const metaB = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'toolB');
 
     expect(metaA.name).toBe('toolA');
     expect(metaA.description).toBe('first');

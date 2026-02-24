@@ -1,5 +1,5 @@
+import { MCP_RATE_LIMIT_EXCEEDED, McpError, type RateLimitConfig } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
-import { McpError, MCP_RATE_LIMIT_EXCEEDED, type RateLimitConfig } from '@btwld/mcp-common';
 
 interface RateLimitEntry {
   count: number;
@@ -57,11 +57,15 @@ export class RateLimiterService {
 function parseWindow(window: string): number {
   const match = window.match(/^(\d+)(s|m|h)$/);
   if (!match) throw new Error(`Invalid rate limit window: ${window}`);
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   switch (match[2]) {
-    case 's': return value * 1000;
-    case 'm': return value * 60 * 1000;
-    case 'h': return value * 60 * 60 * 1000;
-    default: return value * 1000;
+    case 's':
+      return value * 1000;
+    case 'm':
+      return value * 60 * 1000;
+    case 'h':
+      return value * 60 * 60 * 1000;
+    default:
+      return value * 1000;
   }
 }

@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  parseUriTemplate,
-  matchUriTemplate,
   expandUriTemplate,
   getTemplateParams,
+  matchUriTemplate,
+  parseUriTemplate,
 } from './uri-template';
 
 describe('parseUriTemplate', () => {
@@ -38,10 +38,7 @@ describe('matchUriTemplate', () => {
   });
 
   it('should match multiple parameters', () => {
-    const result = matchUriTemplate(
-      '/users/{userId}/posts/{postId}',
-      '/users/1/posts/99',
-    );
+    const result = matchUriTemplate('/users/{userId}/posts/{postId}', '/users/1/posts/99');
     expect(result).toEqual({ params: { userId: '1', postId: '99' } });
   });
 
@@ -90,9 +87,7 @@ describe('getTemplateParams', () => {
   });
 
   it('should return multiple parameter names', () => {
-    expect(
-      getTemplateParams('/users/{userId}/posts/{postId}'),
-    ).toEqual(['userId', 'postId']);
+    expect(getTemplateParams('/users/{userId}/posts/{postId}')).toEqual(['userId', 'postId']);
   });
 
   it('should return empty array for no parameters', () => {

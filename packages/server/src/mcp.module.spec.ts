@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { McpModule } from './mcp.module';
 import { McpTransportType } from '@btwld/mcp-common';
+import { describe, expect, it } from 'vitest';
+import { McpModule } from './mcp.module';
 
 describe('McpModule', () => {
   describe('forRoot', () => {
@@ -12,7 +12,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(1);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('StreamableHttpService');
     });
 
@@ -24,7 +26,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(2);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('SseService');
     });
 
@@ -36,7 +40,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(0);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('StdioService');
     });
   });
@@ -53,7 +59,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(1);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('StreamableHttpService');
     });
 
@@ -68,7 +76,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(2);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('SseService');
     });
 
@@ -83,7 +93,9 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(0);
-      const providerNames = mod.providers!.map((p: any) => p.name ?? p.provide?.toString?.() ?? '');
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
       expect(providerNames).toContain('StdioService');
     });
 
@@ -124,7 +136,13 @@ describe('McpModule', () => {
       const fakeModule = { module: class FakeModule {} };
       const mod = McpModule.forRootAsync({
         transport: McpTransportType.STDIO,
-        imports: [fakeModule as any],
+        imports: [
+          fakeModule as unknown as Parameters<typeof McpModule.forRootAsync>[0]['imports'] extends
+            | (infer U)[]
+            | undefined
+            ? U
+            : never,
+        ],
         useFactory: () => ({
           name: 'test',
           version: '1.0',
@@ -148,11 +166,13 @@ describe('McpModule', () => {
         inject: ['CONFIG_SERVICE'],
       });
 
-      const optionsProvider = (mod.providers as any[]).find(
-        (p: any) => p.provide?.toString?.() === 'Symbol(MCP_OPTIONS)' || p.provide === Symbol.for('MCP_OPTIONS'),
+      const optionsProvider = (mod.providers as Record<string, unknown>[]).find(
+        (p: Record<string, unknown>) =>
+          p.provide?.toString?.() === 'Symbol(MCP_OPTIONS)' ||
+          p.provide === Symbol.for('MCP_OPTIONS'),
       );
       // The MCP_OPTIONS provider should exist (it's an injection token)
-      expect(mod.providers!.length).toBeGreaterThan(0);
+      expect(mod.providers?.length).toBeGreaterThan(0);
     });
   });
 

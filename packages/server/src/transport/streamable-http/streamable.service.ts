@@ -1,16 +1,28 @@
-import { Injectable, Logger, type OnModuleDestroy, Inject } from '@nestjs/common';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { randomUUID } from 'node:crypto';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS } from '@btwld/mcp-common';
-import { McpRegistryService } from '../../discovery/registry.service';
-import { McpExecutorService } from '../../execution/executor.service';
-import { ExecutionPipelineService } from '../../execution/pipeline.service';
-import { McpContextFactory } from '../../execution/context.factory';
 import { McpTransportType } from '@btwld/mcp-common';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import type { McpRegistryService } from '../../discovery/registry.service';
+import type { McpContextFactory } from '../../execution/context.factory';
+import type { McpExecutorService } from '../../execution/executor.service';
+import type { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
-import { randomUUID } from 'crypto';
+
+interface HttpRequest {
+  headers?: Record<string, string | string[] | undefined>;
+  headersSent?: boolean;
+}
+
+interface HttpResponse {
+  headersSent?: boolean;
+  status?: (code: number) => { json?: (body: unknown) => void; end?: () => void };
+  code?: (code: number) => { send?: (body?: unknown) => void };
+  on?: (event: string, cb: () => void) => void;
+}
 
 @Injectable()
 export class StreamableHttpService implements OnModuleDestroy {
@@ -30,7 +42,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     return this.options.transportOptions?.streamableHttp?.stateless ?? false;
   }
 
-  async handlePostRequest(req: any, res: any): Promise<void> {
+  async handlePostRequest(req: unknown, res: unknown): Promise<void> {
     try {
       if (this.isStateless) {
         await this.handleStatelessPost(req, res);
@@ -39,63 +51,74 @@ export class StreamableHttpService implements OnModuleDestroy {
       }
     } catch (error) {
       this.logger.error('Error handling POST request', error);
-      if (!res.headersSent) {
-        res.status?.(500).json?.({ error: 'Internal server error' }) ??
-          res.code?.(500).send?.({ error: 'Internal server error' });
+      const resObj = res as HttpResponse;
+      if (!resObj.headersSent) {
+        resObj.status?.(500).json?.({ error: 'Internal server error' }) ??
+          resObj.code?.(500).send?.({ error: 'Internal server error' });
       }
     }
   }
 
-  async handleGetRequest(req: any, res: any): Promise<void> {
+  async handleGetRequest(req: unknown, res: unknown): Promise<void> {
+    const resObj = res as HttpResponse;
     if (this.isStateless) {
-      res.status?.(405).json?.({ error: 'SSE not supported in stateless mode' }) ??
-        res.code?.(405).send?.({ error: 'SSE not supported in stateless mode' });
+      resObj.status?.(405).json?.({ error: 'SSE not supported in stateless mode' }) ??
+        resObj.code?.(405).send?.({ error: 'SSE not supported in stateless mode' });
       return;
     }
 
-    const sessionId = req.headers?.['mcp-session-id'];
+    const reqObj = req as HttpRequest;
+    const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
     if (!sessionId || !this.transports.has(sessionId)) {
-      res.status?.(404).json?.({ error: 'Session not found' }) ??
-        res.code?.(404).send?.({ error: 'Session not found' });
+      resObj.status?.(404).json?.({ error: 'Session not found' }) ??
+        resObj.code?.(404).send?.({ error: 'Session not found' });
       return;
     }
 
-    const transport = this.transports.get(sessionId)!;
-    await transport.handleRequest(req, res);
+    const transport = this.transports.get(sessionId);
+    if (transport) {
+      await transport.handleRequest(req as Request, res as Response);
+    }
   }
 
-  async handleDeleteRequest(req: any, res: any): Promise<void> {
-    const sessionId = req.headers?.['mcp-session-id'];
+  async handleDeleteRequest(req: unknown, res: unknown): Promise<void> {
+    const reqObj = req as HttpRequest;
+    const resObj = res as HttpResponse;
+    const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
     if (sessionId && this.transports.has(sessionId)) {
       await this.cleanupSession(sessionId);
-      res.status?.(204).end?.() ?? res.code?.(204).send?.();
+      resObj.status?.(204).end?.() ?? resObj.code?.(204).send?.();
     } else {
-      res.status?.(404).json?.({ error: 'Session not found' }) ??
-        res.code?.(404).send?.({ error: 'Session not found' });
+      resObj.status?.(404).json?.({ error: 'Session not found' }) ??
+        resObj.code?.(404).send?.({ error: 'Session not found' });
     }
   }
 
-  private async handleStatelessPost(req: any, res: any): Promise<void> {
+  private async handleStatelessPost(req: unknown, res: unknown): Promise<void> {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
     });
 
-    const server = this.createAndConnectServer(transport, 'stateless-' + randomUUID().slice(0, 8));
+    const server = this.createAndConnectServer(transport, `stateless-${randomUUID().slice(0, 8)}`);
 
-    res.on?.('close', () => {
+    const resObj = res as HttpResponse;
+    resObj.on?.('close', () => {
       transport.close();
       server.close();
     });
 
-    await transport.handleRequest(req, res);
+    await transport.handleRequest(req as Request, res as Response);
   }
 
-  private async handleStatefulPost(req: any, res: any): Promise<void> {
-    const existingSessionId = req.headers?.['mcp-session-id'];
+  private async handleStatefulPost(req: unknown, res: unknown): Promise<void> {
+    const reqObj = req as HttpRequest;
+    const existingSessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
 
     if (existingSessionId && this.transports.has(existingSessionId)) {
-      const transport = this.transports.get(existingSessionId)!;
-      await transport.handleRequest(req, res);
+      const transport = this.transports.get(existingSessionId);
+      if (transport) {
+        await transport.handleRequest(req as Request, res as Response);
+      }
       return;
     }
 
@@ -111,7 +134,7 @@ export class StreamableHttpService implements OnModuleDestroy {
 
     const server = this.createAndConnectServer(transport, 'pending');
 
-    await transport.handleRequest(req, res);
+    await transport.handleRequest(req as Request, res as Response);
 
     const sessionId = transport.sessionId;
     if (sessionId) {
@@ -121,7 +144,10 @@ export class StreamableHttpService implements OnModuleDestroy {
     }
   }
 
-  private createAndConnectServer(transport: StreamableHTTPServerTransport, label: string): McpServer {
+  private createAndConnectServer(
+    transport: StreamableHTTPServerTransport,
+    label: string,
+  ): McpServer {
     const server = createMcpServer(this.registry, this.options);
     this.registerServerHandlers(server, label);
     server.connect(transport);

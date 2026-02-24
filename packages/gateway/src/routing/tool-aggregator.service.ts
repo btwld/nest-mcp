@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { UpstreamManagerService } from '../upstream/upstream-manager.service';
-import { RouterService } from './router.service';
+import type { UpstreamManagerService } from '../upstream/upstream-manager.service';
+import type { RouterService } from './router.service';
 
 export interface AggregatedTool {
   name: string;
@@ -53,9 +53,7 @@ export class ToolAggregatorService {
       const prefix = this.router.getPrefixForUpstream(upstreamName);
 
       return (result.tools ?? []).map((tool) => ({
-        name: prefix
-          ? this.router.buildPrefixedName(prefix, tool.name)
-          : tool.name,
+        name: prefix ? this.router.buildPrefixedName(prefix, tool.name) : tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema as Record<string, unknown>,
         upstreamName,

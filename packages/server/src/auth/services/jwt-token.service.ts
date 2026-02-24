@@ -1,6 +1,6 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { TokenPayload, TokenResponse } from '../interfaces/oauth-types.interface';
 
@@ -19,18 +19,11 @@ export class JwtTokenService {
     scope?: string,
     resource?: string,
   ): TokenResponse {
-    const iss =
-      this.options.issuer ??
-      this.options.serverUrl ??
-      'http://localhost:3000';
+    const iss = this.options.issuer ?? this.options.serverUrl ?? 'http://localhost:3000';
     const aud = this.options.audience ?? 'mcp-client';
 
-    const accessExpiresIn = this.parseExpiresIn(
-      this.options.accessTokenExpiresIn ?? '1d',
-    );
-    const refreshExpiresIn = this.parseExpiresIn(
-      this.options.refreshTokenExpiresIn ?? '30d',
-    );
+    const accessExpiresIn = this.parseExpiresIn(this.options.accessTokenExpiresIn ?? '1d');
+    const refreshExpiresIn = this.parseExpiresIn(this.options.refreshTokenExpiresIn ?? '30d');
 
     const accessToken = jwt.sign(
       {
@@ -86,7 +79,7 @@ export class JwtTokenService {
   private parseExpiresIn(value: string): number {
     const match = value.match(/^(\d+)([smhd])$/);
     if (!match) return 86400;
-    const num = parseInt(match[1], 10);
+    const num = Number.parseInt(match[1], 10);
     const unit = match[2];
     switch (unit) {
       case 's':

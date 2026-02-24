@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { OAuthClient } from '../interfaces/oauth-types.interface';
 import type { IOAuthStore } from '../stores/oauth-store.interface';
@@ -20,10 +20,7 @@ export class OAuthClientService {
     redirectUris: string[],
     grantTypes?: string[],
   ): Promise<OAuthClient> {
-    const clientId = createHash('sha256')
-      .update(clientName)
-      .digest('hex')
-      .substring(0, 32);
+    const clientId = createHash('sha256').update(clientName).digest('hex').substring(0, 32);
     const clientSecret = randomBytes(32).toString('hex');
 
     const client: OAuthClient = {
@@ -43,10 +40,7 @@ export class OAuthClientService {
     return this.store.getClient(clientId);
   }
 
-  async validateRedirectUri(
-    clientId: string,
-    redirectUri: string,
-  ): Promise<boolean> {
+  async validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean> {
     const client = await this.store.getClient(clientId);
     if (!client) return false;
     return client.redirect_uris.includes(redirectUri);

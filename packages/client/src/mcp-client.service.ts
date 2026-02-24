@@ -1,16 +1,19 @@
-import { Logger } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   CallToolRequest,
-  ReadResourceRequest,
-  ListToolsRequest,
-  ListResourcesRequest,
   GetPromptRequest,
   ListPromptsRequest,
+  ListResourcesRequest,
+  ListToolsRequest,
+  ReadResourceRequest,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { McpClientConnection, McpClientReconnectOptions } from './interfaces/client-options.interface';
+import { Logger } from '@nestjs/common';
+import type {
+  McpClientConnection,
+  McpClientReconnectOptions,
+} from './interfaces/client-options.interface';
 import { createClientTransport } from './transport/client-transport.factory';
 
 export class McpClient {
@@ -44,8 +47,10 @@ export class McpClient {
       this.connected = true;
       this.reconnectAttempts = 0;
       this.logger.log(`Connected to MCP server "${this.name}"`);
-    } catch (err: any) {
-      this.logger.error(`Failed to connect to "${this.name}": ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Failed to connect to "${this.name}": ${err instanceof Error ? err.message : String(err)}`,
+      );
       throw err;
     }
   }
@@ -70,50 +75,32 @@ export class McpClient {
     return this.client;
   }
 
-  async callTool(
-    params: CallToolRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async callTool(params: CallToolRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.callTool(params, undefined, options);
   }
 
-  async readResource(
-    params: ReadResourceRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async readResource(params: ReadResourceRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.readResource(params, options);
   }
 
-  async listTools(
-    params?: ListToolsRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async listTools(params?: ListToolsRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listTools(params, options);
   }
 
-  async listResources(
-    params?: ListResourcesRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async listResources(params?: ListResourcesRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listResources(params, options);
   }
 
-  async getPrompt(
-    params: GetPromptRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async getPrompt(params: GetPromptRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.getPrompt(params, options);
   }
 
-  async listPrompts(
-    params?: ListPromptsRequest['params'],
-    options?: RequestOptions,
-  ) {
+  async listPrompts(params?: ListPromptsRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listPrompts(params, options);
   }
@@ -178,15 +165,15 @@ export class McpClient {
         this.reconnecting = false;
         this.logger.log(`Reconnected to "${this.name}"`);
         return;
-      } catch (err: any) {
-        this.logger.warn(`Reconnection attempt ${this.reconnectAttempts} failed: ${err.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Reconnection attempt ${this.reconnectAttempts} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
     this.reconnecting = false;
-    this.logger.error(
-      `Failed to reconnect to "${this.name}" after ${maxAttempts} attempts`,
-    );
+    this.logger.error(`Failed to reconnect to "${this.name}" after ${maxAttempts} attempts`);
   }
 
   private sleep(ms: number): Promise<void> {

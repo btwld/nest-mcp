@@ -1,6 +1,6 @@
 import 'reflect-metadata';
+import { MCP_RATE_LIMIT_EXCEEDED, McpError } from '@btwld/mcp-common';
 import { RateLimiterService } from './rate-limiter.service';
-import { McpError, MCP_RATE_LIMIT_EXCEEDED } from '@btwld/mcp-common';
 
 describe('RateLimiterService', () => {
   let service: RateLimiterService;
@@ -35,7 +35,7 @@ describe('RateLimiterService', () => {
       const mcpErr = err as McpError;
       expect(mcpErr.code).toBe(MCP_RATE_LIMIT_EXCEEDED);
       expect(mcpErr.message).toContain("Rate limit exceeded for 'tool-a'");
-      expect((mcpErr.data as any).retryAfter).toBeGreaterThan(0);
+      expect((mcpErr.data as Record<string, unknown>).retryAfter).toBeGreaterThan(0);
     }
   });
 

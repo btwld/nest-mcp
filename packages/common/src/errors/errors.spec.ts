@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { McpError } from './mcp-error';
-import { ToolExecutionError } from './tool-execution.error';
-import { ValidationError } from './validation.error';
-import { TransportError } from './transport.error';
-import { AuthenticationError, AuthorizationError } from './auth.error';
+import { describe, expect, it } from 'vitest';
 import {
   JSON_RPC_INTERNAL_ERROR,
   JSON_RPC_INVALID_PARAMS,
-  MCP_TRANSPORT_ERROR,
   MCP_AUTHENTICATION_ERROR,
   MCP_AUTHORIZATION_ERROR,
+  MCP_TRANSPORT_ERROR,
 } from '../constants/error-codes';
+import { AuthenticationError, AuthorizationError } from './auth.error';
+import { McpError } from './mcp-error';
+import { ToolExecutionError } from './tool-execution.error';
+import { TransportError } from './transport.error';
+import { ValidationError } from './validation.error';
 
 describe('McpError', () => {
   it('should create an error with message and default code', () => {

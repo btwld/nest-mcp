@@ -1,9 +1,7 @@
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
 
-export function mockMcpContext(
-  overrides: Partial<McpExecutionContext> = {},
-): McpExecutionContext {
+export function mockMcpContext(overrides: Partial<McpExecutionContext> = {}): McpExecutionContext {
   return {
     sessionId: 'test-session',
     transport: McpTransportType.STDIO,

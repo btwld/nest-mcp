@@ -1,14 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { buildServerCapabilities } from './capabilities-builder';
+import { describe, expect, it } from 'vitest';
 import type { McpModuleOptions } from '../interfaces/mcp-options.interface';
+import { buildServerCapabilities } from './capabilities-builder';
 
-function makeOptions(
-  overrides: Partial<McpModuleOptions> = {},
-): McpModuleOptions {
+function makeOptions(overrides: Partial<McpModuleOptions> = {}): McpModuleOptions {
   return {
     name: 'test-server',
     version: '1.0.0',
-    transport: 'stdio' as any,
+    transport: 'stdio' as McpModuleOptions['transport'],
     ...overrides,
   };
 }

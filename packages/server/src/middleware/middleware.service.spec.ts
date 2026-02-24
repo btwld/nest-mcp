@@ -1,7 +1,7 @@
 import 'reflect-metadata';
-import { MiddlewareService } from './middleware.service';
+import type { McpExecutionContext, McpMiddleware } from '@btwld/mcp-common';
 import { mockMcpContext } from '../testing/mock-context';
-import type { McpMiddleware, McpExecutionContext } from '@btwld/mcp-common';
+import { MiddlewareService } from './middleware.service';
 
 describe('MiddlewareService', () => {
   let service: MiddlewareService;
@@ -71,13 +71,13 @@ describe('MiddlewareService', () => {
   it('middleware can modify context and args', async () => {
     const handler = vi.fn().mockResolvedValue('ok');
     const mw: McpMiddleware = async (c, args, next) => {
-      (c as any).custom = 'injected';
-      (args as any).extra = 'value';
+      (c as unknown as Record<string, unknown>).custom = 'injected';
+      (args as unknown as Record<string, unknown>).extra = 'value';
       return next();
     };
 
     await service.executeChain([mw], ctx, { original: true }, handler);
-    expect((ctx as any).custom).toBe('injected');
+    expect((ctx as unknown as Record<string, unknown>).custom).toBe('injected');
   });
 
   it('errors propagate from middleware', async () => {

@@ -1,7 +1,4 @@
-import {
-  OAuthClient,
-  AuthorizationCode,
-} from '../interfaces/oauth-types.interface';
+import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-types.interface';
 
 export interface IOAuthStore {
   storeClient(client: OAuthClient): Promise<OAuthClient>;

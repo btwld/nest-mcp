@@ -1,27 +1,24 @@
+import { createHash, randomBytes } from 'node:crypto';
 import {
-  Controller,
-  Post,
-  Get,
   Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Post,
   Query,
   Req,
   Res,
-  Inject,
-  HttpException,
-  HttpStatus,
   type Type,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
-import type {
-  TokenResponse,
-  OAuthClient,
-} from '../interfaces/oauth-types.interface';
+import type { OAuthClient, TokenPayload, TokenResponse } from '../interfaces/oauth-types.interface';
+import { MCP_OAUTH_STORE, type OAuthClientService } from '../services/client.service';
+import { type JwtTokenService, MCP_AUTH_OPTIONS } from '../services/jwt-token.service';
 import type { IOAuthStore } from '../stores/oauth-store.interface';
-import { JwtTokenService, MCP_AUTH_OPTIONS } from '../services/jwt-token.service';
-import { OAuthClientService, MCP_OAUTH_STORE } from '../services/client.service';
 
-export function createOAuthController(basePath: string): Type<any> {
+export function createOAuthController(basePath: string): Type<unknown> {
   @Controller(basePath)
   class OAuthController {
     constructor(
@@ -33,6 +30,7 @@ export function createOAuthController(basePath: string): Type<any> {
     ) {}
 
     @Get('authorize')
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: OAuth authorize flow requires sequential validation
     async authorize(
       @Query('response_type') responseType: string,
       @Query('client_id') clientId: string,
@@ -42,8 +40,8 @@ export function createOAuthController(basePath: string): Type<any> {
       @Query('scope') scope: string,
       @Query('state') state: string,
       @Query('resource') resource: string,
-      @Req() req: any,
-      @Res({ passthrough: false }) res: any,
+      @Req() req: unknown,
+      @Res({ passthrough: false }) res: { redirect: (status: number, url: string) => void },
     ): Promise<void> {
       // Validate required params before redirect_uri is trusted
       if (responseType !== 'code') {
@@ -69,7 +67,10 @@ export function createOAuthController(basePath: string): Type<any> {
 
       if (!codeChallenge) {
         throw new HttpException(
-          { error: 'invalid_request', error_description: 'code_challenge is required (PKCE is mandatory)' },
+          {
+            error: 'invalid_request',
+            error_description: 'code_challenge is required (PKCE is mandatory)',
+          },
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -93,7 +94,10 @@ export function createOAuthController(basePath: string): Type<any> {
       // Validate redirect_uri matches registered URIs — never redirect to unvalidated URI
       if (!client.redirect_uris.includes(redirectUri)) {
         throw new HttpException(
-          { error: 'invalid_request', error_description: 'redirect_uri does not match any registered URI' },
+          {
+            error: 'invalid_request',
+            error_description: 'redirect_uri does not match any registered URI',
+          },
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -103,14 +107,22 @@ export function createOAuthController(basePath: string): Type<any> {
 
       // Authenticate user via pluggable callback
       if (!this.options.validateUser) {
-        const params = new URLSearchParams({ error: 'access_denied', error_description: 'No user authentication configured', state });
+        const params = new URLSearchParams({
+          error: 'access_denied',
+          error_description: 'No user authentication configured',
+          state,
+        });
         res.redirect(302, `${redirectUri}?${params}`);
         return;
       }
 
       const user = await this.options.validateUser(req);
       if (!user) {
-        const params = new URLSearchParams({ error: 'access_denied', error_description: 'User authentication failed', state });
+        const params = new URLSearchParams({
+          error: 'access_denied',
+          error_description: 'User authentication failed',
+          state,
+        });
         res.redirect(302, `${redirectUri}?${params}`);
         return;
       }
@@ -136,8 +148,8 @@ export function createOAuthController(basePath: string): Type<any> {
     }
 
     @Post('token')
-    async token(@Body() body: any): Promise<TokenResponse> {
-      const { grant_type } = body;
+    async token(@Body() body: Record<string, unknown>): Promise<TokenResponse> {
+      const { grant_type } = body as { grant_type?: string };
 
       if (grant_type === 'authorization_code') {
         return this.handleAuthorizationCode(body);
@@ -147,20 +159,14 @@ export function createOAuthController(basePath: string): Type<any> {
         return this.handleRefreshToken(body);
       }
 
-      throw new HttpException(
-        'Unsupported grant_type',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Unsupported grant_type', HttpStatus.BAD_REQUEST);
     }
 
     @Post('revoke')
-    async revoke(@Body() body: any): Promise<{ success: boolean }> {
-      const { token } = body;
+    async revoke(@Body() body: Record<string, unknown>): Promise<{ success: boolean }> {
+      const { token } = body as { token?: string };
       if (!token) {
-        throw new HttpException(
-          'Token is required',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
       }
 
       try {
@@ -176,15 +182,16 @@ export function createOAuthController(basePath: string): Type<any> {
     }
 
     @Post('register')
-    async register(@Body() body: any): Promise<OAuthClient> {
+    async register(@Body() body: Record<string, unknown>): Promise<OAuthClient> {
       if (this.options.enableDynamicRegistration === false) {
-        throw new HttpException(
-          'Dynamic client registration is disabled',
-          HttpStatus.FORBIDDEN,
-        );
+        throw new HttpException('Dynamic client registration is disabled', HttpStatus.FORBIDDEN);
       }
 
-      const { client_name, redirect_uris, grant_types } = body;
+      const { client_name, redirect_uris, grant_types } = body as {
+        client_name?: string;
+        redirect_uris?: string[];
+        grant_types?: string[];
+      };
 
       if (!client_name || !redirect_uris?.length) {
         throw new HttpException(
@@ -193,60 +200,44 @@ export function createOAuthController(basePath: string): Type<any> {
         );
       }
 
-      return this.clientService.registerClient(
-        client_name,
-        redirect_uris,
-        grant_types,
-      );
+      return this.clientService.registerClient(client_name, redirect_uris, grant_types);
     }
 
-    private async handleAuthorizationCode(body: any): Promise<TokenResponse> {
-      const { code, code_verifier, redirect_uri } = body;
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: PKCE code exchange has inherent branching for validation
+    private async handleAuthorizationCode(body: Record<string, unknown>): Promise<TokenResponse> {
+      const { code, code_verifier, redirect_uri } = body as {
+        code?: string;
+        code_verifier?: string;
+        redirect_uri?: string;
+      };
 
       if (!code || !code_verifier) {
-        throw new HttpException(
-          'code and code_verifier are required',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('code and code_verifier are required', HttpStatus.BAD_REQUEST);
       }
 
       const authCode = await this.store.getAuthCode(code);
       if (!authCode) {
-        throw new HttpException(
-          'Invalid or expired authorization code',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('Invalid or expired authorization code', HttpStatus.BAD_REQUEST);
       }
 
       // Validate redirect_uri matches
       if (redirect_uri && redirect_uri !== authCode.redirect_uri) {
         await this.store.removeAuthCode(code);
-        throw new HttpException(
-          'redirect_uri mismatch',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('redirect_uri mismatch', HttpStatus.BAD_REQUEST);
       }
 
       // PKCE validation
       if (authCode.code_challenge_method === 'S256') {
-        const expected = createHash('sha256')
-          .update(code_verifier)
-          .digest('base64url');
+        const expected = createHash('sha256').update(code_verifier).digest('base64url');
         if (expected !== authCode.code_challenge) {
           await this.store.removeAuthCode(code);
-          throw new HttpException(
-            'Invalid code_verifier',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Invalid code_verifier', HttpStatus.BAD_REQUEST);
         }
       } else {
         // plain
         if (code_verifier !== authCode.code_challenge) {
           await this.store.removeAuthCode(code);
-          throw new HttpException(
-            'Invalid code_verifier',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Invalid code_verifier', HttpStatus.BAD_REQUEST);
         }
       }
 
@@ -261,38 +252,26 @@ export function createOAuthController(basePath: string): Type<any> {
       );
     }
 
-    private async handleRefreshToken(body: any): Promise<TokenResponse> {
-      const { refresh_token } = body;
+    private async handleRefreshToken(body: Record<string, unknown>): Promise<TokenResponse> {
+      const { refresh_token } = body as { refresh_token?: string };
 
       if (!refresh_token) {
-        throw new HttpException(
-          'refresh_token is required',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('refresh_token is required', HttpStatus.BAD_REQUEST);
       }
 
-      let payload;
+      let payload: TokenPayload;
       try {
         payload = this.jwtService.validateToken(refresh_token);
       } catch {
-        throw new HttpException(
-          'Invalid refresh token',
-          HttpStatus.UNAUTHORIZED,
-        );
+        throw new HttpException('Invalid refresh token', HttpStatus.UNAUTHORIZED);
       }
 
       if (payload.type !== 'refresh') {
-        throw new HttpException(
-          'Token is not a refresh token',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('Token is not a refresh token', HttpStatus.BAD_REQUEST);
       }
 
       if (payload.jti && (await this.store.isTokenRevoked(payload.jti))) {
-        throw new HttpException(
-          'Refresh token has been revoked',
-          HttpStatus.UNAUTHORIZED,
-        );
+        throw new HttpException('Refresh token has been revoked', HttpStatus.UNAUTHORIZED);
       }
 
       // Revoke the old refresh token

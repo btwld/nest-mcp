@@ -1,17 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
 import type { RetryConfig } from '@btwld/mcp-common';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class RetryService {
   private readonly logger = new Logger(RetryService.name);
 
   async execute<T>(toolName: string, config: RetryConfig, fn: () => Promise<T>): Promise<T> {
-    const {
-      maxAttempts,
-      backoff,
-      initialDelay = 100,
-      maxDelay = 10_000,
-    } = config;
+    const { maxAttempts, backoff, initialDelay = 100, maxDelay = 10_000 } = config;
 
     let lastError: Error | undefined;
 
@@ -44,14 +39,13 @@ export class RetryService {
 
     switch (backoff) {
       case 'exponential':
-        delay = initialDelay * Math.pow(2, attempt - 1);
+        delay = initialDelay * 2 ** (attempt - 1);
         // Add jitter (±25%)
         delay = delay * (0.75 + Math.random() * 0.5);
         break;
       case 'linear':
         delay = initialDelay * attempt;
         break;
-      case 'fixed':
       default:
         delay = initialDelay;
         break;

@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { AuthorizationError } from '@btwld/mcp-common';
 import type { McpGuardContext } from '@btwld/mcp-common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { RegisteredTool } from '../../discovery/registry.service';
 
 @Injectable()
 export class ToolAuthGuardService {
   private readonly logger = new Logger(ToolAuthGuardService.name);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequential auth checks are inherently branchy
   async checkAuthorization(tool: RegisteredTool, context: McpGuardContext): Promise<void> {
     // Public tools skip auth
     if (tool.isPublic) return;
@@ -36,7 +37,11 @@ export class ToolAuthGuardService {
     // Execute custom guards
     if (tool.guards?.length) {
       for (const GuardClass of tool.guards) {
-        const guard = new (GuardClass as any)();
+        const guard = new (
+          GuardClass as unknown as new () => {
+            canActivate?: (ctx: McpGuardContext) => boolean | Promise<boolean>;
+          }
+        )();
         if (typeof guard.canActivate === 'function') {
           const allowed = await guard.canActivate(context);
           if (!allowed) {

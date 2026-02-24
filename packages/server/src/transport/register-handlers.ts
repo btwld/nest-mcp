@@ -1,8 +1,9 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { zodToJsonSchema, extractZodDescriptions } from '@btwld/mcp-common';
+import { extractZodDescriptions, zodToJsonSchema } from '@btwld/mcp-common';
+import type { McpExecutionContext } from '@btwld/mcp-common';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RegisteredPrompt, RegisteredTool } from '../discovery/registry.service';
 import type { McpRegistryService } from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
-import type { McpExecutionContext } from '@btwld/mcp-common';
 
 /**
  * Registers all tools, resources, resource templates, and prompts from the
@@ -31,12 +32,12 @@ function registerTools(
 ): void {
   for (const tool of registry.getAllTools()) {
     const inputSchema = tool.inputSchema ?? (tool.parameters ? getInputSchema(tool) : {});
-    (server as any).tool(
+    (server as Record<string, unknown> as { tool: (...args: unknown[]) => void }).tool(
       tool.name,
       tool.description,
       inputSchema,
-      async (args: any) => {
-        return pipeline.callTool(tool.name, args, ctx) as any;
+      async (args: Record<string, unknown>) => {
+        return pipeline.callTool(tool.name, args, ctx);
       },
     );
   }
@@ -49,12 +50,12 @@ function registerResources(
   ctx: McpExecutionContext,
 ): void {
   for (const resource of registry.getAllResources()) {
-    (server as any).resource(
+    (server as Record<string, unknown> as { resource: (...args: unknown[]) => void }).resource(
       resource.name,
       resource.uri,
       resource.mimeType ? { mimeType: resource.mimeType } : {},
       async (uri: URL) => {
-        return pipeline.readResource(uri.href, ctx) as any;
+        return pipeline.readResource(uri.href, ctx);
       },
     );
   }
@@ -67,12 +68,12 @@ function registerResourceTemplates(
   ctx: McpExecutionContext,
 ): void {
   for (const template of registry.getAllResourceTemplates()) {
-    (server as any).resource(
+    (server as Record<string, unknown> as { resource: (...args: unknown[]) => void }).resource(
       template.name,
       template.uriTemplate,
       template.mimeType ? { mimeType: template.mimeType } : {},
       async (uri: URL) => {
-        return pipeline.readResource(uri.href, ctx) as any;
+        return pipeline.readResource(uri.href, ctx);
       },
     );
   }
@@ -86,26 +87,28 @@ function registerPrompts(
 ): void {
   for (const prompt of registry.getAllPrompts()) {
     const promptArgs = prompt.parameters ? getPromptArgs(prompt) : {};
-    (server as any).prompt(
+    (server as Record<string, unknown> as { prompt: (...args: unknown[]) => void }).prompt(
       prompt.name,
       prompt.description,
       promptArgs,
-      async (args: any) => {
-        return pipeline.getPrompt(prompt.name, args, ctx) as any;
+      async (args: Record<string, unknown>) => {
+        return pipeline.getPrompt(prompt.name, args, ctx);
       },
     );
   }
 }
 
-function getInputSchema(tool: any): Record<string, unknown> {
+function getInputSchema(tool: RegisteredTool): Record<string, unknown> {
   if (!tool.parameters) return {};
   return zodToJsonSchema(tool.parameters);
 }
 
-function getPromptArgs(prompt: any): Record<string, any> {
+function getPromptArgs(
+  prompt: RegisteredPrompt,
+): Record<string, { description: string; required: boolean }> {
   if (!prompt.parameters) return {};
   const descriptions = extractZodDescriptions(prompt.parameters);
-  const args: Record<string, any> = {};
+  const args: Record<string, { description: string; required: boolean }> = {};
   for (const desc of descriptions) {
     args[desc.name] = {
       description: desc.description,

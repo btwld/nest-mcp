@@ -1,58 +1,64 @@
 import type { McpHttpAdapter } from '@btwld/mcp-common';
 
 export class ExpressAdapter implements McpHttpAdapter {
-  getRequestMethod(request: any): string {
-    return request.method;
+  getRequestMethod(request: unknown): string {
+    return (request as { method: string }).method;
   }
 
-  getRequestUrl(request: any): string {
-    return request.url;
+  getRequestUrl(request: unknown): string {
+    return (request as { url: string }).url;
   }
 
-  getRequestHeaders(request: any): Record<string, string | string[]> {
-    return request.headers;
+  getRequestHeaders(request: unknown): Record<string, string | string[]> {
+    return (request as { headers: Record<string, string | string[]> }).headers;
   }
 
-  getRequestBody(request: any): unknown {
-    return request.body;
+  getRequestBody(request: unknown): unknown {
+    return (request as { body: unknown }).body;
   }
 
-  getRequestQuery(request: any): Record<string, string> {
-    return request.query;
+  getRequestQuery(request: unknown): Record<string, string> {
+    return (request as { query: Record<string, string> }).query;
   }
 
-  setResponseHeader(response: any, name: string, value: string): void {
-    response.setHeader(name, value);
+  setResponseHeader(response: unknown, name: string, value: string): void {
+    (response as { setHeader: (name: string, value: string) => void }).setHeader(name, value);
   }
 
-  sendResponse(response: any, statusCode: number, body?: unknown): void {
+  sendResponse(response: unknown, statusCode: number, body?: unknown): void {
+    const res = response as {
+      status: (code: number) => { json: (body: unknown) => void; end: () => void };
+    };
     if (body !== undefined) {
-      response.status(statusCode).json(body);
+      res.status(statusCode).json(body);
     } else {
-      response.status(statusCode).end();
+      res.status(statusCode).end();
     }
   }
 
-  sendSseEvent(response: any, event: string, data: string, id?: string): void {
-    if (id) response.write(`id: ${id}\n`);
-    response.write(`event: ${event}\n`);
-    response.write(`data: ${data}\n\n`);
-    if (response.flush) response.flush();
+  sendSseEvent(response: unknown, event: string, data: string, id?: string): void {
+    const res = response as { write: (chunk: string) => void; flush?: () => void };
+    if (id) res.write(`id: ${id}\n`);
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${data}\n\n`);
+    if (res.flush) res.flush();
   }
 
-  setupSse(response: any): void {
-    response.writeHead(200, {
+  setupSse(response: unknown): void {
+    (
+      response as { writeHead: (status: number, headers: Record<string, string>) => void }
+    ).writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
   }
 
-  closeSse(response: any): void {
-    response.end();
+  closeSse(response: unknown): void {
+    (response as { end: () => void }).end();
   }
 
-  onClose(response: any, callback: () => void): void {
-    response.on('close', callback);
+  onClose(response: unknown, callback: () => void): void {
+    (response as { on: (event: string, cb: () => void) => void }).on('close', callback);
   }
 }

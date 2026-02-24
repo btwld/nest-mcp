@@ -1,11 +1,11 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import { McpRegistryService } from '../../discovery/registry.service';
-import { McpExecutorService } from '../../execution/executor.service';
-import { ExecutionPipelineService } from '../../execution/pipeline.service';
-import { McpContextFactory } from '../../execution/context.factory';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { McpRegistryService } from '../../discovery/registry.service';
+import type { McpContextFactory } from '../../execution/context.factory';
+import type { McpExecutorService } from '../../execution/executor.service';
+import type { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import { registerHandlers } from '../register-handlers';
 

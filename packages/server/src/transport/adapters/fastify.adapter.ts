@@ -1,47 +1,52 @@
 import type { McpHttpAdapter } from '@btwld/mcp-common';
 
 export class FastifyAdapter implements McpHttpAdapter {
-  getRequestMethod(request: any): string {
-    return request.method;
+  getRequestMethod(request: unknown): string {
+    return (request as { method: string }).method;
   }
 
-  getRequestUrl(request: any): string {
-    return request.url;
+  getRequestUrl(request: unknown): string {
+    return (request as { url: string }).url;
   }
 
-  getRequestHeaders(request: any): Record<string, string | string[]> {
-    return request.headers;
+  getRequestHeaders(request: unknown): Record<string, string | string[]> {
+    return (request as { headers: Record<string, string | string[]> }).headers;
   }
 
-  getRequestBody(request: any): unknown {
-    return request.body;
+  getRequestBody(request: unknown): unknown {
+    return (request as { body: unknown }).body;
   }
 
-  getRequestQuery(request: any): Record<string, string> {
-    return request.query;
+  getRequestQuery(request: unknown): Record<string, string> {
+    return (request as { query: Record<string, string> }).query;
   }
 
-  setResponseHeader(response: any, name: string, value: string): void {
-    response.header(name, value);
+  setResponseHeader(response: unknown, name: string, value: string): void {
+    (response as { header: (name: string, value: string) => void }).header(name, value);
   }
 
-  sendResponse(response: any, statusCode: number, body?: unknown): void {
+  sendResponse(response: unknown, statusCode: number, body?: unknown): void {
+    const res = response as {
+      code: (code: number) => { send: (body?: unknown) => void };
+    };
     if (body !== undefined) {
-      response.code(statusCode).send(body);
+      res.code(statusCode).send(body);
     } else {
-      response.code(statusCode).send();
+      res.code(statusCode).send();
     }
   }
 
-  sendSseEvent(response: any, event: string, data: string, id?: string): void {
-    const raw = response.raw;
+  sendSseEvent(response: unknown, event: string, data: string, id?: string): void {
+    const raw = (response as { raw: { write: (chunk: string) => void } }).raw;
     if (id) raw.write(`id: ${id}\n`);
     raw.write(`event: ${event}\n`);
     raw.write(`data: ${data}\n\n`);
   }
 
-  setupSse(response: any): void {
-    const raw = response.raw;
+  setupSse(response: unknown): void {
+    const raw = (
+      response as { raw: { writeHead: (status: number, headers: Record<string, string>) => void } }
+    ).raw;
     raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -49,13 +54,13 @@ export class FastifyAdapter implements McpHttpAdapter {
     });
   }
 
-  closeSse(response: any): void {
-    const raw = response.raw;
+  closeSse(response: unknown): void {
+    const raw = (response as { raw: { end: () => void } }).raw;
     raw.end();
   }
 
-  onClose(response: any, callback: () => void): void {
-    const raw = response.raw;
+  onClose(response: unknown, callback: () => void): void {
+    const raw = (response as { raw: { on: (event: string, cb: () => void) => void } }).raw;
     raw.on('close', callback);
   }
 }

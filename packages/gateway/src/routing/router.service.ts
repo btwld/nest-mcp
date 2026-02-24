@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ResolvedRoute, RoutingConfig } from './route-config.interface';
 import type { UpstreamConfig } from '../upstream/upstream.interface';
+import type { ResolvedRoute, RoutingConfig } from './route-config.interface';
 
 @Injectable()
 export class RouterService {

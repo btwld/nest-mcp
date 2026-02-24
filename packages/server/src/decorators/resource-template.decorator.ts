@@ -1,5 +1,5 @@
 import { MCP_RESOURCE_TEMPLATE_METADATA } from '@btwld/mcp-common';
-import type { ResourceTemplateOptions, ResourceTemplateMetadata } from '@btwld/mcp-common';
+import type { ResourceTemplateMetadata, ResourceTemplateOptions } from '@btwld/mcp-common';
 
 export function ResourceTemplate(options: ResourceTemplateOptions): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

@@ -1,6 +1,6 @@
-import { RouterService } from './router.service';
 import type { UpstreamConfig } from '../upstream/upstream.interface';
 import type { RoutingConfig } from './route-config.interface';
+import { RouterService } from './router.service';
 
 describe('RouterService', () => {
   let service: RouterService;
@@ -25,7 +25,13 @@ describe('RouterService', () => {
 
     it('should skip disabled upstreams', () => {
       const upstreams: UpstreamConfig[] = [
-        { name: 'github', url: 'http://localhost', transport: 'sse', toolPrefix: 'gh', enabled: false },
+        {
+          name: 'github',
+          url: 'http://localhost',
+          transport: 'sse',
+          toolPrefix: 'gh',
+          enabled: false,
+        },
         { name: 'slack', url: 'http://localhost', transport: 'sse', toolPrefix: 'sl' },
       ];
 

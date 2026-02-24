@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import 'reflect-metadata';
 import {
-  setMethodMetadata,
-  getMethodMetadata,
-  setClassMetadata,
   getClassMetadata,
   getDecoratedMethods,
+  getMethodMetadata,
+  setClassMetadata,
+  setMethodMetadata,
 } from './metadata.utils';
 
 const TEST_KEY = Symbol('test:key');
@@ -80,7 +80,6 @@ describe('getDecoratedMethods', () => {
 
   it('should skip the constructor', () => {
     class MyClass {
-      constructor() {}
       handler() {}
     }
     Reflect.defineMetadata(TEST_KEY, 'val', MyClass.prototype, 'constructor');
