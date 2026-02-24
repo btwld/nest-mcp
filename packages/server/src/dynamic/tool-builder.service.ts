@@ -7,6 +7,7 @@ export interface DynamicToolConfig {
   name: string;
   description: string;
   parameters?: ZodType;
+  inputSchema?: Record<string, unknown>;
   outputSchema?: ZodType;
   annotations?: ToolAnnotations;
   handler: (args: any, ctx: McpExecutionContext) => Promise<ToolCallResult | string | unknown>;
@@ -30,6 +31,7 @@ export class McpToolBuilder {
       name: config.name,
       description: config.description,
       parameters: config.parameters,
+      inputSchema: config.inputSchema,
       outputSchema: config.outputSchema,
       annotations: config.annotations,
       methodName: config.name,

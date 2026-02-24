@@ -80,6 +80,51 @@ describe('registerHandlers', () => {
     expect(inputSchema).toEqual({});
   });
 
+  it('prefers pre-converted inputSchema over Zod parameters', () => {
+    const preConverted = {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    };
+    const zodSchema = z.object({ name: z.string() });
+
+    mockRegistry.getAllTools.mockReturnValue([
+      { name: 'search', description: 'Search', parameters: zodSchema, inputSchema: preConverted },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const [, , inputSchema] = mockServer.tool.mock.calls[0];
+    expect(inputSchema).toEqual(preConverted);
+  });
+
+  it('uses inputSchema when parameters is undefined', () => {
+    const preConverted = {
+      type: 'object',
+      properties: { city: { type: 'string' } },
+      required: ['city'],
+    };
+
+    mockRegistry.getAllTools.mockReturnValue([
+      { name: 'weather', description: 'Weather', parameters: undefined, inputSchema: preConverted },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const [, , inputSchema] = mockServer.tool.mock.calls[0];
+    expect(inputSchema).toEqual(preConverted);
+  });
+
+  it('falls back to empty schema when neither inputSchema nor parameters are set', () => {
+    mockRegistry.getAllTools.mockReturnValue([
+      { name: 'noop', description: 'No-op', parameters: undefined, inputSchema: undefined },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const [, , inputSchema] = mockServer.tool.mock.calls[0];
+    expect(inputSchema).toEqual({});
+  });
+
   it('registers resources with name, uri, mimeType metadata, and callback', () => {
     mockRegistry.getAllResources.mockReturnValue([
       { name: 'config', uri: 'data://config', mimeType: 'application/json' },

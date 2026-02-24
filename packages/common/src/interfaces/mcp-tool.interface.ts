@@ -22,6 +22,7 @@ export interface ToolMetadata {
   name: string;
   description: string;
   parameters?: ZodType;
+  inputSchema?: Record<string, unknown>;
   outputSchema?: ZodType;
   annotations?: ToolAnnotations;
   // Auth

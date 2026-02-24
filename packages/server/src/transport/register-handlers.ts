@@ -30,7 +30,7 @@ function registerTools(
   ctx: McpExecutionContext,
 ): void {
   for (const tool of registry.getAllTools()) {
-    const inputSchema = tool.parameters ? getInputSchema(tool) : {};
+    const inputSchema = tool.inputSchema ?? (tool.parameters ? getInputSchema(tool) : {});
     (server as any).tool(
       tool.name,
       tool.description,

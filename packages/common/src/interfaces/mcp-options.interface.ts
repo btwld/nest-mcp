@@ -51,6 +51,8 @@ export interface McpModuleOptions {
 
 export interface McpModuleAsyncOptions {
   imports?: any[];
+  transport: McpTransportType;
+  transportOptions?: TransportOptions;
   useFactory: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;
   inject?: any[];
 }

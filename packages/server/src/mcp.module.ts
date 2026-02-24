@@ -1,4 +1,4 @@
-import { DynamicModule, Module, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import { DynamicModule, Module, Logger, type OnApplicationBootstrap, type Provider, type Type } from '@nestjs/common';
 import type { McpModuleOptions, McpModuleAsyncOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 
@@ -54,8 +54,8 @@ export class McpModule {
   private static readonly logger = new Logger('McpModule');
 
   static forRoot(options: McpModuleOptions): DynamicModule {
-    const controllers: any[] = [];
-    const providers: any[] = [
+    const controllers: Type[] = [];
+    const providers: Provider[] = [
       { provide: MCP_OPTIONS, useValue: options },
       McpRegistryService,
       McpScannerService,
@@ -117,7 +117,8 @@ export class McpModule {
   }
 
   static forRootAsync(options: McpModuleAsyncOptions): DynamicModule {
-    const providers: any[] = [
+    const controllers: Type[] = [];
+    const providers: Provider[] = [
       {
         provide: MCP_OPTIONS,
         useFactory: options.useFactory,
@@ -140,10 +141,34 @@ export class McpModule {
       MetricsService,
     ];
 
+    // Streamable HTTP transport
+    if (options.transport === McpTransportType.STREAMABLE_HTTP) {
+      const endpoint =
+        options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+      providers.push(StreamableHttpService);
+      controllers.push(createStreamableHttpController(endpoint));
+    }
+
+    // SSE transport
+    if (options.transport === McpTransportType.SSE) {
+      const sseEndpoint =
+        options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+      const messagesEndpoint =
+        options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
+      providers.push(SseService);
+      controllers.push(...createSseController(sseEndpoint, messagesEndpoint));
+    }
+
+    // STDIO transport
+    if (options.transport === McpTransportType.STDIO) {
+      providers.push(StdioService);
+    }
+
     return {
       module: McpModule,
       global: true,
       imports: options.imports ?? [],
+      controllers,
       providers,
       exports: [
         McpRegistryService,
@@ -159,7 +184,7 @@ export class McpModule {
     };
   }
 
-  static forFeature(providers: any[]): DynamicModule {
+  static forFeature(providers: Provider[]): DynamicModule {
     return {
       module: McpModule,
       providers,

@@ -18,16 +18,30 @@ export class McpClientModule {
   private static readonly logger = new Logger('McpClientModule');
 
   static forRoot(options: McpClientModuleOptions): DynamicModule {
-    const providers = this.createConnectionProviders(options);
+    const connectionProviders = this.createConnectionProviders(options);
+
+    const connectionsAggregateProvider = {
+      provide: 'MCP_CLIENT_CONNECTIONS',
+      useFactory: (...clients: McpClient[]) => clients,
+      inject: connectionProviders.map((p) => p.provide),
+    };
+
+    const bootstrapProvider = {
+      provide: McpClientBootstrap,
+      useFactory: (clients: McpClient[]) => new McpClientBootstrap(clients),
+      inject: ['MCP_CLIENT_CONNECTIONS'],
+    };
 
     return {
       module: McpClientModule,
       global: true,
       providers: [
         { provide: MCP_CLIENT_OPTIONS, useValue: options },
-        ...providers,
+        ...connectionProviders,
+        connectionsAggregateProvider,
+        bootstrapProvider,
       ],
-      exports: [MCP_CLIENT_OPTIONS, ...providers.map((p) => p.provide)],
+      exports: [MCP_CLIENT_OPTIONS, ...connectionProviders.map((p) => p.provide)],
     };
   }
 
@@ -51,11 +65,17 @@ export class McpClientModule {
       inject: [MCP_CLIENT_OPTIONS],
     };
 
+    const bootstrapProvider = {
+      provide: McpClientBootstrap,
+      useFactory: (clients: McpClient[]) => new McpClientBootstrap(clients),
+      inject: ['MCP_CLIENT_CONNECTIONS'],
+    };
+
     return {
       module: McpClientModule,
       global: true,
       imports: options.imports ?? [],
-      providers: [asyncOptionsProvider, connectionsProvider],
+      providers: [asyncOptionsProvider, connectionsProvider, bootstrapProvider],
       exports: [MCP_CLIENT_OPTIONS, connectionsProvider.provide],
     };
   }
