@@ -30,6 +30,111 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.11)
 
+  apps/example-client:
+    dependencies:
+      '@btwld/mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@btwld/mcp-common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.10.0
+        version: 1.26.0(zod@3.25.76)
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.14(@nestjs/common@11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.0.0
+        version: 11.1.14(@nestjs/common@11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.0
+        version: 7.8.2
+    devDependencies:
+      ts-node:
+        specifier: ^10.9.0
+        version: 10.9.2(@types/node@22.19.11)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  apps/example-gateway:
+    dependencies:
+      '@btwld/mcp-common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      '@btwld/mcp-gateway':
+        specifier: workspace:*
+        version: link:../../packages/gateway
+      '@btwld/mcp-server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.10.0
+        version: 1.26.0(zod@3.25.76)
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.14(@nestjs/common@11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.0.0
+        version: 11.1.14(@nestjs/common@11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.0
+        version: 7.8.2
+    devDependencies:
+      ts-node:
+        specifier: ^10.9.0
+        version: 10.9.2(@types/node@22.19.11)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  apps/example-stdio:
+    dependencies:
+      '@btwld/mcp-common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      '@btwld/mcp-server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.10.0
+        version: 1.26.0(zod@3.25.76)
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.14(@nestjs/common@11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.0
+        version: 7.8.2
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      ts-node:
+        specifier: ^10.9.0
+        version: 10.9.2(@types/node@22.19.11)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   apps/playground:
     dependencies:
       '@btwld/mcp-common':

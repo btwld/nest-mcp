@@ -8,6 +8,8 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`MCP Playground server running on http://localhost:${port}`);
   console.log(`MCP endpoint: http://localhost:${port}/mcp`);
+  console.log(`OAuth discovery: http://localhost:${port}/.well-known/oauth-authorization-server`);
+  console.log(`Metrics endpoint: http://localhost:${port}/metrics`);
 }
 
 bootstrap();
