@@ -17,6 +17,7 @@ describe('ExecutionPipelineService', () => {
   let circuitBreaker: Record<string, ReturnType<typeof vi.fn>>;
   let retry: Record<string, ReturnType<typeof vi.fn>>;
   let metrics: Record<string, ReturnType<typeof vi.fn>>;
+  let moduleRef: Record<string, ReturnType<typeof vi.fn>>;
   let options: McpModuleOptions;
 
   beforeEach(() => {
@@ -63,6 +64,7 @@ describe('ExecutionPipelineService', () => {
         .mockImplementation((_n: unknown, _c: unknown, fn: () => Promise<unknown>) => fn()),
     };
     metrics = { recordCall: vi.fn() };
+    moduleRef = { get: vi.fn() };
 
     options = {} as McpModuleOptions;
 
@@ -76,6 +78,7 @@ describe('ExecutionPipelineService', () => {
       retry as unknown as ConstructorParameters<typeof ExecutionPipelineService>[6],
       metrics as unknown as ConstructorParameters<typeof ExecutionPipelineService>[7],
       options,
+      moduleRef as unknown as ConstructorParameters<typeof ExecutionPipelineService>[9],
     );
   });
 
@@ -268,6 +271,147 @@ describe('ExecutionPipelineService', () => {
         {},
         expect.any(Function),
       );
+    });
+  });
+
+  // --- global guards ---
+
+  describe('applyGlobalGuards', () => {
+    it('does nothing when no guards are configured', async () => {
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(moduleRef.get).not.toHaveBeenCalled();
+    });
+
+    it('resolves guard from DI and calls canActivate', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const GuardClass = class TestGuard {} as any;
+      options.guards = [GuardClass];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(moduleRef.get).toHaveBeenCalledWith(GuardClass, { strict: false });
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: ctx.sessionId, toolName: 'test' }),
+      );
+    });
+
+    it('instantiates guard directly when not found in DI', async () => {
+      const canActivate = vi.fn().mockResolvedValue(true);
+      const GuardClass = class SimpleGuard {
+        canActivate = canActivate;
+        // biome-ignore lint/suspicious/noExplicitAny: test mock
+      } as any;
+      options.guards = [GuardClass];
+      moduleRef.get.mockImplementation(() => {
+        throw new Error('not found');
+      });
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(canActivate).toHaveBeenCalled();
+    });
+
+    it('syncs user back to context after guard populates it', async () => {
+      const mockGuard = {
+        canActivate: vi.fn().mockImplementation((guardCtx: { user?: unknown }) => {
+          guardCtx.user = { id: 'authed-user', scopes: ['tools:read'] };
+          return true;
+        }),
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      expect(ctx.user).toBeUndefined();
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(ctx.user).toEqual({ id: 'authed-user', scopes: ['tools:read'] });
+    });
+
+    it('runs global guards before tool-specific auth check', async () => {
+      const callOrder: string[] = [];
+      const mockGuard = {
+        canActivate: vi.fn().mockImplementation((guardCtx: { user?: unknown }) => {
+          callOrder.push('global-guard');
+          guardCtx.user = { id: 'user1', scopes: ['tools:read'] };
+          return true;
+        }),
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      authGuard.checkAuthorization.mockImplementation(() => {
+        callOrder.push('tool-auth');
+        return Promise.resolve();
+      });
+      registry.getTool.mockReturnValue({ name: 'priv', isPublic: false });
+
+      await pipeline.callTool('priv', {}, ctx);
+
+      expect(callOrder).toEqual(['global-guard', 'tool-auth']);
+    });
+
+    it('runs global guards for readResource', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getResource.mockReturnValue(undefined);
+
+      await pipeline.readResource('file:///x', ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(
+        expect.objectContaining({ resourceUri: 'file:///x' }),
+      );
+    });
+
+    it('runs global guards for getPrompt', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getPrompt.mockReturnValue(undefined);
+
+      await pipeline.getPrompt('greet', {}, ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(
+        expect.objectContaining({ promptName: 'greet' }),
+      );
+    });
+
+    it('runs multiple guards in order', async () => {
+      const order: number[] = [];
+      const guard1 = {
+        canActivate: vi.fn().mockImplementation(() => {
+          order.push(1);
+          return true;
+        }),
+      };
+      const guard2 = {
+        canActivate: vi.fn().mockImplementation(() => {
+          order.push(2);
+          return true;
+        }),
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const G1 = class {} as any;
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const G2 = class {} as any;
+      options.guards = [G1, G2];
+      moduleRef.get.mockImplementation((cls: unknown) => (cls === G1 ? guard1 : guard2));
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(order).toEqual([1, 2]);
     });
   });
 
