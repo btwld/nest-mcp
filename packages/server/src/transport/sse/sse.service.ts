@@ -42,7 +42,7 @@ export class SseService implements OnModuleDestroy {
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options);
-    this.registerServerHandlers(server, sessionId);
+    this.registerServerHandlers(server, sessionId, req);
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
@@ -97,10 +97,11 @@ export class SseService implements OnModuleDestroy {
     }
   }
 
-  private registerServerHandlers(server: McpServer, sessionId: string): void {
+  private registerServerHandlers(server: McpServer, sessionId: string, req?: unknown): void {
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.SSE,
+      request: req,
     });
 
     registerHandlers(server, this.registry, this.pipeline, ctx);

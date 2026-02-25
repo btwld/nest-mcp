@@ -14,12 +14,14 @@
     "@btwld/mcp-common": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
     "typescript": "^5.7.0"
   }
 }

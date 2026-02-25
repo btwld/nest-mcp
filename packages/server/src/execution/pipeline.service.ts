@@ -10,6 +10,8 @@ import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ModuleRef } from '@nestjs/core';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
@@ -41,6 +43,7 @@ export class ExecutionPipelineService {
     private readonly retry: RetryService,
     private readonly metrics: MetricsService,
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   // ---- Tools ----
@@ -54,6 +57,9 @@ export class ExecutionPipelineService {
     if (!tool) {
       throw new ToolExecutionError(name, `Tool '${name}' not found`);
     }
+
+    // Global guards (populate user from token)
+    await this.applyGlobalGuards(ctx, { toolName: name });
 
     // Auth check
     if (!tool.isPublic) {
@@ -116,6 +122,9 @@ export class ExecutionPipelineService {
     // Try to find resource for auth check
     const resource = this.registry.getResource(uri);
 
+    // Global guards (populate user from token)
+    await this.applyGlobalGuards(ctx, { resourceUri: uri });
+
     if (resource) {
       const guardContext = this.buildGuardContext(ctx, { resourceUri: uri });
       // Resources use the same auth guard with a tool-like shape
@@ -142,6 +151,9 @@ export class ExecutionPipelineService {
   ): Promise<PromptGetResult> {
     // Try to find prompt for auth check
     const prompt = this.registry.getPrompt(name);
+
+    // Global guards (populate user from token)
+    await this.applyGlobalGuards(ctx, { promptName: name });
 
     if (prompt) {
       const guardContext = this.buildGuardContext(ctx, { promptName: name });
@@ -178,6 +190,36 @@ export class ExecutionPipelineService {
   }
 
   // ---- Helpers ----
+
+  private async applyGlobalGuards(
+    ctx: McpExecutionContext,
+    extra: { toolName?: string; resourceUri?: string; promptName?: string },
+  ): Promise<void> {
+    if (!this.options.guards?.length) return;
+
+    const guardContext = this.buildGuardContext(ctx, extra);
+
+    for (const GuardClass of this.options.guards) {
+      // biome-ignore lint/suspicious/noExplicitAny: Guard classes have varying constructor signatures
+      let guard: any;
+      try {
+        guard = this.moduleRef.get(GuardClass, { strict: false });
+      } catch {
+        // Guard not in DI — instantiate directly (for simple guards)
+        // biome-ignore lint/suspicious/noExplicitAny: Guard classes have varying constructor signatures
+        guard = new (GuardClass as any)();
+      }
+
+      if (typeof guard.canActivate === 'function') {
+        await guard.canActivate(guardContext);
+      }
+    }
+
+    // Sync user back to execution context after guards may have populated it
+    if (guardContext.user) {
+      ctx.user = guardContext.user;
+    }
+  }
 
   private buildGuardContext(
     ctx: McpExecutionContext,

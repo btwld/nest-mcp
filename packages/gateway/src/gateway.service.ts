@@ -4,6 +4,12 @@ import { ResponseCacheService } from './cache/response-cache.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService } from './policies/policy-engine.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { PromptAggregatorService } from './routing/prompt-aggregator.service';
+import type { AggregatedPrompt } from './routing/prompt-aggregator.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResourceAggregatorService } from './routing/resource-aggregator.service';
+import type { AggregatedResource } from './routing/resource-aggregator.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RouterService } from './routing/router.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ToolAggregatorService } from './routing/tool-aggregator.service';
@@ -21,6 +27,15 @@ export interface GatewayCallToolResult {
   isError?: boolean;
 }
 
+export interface GatewayReadResourceResult {
+  contents: unknown[];
+}
+
+export interface GatewayGetPromptResult {
+  description?: string;
+  messages: unknown[];
+}
+
 @Injectable()
 export class GatewayService {
   private readonly logger = new Logger(GatewayService.name);
@@ -28,6 +43,8 @@ export class GatewayService {
   constructor(
     private readonly router: RouterService,
     private readonly toolAggregator: ToolAggregatorService,
+    private readonly resourceAggregator: ResourceAggregatorService,
+    private readonly promptAggregator: PromptAggregatorService,
     private readonly upstreamManager: UpstreamManagerService,
     private readonly policyEngine: PolicyEngineService,
     private readonly responseCache: ResponseCacheService,
@@ -154,6 +171,108 @@ export class GatewayService {
       return {
         content: [{ type: 'text', text: `Error forwarding to upstream: ${message}` }],
         isError: true,
+      };
+    }
+  }
+
+  async listResources(): Promise<AggregatedResource[]> {
+    return this.resourceAggregator.aggregateAll();
+  }
+
+  getCachedResources(): AggregatedResource[] {
+    return this.resourceAggregator.getCachedResources();
+  }
+
+  async readResource(uri: string): Promise<GatewayReadResourceResult> {
+    // Find the aggregated resource to determine the upstream
+    const cached = this.resourceAggregator.getCachedResources();
+    const resource = cached.find((r) => r.uri === uri);
+
+    if (!resource) {
+      return { contents: [{ uri, text: `Resource "${uri}" not found` }] };
+    }
+
+    const client = this.upstreamManager.getClient(resource.upstreamName);
+    if (!client) {
+      return { contents: [{ uri, text: `Upstream "${resource.upstreamName}" is not connected` }] };
+    }
+
+    if (!this.upstreamManager.isHealthy(resource.upstreamName)) {
+      return { contents: [{ uri, text: `Upstream "${resource.upstreamName}" is unhealthy` }] };
+    }
+
+    try {
+      const result = await client.readResource({ uri: resource.originalUri });
+      return { contents: result.contents as unknown[] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error reading resource "${uri}" from "${resource.upstreamName}": ${message}`,
+      );
+      return { contents: [{ uri, text: `Error reading resource: ${message}` }] };
+    }
+  }
+
+  async listPrompts(): Promise<AggregatedPrompt[]> {
+    return this.promptAggregator.aggregateAll();
+  }
+
+  getCachedPrompts(): AggregatedPrompt[] {
+    return this.promptAggregator.getCachedPrompts();
+  }
+
+  async getPrompt(name: string, args: Record<string, string>): Promise<GatewayGetPromptResult> {
+    // Find the aggregated prompt to determine the upstream
+    const cached = this.promptAggregator.getCachedPrompts();
+    const prompt = cached.find((p) => p.name === name);
+
+    if (!prompt) {
+      return {
+        messages: [
+          { role: 'assistant', content: { type: 'text', text: `Prompt "${name}" not found` } },
+        ],
+      };
+    }
+
+    const client = this.upstreamManager.getClient(prompt.upstreamName);
+    if (!client) {
+      return {
+        messages: [
+          {
+            role: 'assistant',
+            content: { type: 'text', text: `Upstream "${prompt.upstreamName}" is not connected` },
+          },
+        ],
+      };
+    }
+
+    if (!this.upstreamManager.isHealthy(prompt.upstreamName)) {
+      return {
+        messages: [
+          {
+            role: 'assistant',
+            content: { type: 'text', text: `Upstream "${prompt.upstreamName}" is unhealthy` },
+          },
+        ],
+      };
+    }
+
+    try {
+      const result = await client.getPrompt({ name: prompt.originalName, arguments: args });
+      return {
+        description: result.description,
+        messages: result.messages as unknown[],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error getting prompt "${name}" from "${prompt.upstreamName}": ${message}`);
+      return {
+        messages: [
+          {
+            role: 'assistant',
+            content: { type: 'text', text: `Error getting prompt: ${message}` },
+          },
+        ],
       };
     }
   }

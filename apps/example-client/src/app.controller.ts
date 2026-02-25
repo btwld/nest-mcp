@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // --- Playground endpoints ---
+
   @Get('tools')
   async listTools() {
     return this.appService.listTools();
@@ -44,5 +46,56 @@ export class AppController {
   @Get('status')
   getStatus() {
     return this.appService.getStatus();
+  }
+
+  // --- SSE Server endpoints ---
+
+  @Get('sse-server/tools')
+  async listSseTools() {
+    return this.appService.listSseTools();
+  }
+
+  @Post('sse-server/tools/:name')
+  async callSseTool(@Param('name') name: string, @Body() args: Record<string, unknown> = {}) {
+    return this.appService.callSseTool(name, args);
+  }
+
+  @Get('sse-server/resources')
+  async listSseResources() {
+    return this.appService.listSseResources();
+  }
+
+  // --- Stdio Server endpoints ---
+
+  @Get('stdio-server/tools')
+  async listStdioTools() {
+    return this.appService.listStdioTools();
+  }
+
+  @Post('stdio-server/tools/:name')
+  async callStdioTool(@Param('name') name: string, @Body() args: Record<string, unknown> = {}) {
+    return this.appService.callStdioTool(name, args);
+  }
+
+  @Get('stdio-server/resources')
+  async listStdioResources() {
+    return this.appService.listStdioResources();
+  }
+
+  @Get('stdio-server/prompts')
+  async listStdioPrompts() {
+    return this.appService.listStdioPrompts();
+  }
+
+  // --- Multi-client endpoints ---
+
+  @Get('connections')
+  getConnections() {
+    return this.appService.getConnectionStatus();
+  }
+
+  @Get('all-tools')
+  async listAllTools() {
+    return this.appService.listAllTools();
   }
 }

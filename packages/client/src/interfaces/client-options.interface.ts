@@ -49,6 +49,14 @@ export interface McpClientModuleOptions {
 }
 
 export interface McpClientModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
-  useFactory: (...args: unknown[]) => McpClientModuleOptions | Promise<McpClientModuleOptions>;
-  inject?: InjectionToken[];
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
+  useFactory: (...args: any[]) => McpClientModuleOptions | Promise<McpClientModuleOptions>;
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types
+  inject?: any[];
+  /**
+   * Declare connection names to enable @InjectMcpClient('name') with forRootAsync.
+   * Each name listed here creates a named provider that extracts the matching
+   * client from the connections array returned by useFactory.
+   */
+  connectionNames?: string[];
 }

@@ -107,7 +107,11 @@ export class StreamableHttpService implements OnModuleDestroy {
       sessionIdGenerator: undefined, // stateless
     });
 
-    const server = this.createAndConnectServer(transport, `stateless-${randomUUID().slice(0, 8)}`);
+    const server = this.createAndConnectServer(
+      transport,
+      `stateless-${randomUUID().slice(0, 8)}`,
+      req,
+    );
 
     const resObj = res as HttpResponse;
     resObj.on?.('close', () => {
@@ -146,7 +150,7 @@ export class StreamableHttpService implements OnModuleDestroy {
       if (sid) this.cleanupSession(sid);
     };
 
-    const server = this.createAndConnectServer(transport, 'pending');
+    const server = this.createAndConnectServer(transport, 'pending', req);
 
     await transport.handleRequest(
       req as unknown as IncomingMessage,
@@ -164,17 +168,19 @@ export class StreamableHttpService implements OnModuleDestroy {
   private createAndConnectServer(
     transport: StreamableHTTPServerTransport,
     label: string,
+    req?: unknown,
   ): McpServer {
     const server = createMcpServer(this.registry, this.options);
-    this.registerServerHandlers(server, label);
+    this.registerServerHandlers(server, label, req);
     server.connect(transport);
     return server;
   }
 
-  private registerServerHandlers(server: McpServer, sessionId: string): void {
+  private registerServerHandlers(server: McpServer, sessionId: string, req?: unknown): void {
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.STREAMABLE_HTTP,
+      request: req,
     });
 
     registerHandlers(server, this.registry, this.pipeline, ctx);

@@ -5,4 +5,6 @@ export default defineWorkspace([
   'packages/server',
   'packages/client',
   'packages/gateway',
+  'apps/example-client',
+  'apps/playground',
 ]);

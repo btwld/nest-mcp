@@ -1,7 +1,7 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import type { McpModuleOptions, ToolContent } from '@btwld/mcp-common';
+import type { McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
-import { McpModule, McpToolBuilder } from '@btwld/mcp-server';
+import { McpModule, McpPromptBuilder, McpResourceBuilder, McpToolBuilder } from '@btwld/mcp-server';
 import {
   type DynamicModule,
   Inject,
@@ -15,6 +15,8 @@ import { HealthCheckerService } from './upstream/health-checker.service';
 import { UpstreamManagerService } from './upstream/upstream-manager.service';
 import type { UpstreamConfig } from './upstream/upstream.interface';
 
+import { PromptAggregatorService } from './routing/prompt-aggregator.service';
+import { ResourceAggregatorService } from './routing/resource-aggregator.service';
 import type { RoutingConfig } from './routing/route-config.interface';
 // Routing
 import { RouterService } from './routing/router.service';
@@ -43,6 +45,16 @@ export interface McpGatewayOptions {
   cache?: CacheConfig;
 }
 
+export interface McpGatewayAsyncOptions {
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS DynamicModule requires broad module types
+  imports?: any[];
+  server: { transport: McpTransportType; transportOptions?: TransportOptions };
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
+  useFactory: (...args: any[]) => McpGatewayOptions | Promise<McpGatewayOptions>;
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types
+  inject?: any[];
+}
+
 @Module({})
 export class McpGatewayModule implements OnApplicationBootstrap {
   private static readonly logger = new Logger('McpGatewayModule');
@@ -57,6 +69,10 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     private readonly policyEngine: PolicyEngineService,
     private readonly responseCache: ResponseCacheService,
     private readonly toolBuilder: McpToolBuilder,
+    private readonly resourceBuilder: McpResourceBuilder,
+    private readonly promptBuilder: McpPromptBuilder,
+    private readonly resourceAggregator: ResourceAggregatorService,
+    private readonly promptAggregator: PromptAggregatorService,
   ) {}
 
   static forRoot(options: McpGatewayOptions): DynamicModule {
@@ -79,15 +95,74 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         RequestTransformService,
         ResponseTransformService,
         GatewayService,
+        ResourceAggregatorService,
+        PromptAggregatorService,
       ],
       exports: [
         GatewayService,
         UpstreamManagerService,
         HealthCheckerService,
+        RouterService,
+        ToolAggregatorService,
         PolicyEngineService,
         ResponseCacheService,
         RequestTransformService,
         ResponseTransformService,
+        ResourceAggregatorService,
+        PromptAggregatorService,
+        MCP_GATEWAY_OPTIONS,
+      ],
+    };
+  }
+
+  static forRootAsync(options: McpGatewayAsyncOptions): DynamicModule {
+    const asyncOptionsProvider = {
+      provide: MCP_GATEWAY_OPTIONS,
+      useFactory: options.useFactory,
+      inject: options.inject ?? [],
+    };
+
+    return {
+      module: McpGatewayModule,
+      imports: [
+        ...(options.imports ?? []),
+        McpModule.forRootAsync({
+          transport: options.server.transport,
+          transportOptions: options.server.transportOptions,
+          // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
+          useFactory: async (...args: any[]) => {
+            const gatewayOpts = await options.useFactory(...args);
+            return gatewayOpts.server;
+          },
+          inject: options.inject ?? [],
+        }),
+      ],
+      providers: [
+        asyncOptionsProvider,
+        UpstreamManagerService,
+        HealthCheckerService,
+        RouterService,
+        ToolAggregatorService,
+        PolicyEngineService,
+        ResponseCacheService,
+        RequestTransformService,
+        ResponseTransformService,
+        GatewayService,
+        ResourceAggregatorService,
+        PromptAggregatorService,
+      ],
+      exports: [
+        GatewayService,
+        UpstreamManagerService,
+        HealthCheckerService,
+        RouterService,
+        ToolAggregatorService,
+        PolicyEngineService,
+        ResponseCacheService,
+        RequestTransformService,
+        ResponseTransformService,
+        ResourceAggregatorService,
+        PromptAggregatorService,
         MCP_GATEWAY_OPTIONS,
       ],
     };
@@ -115,6 +190,12 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     // Aggregate tools and register them as dynamic tools on the MCP server
     await this.registerUpstreamTools();
 
+    // Aggregate resources and register them on the MCP server
+    await this.registerUpstreamResources();
+
+    // Aggregate prompts and register them on the MCP server
+    await this.registerUpstreamPrompts();
+
     McpGatewayModule.logger.log('MCP Gateway initialized');
   }
 
@@ -137,5 +218,53 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     }
 
     McpGatewayModule.logger.log(`Registered ${tools.length} upstream tools`);
+  }
+
+  private async registerUpstreamResources(): Promise<void> {
+    const resources = await this.gatewayService.listResources();
+
+    for (const resource of resources) {
+      this.resourceBuilder.register({
+        uri: resource.uri,
+        name: resource.name,
+        description: resource.description ?? `Proxied resource from ${resource.upstreamName}`,
+        mimeType: resource.mimeType,
+        handler: async () => {
+          const result = await this.gatewayService.readResource(resource.uri);
+          return { contents: result.contents } as {
+            contents: Array<{ uri: string; mimeType?: string; text?: string; blob?: string }>;
+          };
+        },
+      });
+    }
+
+    McpGatewayModule.logger.log(`Registered ${resources.length} upstream resources`);
+  }
+
+  private async registerUpstreamPrompts(): Promise<void> {
+    const prompts = await this.gatewayService.listPrompts();
+
+    for (const prompt of prompts) {
+      this.promptBuilder.register({
+        name: prompt.name,
+        description: prompt.description ?? `Proxied prompt from ${prompt.upstreamName}`,
+        handler: async (args: Record<string, unknown>) => {
+          const stringArgs: Record<string, string> = {};
+          for (const [key, value] of Object.entries(args)) {
+            stringArgs[key] = String(value);
+          }
+          const result = await this.gatewayService.getPrompt(prompt.name, stringArgs);
+          return result as {
+            description?: string;
+            messages: Array<{
+              role: 'user' | 'assistant';
+              content: { type: 'text'; text: string };
+            }>;
+          };
+        },
+      });
+    }
+
+    McpGatewayModule.logger.log(`Registered ${prompts.length} upstream prompts`);
   }
 }

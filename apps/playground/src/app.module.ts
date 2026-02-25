@@ -1,9 +1,11 @@
-import { McpModule, McpTransportType } from '@btwld/mcp-server';
+import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType } from '@btwld/mcp-server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
+import { AuthDemoController } from './auth-demo.controller';
 import { DynamicRegistrationService } from './dynamic-registration.service';
 import { FeatureModule } from './feature/feature.module';
 import { ApiKeyGuard } from './guards/api-key.guard';
+import { MetricsController } from './metrics.controller';
 import { loggingMiddleware } from './middleware/logging.middleware';
 import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
 
@@ -30,6 +32,8 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
         rateLimit: { max: 100, window: '1m' },
         retry: { maxAttempts: 1, backoff: 'fixed' },
       },
+      // Global guards (run JwtAuthGuard on every tool/resource/prompt call)
+      guards: [JwtAuthGuard as unknown as abstract new (...args: unknown[]) => unknown],
       // Global middleware
       middleware: [loggingMiddleware],
       // Session management
@@ -45,9 +49,21 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
       },
     }),
 
+    // OAuth2 / JWT authentication
+    McpAuthModule.forRoot({
+      jwtSecret: 'playground-demo-secret-key-at-least-32chars!',
+      issuer: 'http://localhost:3000',
+      serverUrl: 'http://localhost:3000',
+      resourceUrl: 'http://localhost:3000/mcp',
+      enableDynamicRegistration: true,
+      scopes: ['tools:read', 'admin:read', 'analytics:read'],
+      validateUser: async () => ({ id: 'demo-user' }),
+    }),
+
     // Feature module
     FeatureModule,
   ],
+  controllers: [MetricsController, AuthDemoController],
   providers: [
     WeatherTools,
     DataResources,

@@ -2,16 +2,21 @@
 
 // Module
 export { McpGatewayModule } from './mcp-gateway.module';
-export type { McpGatewayOptions } from './mcp-gateway.module';
+export type { McpGatewayOptions, McpGatewayAsyncOptions } from './mcp-gateway.module';
 
 // Gateway service
 export { GatewayService } from './gateway.service';
 export type { GatewayCallToolResult } from './gateway.service';
+export type { GatewayReadResourceResult, GatewayGetPromptResult } from './gateway.service';
 
 // Routing
 export { RouterService } from './routing/router.service';
 export { ToolAggregatorService } from './routing/tool-aggregator.service';
 export type { AggregatedTool } from './routing/tool-aggregator.service';
+export { ResourceAggregatorService } from './routing/resource-aggregator.service';
+export type { AggregatedResource } from './routing/resource-aggregator.service';
+export { PromptAggregatorService } from './routing/prompt-aggregator.service';
+export type { AggregatedPrompt } from './routing/prompt-aggregator.service';
 export type {
   RoutingConfig,
   ToolRoutingStrategy,

@@ -8,10 +8,11 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`MCP Gateway running on http://localhost:${port}`);
   console.log(`Gateway MCP endpoint: http://localhost:${port}/mcp`);
-  console.log('Proxying upstream: playground at http://localhost:3000/mcp');
+  console.log('Upstreams: playground (:3000), inventory (:3003)');
   console.log('');
   console.log('REST endpoints:');
   console.log(`  GET http://localhost:${port}/gateway/status`);
+  console.log(`  GET http://localhost:${port}/gateway/tools`);
   console.log(`  GET http://localhost:${port}/gateway/policy/:tool`);
 }
 

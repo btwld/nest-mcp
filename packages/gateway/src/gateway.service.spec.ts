@@ -1,6 +1,8 @@
 import type { ResponseCacheService } from './cache/response-cache.service';
 import { GatewayService } from './gateway.service';
 import type { PolicyEngineService } from './policies/policy-engine.service';
+import type { PromptAggregatorService } from './routing/prompt-aggregator.service';
+import type { ResourceAggregatorService } from './routing/resource-aggregator.service';
 import type { RouterService } from './routing/router.service';
 import type { ToolAggregatorService } from './routing/tool-aggregator.service';
 import type { RequestTransformService } from './transform/request-transform.service';
@@ -11,6 +13,8 @@ describe('GatewayService', () => {
   let service: GatewayService;
   let router: Record<string, ReturnType<typeof vi.fn>>;
   let toolAggregator: Record<string, ReturnType<typeof vi.fn>>;
+  let resourceAggregator: Record<string, ReturnType<typeof vi.fn>>;
+  let promptAggregator: Record<string, ReturnType<typeof vi.fn>>;
   let upstreamManager: Record<string, ReturnType<typeof vi.fn>>;
   let policyEngine: Record<string, ReturnType<typeof vi.fn>>;
   let responseCache: Record<string, ReturnType<typeof vi.fn>>;
@@ -25,6 +29,16 @@ describe('GatewayService', () => {
     toolAggregator = {
       aggregateAll: vi.fn().mockResolvedValue([]),
       getCachedTools: vi.fn().mockReturnValue([]),
+    };
+
+    resourceAggregator = {
+      aggregateAll: vi.fn().mockResolvedValue([]),
+      getCachedResources: vi.fn().mockReturnValue([]),
+    };
+
+    promptAggregator = {
+      aggregateAll: vi.fn().mockResolvedValue([]),
+      getCachedPrompts: vi.fn().mockReturnValue([]),
     };
 
     upstreamManager = {
@@ -53,6 +67,8 @@ describe('GatewayService', () => {
     service = new GatewayService(
       router as unknown as RouterService,
       toolAggregator as unknown as ToolAggregatorService,
+      resourceAggregator as unknown as ResourceAggregatorService,
+      promptAggregator as unknown as PromptAggregatorService,
       upstreamManager as unknown as UpstreamManagerService,
       policyEngine as unknown as PolicyEngineService,
       responseCache as unknown as ResponseCacheService,

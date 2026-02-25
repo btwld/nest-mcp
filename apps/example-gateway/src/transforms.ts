@@ -12,18 +12,30 @@ export class TransformService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Add request logging transform
+    // Request transform: inject default units for weather tools
     this.requestTransform.register((request) => {
       this.logger.log(`[Request] ${request.upstreamName}:${request.toolName}`);
+
+      // Inject default celsius units for weather tool if not specified
+      if (request.toolName === 'get_weather' && request.upstreamName === 'playground') {
+        if (!request.arguments.units) {
+          return {
+            ...request,
+            arguments: { ...request.arguments, units: 'celsius' },
+          };
+        }
+      }
+
       return request;
     });
 
-    // Add response metadata transform
+    // Response transform: enrich responses with gateway metadata
     this.responseTransform.register((response) => {
       this.logger.log(
         `[Response] ${response.upstreamName}:${response.toolName} (error: ${response.isError ?? false})`,
       );
-      // Add gateway metadata to text content
+
+      // Enrich JSON text content with _gateway metadata
       const enrichedContent = response.content.map((item: unknown) => {
         if (
           typeof item === 'object' &&
@@ -31,10 +43,27 @@ export class TransformService implements OnModuleInit {
           'type' in item &&
           (item as Record<string, unknown>).type === 'text'
         ) {
-          return item;
+          const textItem = item as { type: string; text: string };
+          try {
+            const parsed = JSON.parse(textItem.text);
+            const enriched = {
+              ...parsed,
+              _gateway: {
+                upstream: response.upstreamName,
+                tool: response.toolName,
+                timestamp: new Date().toISOString(),
+                cached: false,
+              },
+            };
+            return { ...textItem, text: JSON.stringify(enriched) };
+          } catch {
+            // Not JSON, return as-is
+            return item;
+          }
         }
         return item;
       });
+
       return { ...response, content: enrichedContent };
     });
   }

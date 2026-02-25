@@ -72,12 +72,33 @@ export class McpClientModule {
       inject: ['MCP_CLIENT_CONNECTIONS'],
     };
 
+    // When using forRootAsync, connection names are resolved at runtime.
+    // Use @Inject('MCP_CLIENT_CONNECTIONS') and find clients by name,
+    // or use the connectionNames option to enable @InjectMcpClient('name').
+    const namedProviders = (options.connectionNames ?? []).map((name) => ({
+      provide: getMcpClientToken(name),
+      useFactory: (clients: McpClient[]) => {
+        const client = clients.find((c) => c.name === name);
+        if (!client) {
+          throw new Error(
+            `McpClientModule: No connection named "${name}" found. Ensure the name matches a connection in the factory options.`,
+          );
+        }
+        return client;
+      },
+      inject: ['MCP_CLIENT_CONNECTIONS'],
+    }));
+
     return {
       module: McpClientModule,
       global: true,
       imports: options.imports ?? [],
-      providers: [asyncOptionsProvider, connectionsProvider, bootstrapProvider],
-      exports: [MCP_CLIENT_OPTIONS, connectionsProvider.provide],
+      providers: [asyncOptionsProvider, connectionsProvider, ...namedProviders, bootstrapProvider],
+      exports: [
+        MCP_CLIENT_OPTIONS,
+        connectionsProvider.provide,
+        ...namedProviders.map((p) => p.provide),
+      ],
     };
   }
 
