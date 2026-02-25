@@ -1,6 +1,8 @@
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import {
   PolicyEngineService,
+  PromptAggregatorService,
+  ResourceAggregatorService,
   ToolAggregatorService,
   UpstreamManagerService,
 } from '@btwld/mcp-gateway';
@@ -12,6 +14,8 @@ export class GatewayStatusController {
     private readonly upstreamManager: UpstreamManagerService,
     private readonly policyEngine: PolicyEngineService,
     private readonly toolAggregator: ToolAggregatorService,
+    private readonly resourceAggregator: ResourceAggregatorService,
+    private readonly promptAggregator: PromptAggregatorService,
   ) {}
 
   @Get('status')
@@ -42,6 +46,37 @@ export class GatewayStatusController {
         description: t.description,
         upstream: t.upstreamName,
         originalName: t.originalName,
+      })),
+    };
+  }
+
+  @Get('resources')
+  getResources() {
+    const resources = this.resourceAggregator.getCachedResources();
+    return {
+      totalResources: resources.length,
+      resources: resources.map((r) => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description,
+        mimeType: r.mimeType,
+        upstream: r.upstreamName,
+        originalUri: r.originalUri,
+      })),
+    };
+  }
+
+  @Get('prompts')
+  getPrompts() {
+    const prompts = this.promptAggregator.getCachedPrompts();
+    return {
+      totalPrompts: prompts.length,
+      prompts: prompts.map((p) => ({
+        name: p.name,
+        description: p.description,
+        upstream: p.upstreamName,
+        originalName: p.originalName,
+        arguments: p.arguments,
       })),
     };
   }

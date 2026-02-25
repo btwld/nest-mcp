@@ -225,4 +225,226 @@ describe('GatewayService', () => {
       expect((result.content[0] as { text: string }).text).toContain('network error');
     });
   });
+
+  describe('listResources', () => {
+    it('should delegate to resourceAggregator.aggregateAll', async () => {
+      const expected = [
+        {
+          uri: 'fs://file:///readme.md',
+          name: 'readme',
+          description: 'Readme',
+          upstreamName: 'files',
+          originalUri: 'file:///readme.md',
+        },
+      ];
+      resourceAggregator.aggregateAll.mockResolvedValue(expected);
+
+      const result = await service.listResources();
+
+      expect(result).toBe(expected);
+      expect(resourceAggregator.aggregateAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('getCachedResources', () => {
+    it('should delegate to resourceAggregator.getCachedResources', () => {
+      const expected = [{ uri: 'file:///r', name: 'r' }];
+      resourceAggregator.getCachedResources.mockReturnValue(expected);
+
+      const result = service.getCachedResources();
+
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('readResource', () => {
+    it('should return not-found when resource is not in cache', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([]);
+
+      const result = await service.readResource('missing://uri');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('not found') }),
+      );
+    });
+
+    it('should return error when client is not connected', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      upstreamManager.getClient.mockReturnValue(undefined);
+
+      const result = await service.readResource('fs://file:///a');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('not connected') }),
+      );
+    });
+
+    it('should return error when upstream is unhealthy', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({});
+      upstreamManager.isHealthy.mockReturnValue(false);
+
+      const result = await service.readResource('fs://file:///a');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
+      );
+    });
+
+    it('should delegate read to upstream client with originalUri', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      const mockClient = {
+        readResource: vi.fn().mockResolvedValue({
+          contents: [{ uri: 'file:///a', text: 'hello' }],
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.isHealthy.mockReturnValue(true);
+
+      const result = await service.readResource('fs://file:///a');
+
+      expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'file:///a' });
+      expect(result.contents).toEqual([{ uri: 'file:///a', text: 'hello' }]);
+    });
+
+    it('should return error when upstream call throws', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi.fn().mockRejectedValue(new Error('read failed')),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+
+      const result = await service.readResource('fs://file:///a');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('read failed') }),
+      );
+    });
+  });
+
+  describe('listPrompts', () => {
+    it('should delegate to promptAggregator.aggregateAll', async () => {
+      const expected = [
+        {
+          name: 'ai_summarize',
+          description: 'Summarize text',
+          upstreamName: 'assistant',
+          originalName: 'summarize',
+        },
+      ];
+      promptAggregator.aggregateAll.mockResolvedValue(expected);
+
+      const result = await service.listPrompts();
+
+      expect(result).toBe(expected);
+      expect(promptAggregator.aggregateAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('getCachedPrompts', () => {
+    it('should delegate to promptAggregator.getCachedPrompts', () => {
+      const expected = [{ name: 'p1' }];
+      promptAggregator.getCachedPrompts.mockReturnValue(expected);
+
+      const result = service.getCachedPrompts();
+
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('getPrompt', () => {
+    it('should return not-found when prompt is not in cache', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([]);
+
+      const result = await service.getPrompt('missing', {});
+
+      expect(result.messages[0]).toEqual(
+        expect.objectContaining({
+          content: expect.objectContaining({ text: expect.stringContaining('not found') }),
+        }),
+      );
+    });
+
+    it('should return error when client is not connected', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue(undefined);
+
+      const result = await service.getPrompt('ai_summarize', {});
+
+      expect(result.messages[0]).toEqual(
+        expect.objectContaining({
+          content: expect.objectContaining({ text: expect.stringContaining('not connected') }),
+        }),
+      );
+    });
+
+    it('should return error when upstream is unhealthy', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({});
+      upstreamManager.isHealthy.mockReturnValue(false);
+
+      const result = await service.getPrompt('ai_summarize', {});
+
+      expect(result.messages[0]).toEqual(
+        expect.objectContaining({
+          content: expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
+        }),
+      );
+    });
+
+    it('should delegate getPrompt to upstream with originalName and args', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      const mockClient = {
+        getPrompt: vi.fn().mockResolvedValue({
+          description: 'Summarize text',
+          messages: [{ role: 'user', content: { type: 'text', text: 'summarized' } }],
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.isHealthy.mockReturnValue(true);
+
+      const result = await service.getPrompt('ai_summarize', { text: 'hello' });
+
+      expect(mockClient.getPrompt).toHaveBeenCalledWith({
+        name: 'summarize',
+        arguments: { text: 'hello' },
+      });
+      expect(result.description).toBe('Summarize text');
+      expect(result.messages).toEqual([
+        { role: 'user', content: { type: 'text', text: 'summarized' } },
+      ]);
+    });
+
+    it('should return error when upstream call throws', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        getPrompt: vi.fn().mockRejectedValue(new Error('prompt failed')),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+
+      const result = await service.getPrompt('ai_summarize', {});
+
+      expect(result.messages[0]).toEqual(
+        expect.objectContaining({
+          content: expect.objectContaining({ text: expect.stringContaining('prompt failed') }),
+        }),
+      );
+    });
+  });
 });
