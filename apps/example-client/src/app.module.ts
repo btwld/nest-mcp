@@ -35,7 +35,7 @@ import { NotificationHandler } from './notification.handler';
             name: 'stdio-server',
             transport: 'stdio' as const,
             command: 'node',
-            args: [config.get('STDIO_SERVER_PATH', '../example-stdio/dist/main.js')],
+            args: [config.get('STDIO_SERVER_PATH', './apps/example-stdio/dist/main.js')],
           },
         ],
       }),
