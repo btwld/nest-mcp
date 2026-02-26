@@ -1,4 +1,6 @@
+import type { ToolContent } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
 
 export type ResponseTransformFn = (
   response: ToolCallResponse,
@@ -7,7 +9,7 @@ export type ResponseTransformFn = (
 export interface ToolCallResponse {
   toolName: string;
   upstreamName: string;
-  content: unknown[];
+  content: ToolContent[];
   isError?: boolean;
 }
 
@@ -20,20 +22,18 @@ export class ResponseTransformService {
     this.transforms.push(transform);
   }
 
-  async apply(response: ToolCallResponse): Promise<ToolCallResponse> {
-    let current = response;
-
-    for (const transform of this.transforms) {
-      try {
-        current = await transform(current);
-      } catch (error) {
-        this.logger.error(
-          `Response transform failed: ${error instanceof Error ? error.message : error}`,
-        );
-        throw error;
-      }
-    }
-
-    return current;
+  async apply(initial: ToolCallResponse): Promise<ToolCallResponse> {
+    return this.transforms.reduce<Promise<ToolCallResponse>>(
+      async (acc, transform) => {
+        const current = await acc;
+        try {
+          return await transform(current);
+        } catch (error) {
+          this.logger.error(`Response transform failed: ${extractErrorMessage(error)}`);
+          throw error;
+        }
+      },
+      Promise.resolve(initial),
+    );
   }
 }

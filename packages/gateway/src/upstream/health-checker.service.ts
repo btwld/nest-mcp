@@ -1,4 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from './upstream-manager.service';
 import type { UpstreamConfig } from './upstream.interface';
@@ -52,7 +53,7 @@ export class HealthCheckerService implements OnModuleDestroy {
       this.upstreamManager.setHealthy(name, true);
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       this.logger.warn(`Health check failed for "${name}": ${message}`);
       this.upstreamManager.setHealthy(name, false, message);
       return false;

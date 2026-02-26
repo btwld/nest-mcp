@@ -19,6 +19,7 @@ export type {
   McpClientModuleOptions,
   McpClientModuleAsyncOptions,
   McpClientConnection,
+  McpClientHttpConnectionBase,
   McpClientStreamableHttpConnection,
   McpClientSseConnection,
   McpClientStdioConnection,
@@ -32,6 +33,10 @@ export { createClientTransport } from './transport/client-transport.factory';
 export { createStreamableHttpTransport } from './transport/streamable-client.transport';
 export { createSseTransport } from './transport/sse-client.transport';
 export { createStdioTransport } from './transport/stdio-client.transport';
+export { applyAuthHeaders } from './transport/apply-auth-headers';
+
+// Utilities
+export { formatErrorMessage } from './utils/format-error-message';
 
 // Health
 export { McpClientHealthIndicator } from './health/mcp-client.health';

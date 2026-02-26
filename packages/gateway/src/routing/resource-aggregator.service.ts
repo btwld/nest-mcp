@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
+import { collectFulfilled } from '../utils/settled-results';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -25,17 +27,10 @@ export class ResourceAggregatorService {
 
   async aggregateAll(): Promise<AggregatedResource[]> {
     const names = this.upstreamManager.getAllNames();
-    const allResources: AggregatedResource[] = [];
-
     const results = await Promise.allSettled(
       names.map((name) => this.fetchResourcesFromUpstream(name)),
     );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allResources.push(...result.value);
-      }
-    }
+    const allResources = collectFulfilled(results);
 
     this.cachedResources = allResources;
     this.logger.log(`Aggregated ${allResources.length} resources from ${names.length} upstreams`);
@@ -65,7 +60,7 @@ export class ResourceAggregatorService {
       }));
     } catch (error) {
       this.logger.error(
-        `Failed to fetch resources from "${upstreamName}": ${error instanceof Error ? error.message : error}`,
+        `Failed to fetch resources from "${upstreamName}": ${extractErrorMessage(error)}`,
       );
       return [];
     }

@@ -18,18 +18,18 @@ interface McpClientConnectionBase {
   reconnect?: McpClientReconnectOptions;
 }
 
-export interface McpClientStreamableHttpConnection extends McpClientConnectionBase {
-  transport: 'streamable-http';
+export interface McpClientHttpConnectionBase extends McpClientConnectionBase {
   url: string;
   auth?: McpClientAuthOptions;
   requestInit?: RequestInit;
 }
 
-export interface McpClientSseConnection extends McpClientConnectionBase {
+export interface McpClientStreamableHttpConnection extends McpClientHttpConnectionBase {
+  transport: 'streamable-http';
+}
+
+export interface McpClientSseConnection extends McpClientHttpConnectionBase {
   transport: 'sse';
-  url: string;
-  auth?: McpClientAuthOptions;
-  requestInit?: RequestInit;
 }
 
 export interface McpClientStdioConnection extends McpClientConnectionBase {
@@ -50,10 +50,9 @@ export interface McpClientModuleOptions {
 }
 
 export interface McpClientModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS useFactory requires `any[]` params — TypeScript contravariance prevents narrowing factory parameter types
   useFactory: (...args: any[]) => McpClientModuleOptions | Promise<McpClientModuleOptions>;
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types
-  inject?: any[];
+  inject?: InjectionToken[];
   /**
    * Declare connection names to enable @InjectMcpClient('name') with forRootAsync.
    * Each name listed here creates a named provider that extracts the matching

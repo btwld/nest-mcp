@@ -4,10 +4,12 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   CallToolRequest,
   GetPromptRequest,
+  Implementation,
   ListPromptsRequest,
   ListResourcesRequest,
   ListToolsRequest,
   ReadResourceRequest,
+  ServerCapabilities,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import type {
@@ -15,6 +17,7 @@ import type {
   McpClientReconnectOptions,
 } from './interfaces/client-options.interface';
 import { createClientTransport } from './transport/client-transport.factory';
+import { formatErrorMessage } from './utils/format-error-message';
 
 export class McpClient {
   private readonly logger: Logger;
@@ -50,9 +53,7 @@ export class McpClient {
       this.reconnectAttempts = 0;
       this.logger.log(`Connected to MCP server "${this.name}"`);
     } catch (err: unknown) {
-      this.logger.error(
-        `Failed to connect to "${this.name}": ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.error(`Failed to connect to "${this.name}": ${formatErrorMessage(err)}`);
       throw err;
     }
   }
@@ -77,46 +78,64 @@ export class McpClient {
     return this.client;
   }
 
-  async callTool(params: CallToolRequest['params'], options?: RequestOptions) {
+  async callTool(
+    params: CallToolRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['callTool']> {
     this.assertConnected();
     return this.client.callTool(params, undefined, options);
   }
 
-  async readResource(params: ReadResourceRequest['params'], options?: RequestOptions) {
+  async readResource(
+    params: ReadResourceRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['readResource']> {
     this.assertConnected();
     return this.client.readResource(params, options);
   }
 
-  async listTools(params?: ListToolsRequest['params'], options?: RequestOptions) {
+  async listTools(
+    params?: ListToolsRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['listTools']> {
     this.assertConnected();
     return this.client.listTools(params, options);
   }
 
-  async listResources(params?: ListResourcesRequest['params'], options?: RequestOptions) {
+  async listResources(
+    params?: ListResourcesRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['listResources']> {
     this.assertConnected();
     return this.client.listResources(params, options);
   }
 
-  async getPrompt(params: GetPromptRequest['params'], options?: RequestOptions) {
+  async getPrompt(
+    params: GetPromptRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['getPrompt']> {
     this.assertConnected();
     return this.client.getPrompt(params, options);
   }
 
-  async listPrompts(params?: ListPromptsRequest['params'], options?: RequestOptions) {
+  async listPrompts(
+    params?: ListPromptsRequest['params'],
+    options?: RequestOptions,
+  ): ReturnType<Client['listPrompts']> {
     this.assertConnected();
     return this.client.listPrompts(params, options);
   }
 
-  async ping(options?: RequestOptions) {
+  async ping(options?: RequestOptions): ReturnType<Client['ping']> {
     this.assertConnected();
     return this.client.ping(options);
   }
 
-  getServerCapabilities() {
+  getServerCapabilities(): ServerCapabilities | undefined {
     return this.client.getServerCapabilities();
   }
 
-  getServerVersion() {
+  getServerVersion(): Implementation | undefined {
     return this.client.getServerVersion();
   }
 
@@ -171,7 +190,7 @@ export class McpClient {
         return;
       } catch (err: unknown) {
         this.logger.warn(
-          `Reconnection attempt ${this.reconnectAttempts} failed: ${err instanceof Error ? err.message : String(err)}`,
+          `Reconnection attempt ${this.reconnectAttempts} failed: ${formatErrorMessage(err)}`,
         );
       }
     }
@@ -181,14 +200,13 @@ export class McpClient {
   }
 
   private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-    let timer: ReturnType<typeof setTimeout>;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
         () => reject(new Error(`Connection to "${this.name}" timed out after ${timeoutMs}ms`)),
         timeoutMs,
       );
+      promise.then(resolve, reject).finally(() => clearTimeout(timer));
     });
-    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 
   private sleep(ms: number): Promise<void> {

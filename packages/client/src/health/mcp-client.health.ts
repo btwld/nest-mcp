@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import type { McpClient } from '../mcp-client.service';
+import { formatErrorMessage } from '../utils/format-error-message';
 
 export interface McpClientHealthStatus {
   name: string;
@@ -14,39 +14,32 @@ export interface McpClientHealthResult {
 }
 
 export class McpClientHealthIndicator {
-  private readonly logger = new Logger('McpClientHealthIndicator');
-  private readonly clients: McpClient[];
-
-  constructor(clients: McpClient[]) {
-    this.clients = clients;
-  }
+  constructor(private readonly clients: McpClient[]) {}
 
   async check(): Promise<McpClientHealthResult> {
     const connections: McpClientHealthStatus[] = [];
 
     for (const client of this.clients) {
-      const status: McpClientHealthStatus = {
-        name: client.name,
-        connected: client.isConnected(),
-      };
-
-      if (client.isConnected()) {
-        try {
-          await client.ping();
-          const version = client.getServerVersion();
-          if (version) {
-            status.serverVersion = {
-              name: version.name,
-              version: version.version,
-            };
-          }
-        } catch (err: unknown) {
-          status.connected = false;
-          status.error = err instanceof Error ? err.message : String(err);
-        }
+      if (!client.isConnected()) {
+        connections.push({ name: client.name, connected: false });
+        continue;
       }
 
-      connections.push(status);
+      try {
+        await client.ping();
+        const version = client.getServerVersion();
+        connections.push({
+          name: client.name,
+          connected: true,
+          ...(version && { serverVersion: { name: version.name, version: version.version } }),
+        });
+      } catch (err: unknown) {
+        connections.push({
+          name: client.name,
+          connected: false,
+          error: formatErrorMessage(err),
+        });
+      }
     }
 
     const allUp = connections.length > 0 && connections.every((c) => c.connected);

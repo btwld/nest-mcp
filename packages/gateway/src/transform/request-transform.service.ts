@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
 
 export type RequestTransformFn = (
   request: ToolCallRequest,
@@ -19,20 +20,18 @@ export class RequestTransformService {
     this.transforms.push(transform);
   }
 
-  async apply(request: ToolCallRequest): Promise<ToolCallRequest> {
-    let current = request;
-
-    for (const transform of this.transforms) {
-      try {
-        current = await transform(current);
-      } catch (error) {
-        this.logger.error(
-          `Request transform failed: ${error instanceof Error ? error.message : error}`,
-        );
-        throw error;
-      }
-    }
-
-    return current;
+  async apply(initial: ToolCallRequest): Promise<ToolCallRequest> {
+    return this.transforms.reduce<Promise<ToolCallRequest>>(
+      async (acc, transform) => {
+        const current = await acc;
+        try {
+          return await transform(current);
+        } catch (error) {
+          this.logger.error(`Request transform failed: ${extractErrorMessage(error)}`);
+          throw error;
+        }
+      },
+      Promise.resolve(initial),
+    );
   }
 }

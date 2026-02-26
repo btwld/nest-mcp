@@ -1,7 +1,14 @@
-import { McpTimeoutError, McpUpstreamError } from '@btwld/mcp-common';
+import {
+  McpTimeoutError,
+  McpUpstreamError,
+  type PromptMessage,
+  type ResourceContent,
+  type ToolContent,
+} from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResponseCacheService } from './cache/response-cache.service';
+import type { PolicyEffect } from './policies/policy.interface';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService } from './policies/policy-engine.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -22,24 +29,55 @@ import { ResponseTransformService } from './transform/response-transform.service
 import type { ToolCallResponse } from './transform/response-transform.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from './upstream/upstream-manager.service';
+import { extractErrorMessage } from './utils/error-utils';
 
 export interface GatewayCallToolResult {
-  content: unknown[];
+  content: ToolContent[];
   isError?: boolean;
 }
 
 export interface GatewayReadResourceResult {
-  contents: unknown[];
+  contents: ResourceContent[];
 }
 
 export interface GatewayGetPromptResult {
   description?: string;
-  messages: unknown[];
+  messages: PromptMessage[];
 }
 
 @Injectable()
 export class GatewayService {
   private readonly logger = new Logger(GatewayService.name);
+
+  private static readonly policyDenialHandlers = new Map<
+    PolicyEffect,
+    (toolName: string, reason?: string) => GatewayCallToolResult | undefined
+  >([
+    [
+      'deny',
+      (toolName, reason) => ({
+        content: [
+          {
+            type: 'text' as const,
+            text: `Tool "${toolName}" is denied by policy: ${reason ?? 'access denied'}`,
+          },
+        ],
+        isError: true,
+      }),
+    ],
+    [
+      'require_approval',
+      (toolName, reason) => ({
+        content: [
+          {
+            type: 'text' as const,
+            text: `Tool "${toolName}" requires approval: ${reason ?? 'approval required'}`,
+          },
+        ],
+        isError: true,
+      }),
+    ],
+  ]);
 
   constructor(
     private readonly router: RouterService,
@@ -64,30 +102,11 @@ export class GatewayService {
   async callTool(toolName: string, args: Record<string, unknown>): Promise<GatewayCallToolResult> {
     // Evaluate policy
     const policy = this.policyEngine.evaluate(toolName);
-
-    if (policy.effect === 'deny') {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Tool "${toolName}" is denied by policy: ${policy.reason ?? 'access denied'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    if (policy.effect === 'require_approval') {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Tool "${toolName}" requires approval: ${policy.reason ?? 'approval required'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+    const denial = GatewayService.policyDenialHandlers.get(policy.effect)?.(
+      toolName,
+      policy.reason,
+    );
+    if (denial) return denial;
 
     // Resolve routing
     const route = this.router.resolve(toolName);
@@ -154,7 +173,7 @@ export class GatewayService {
       const transformed: ToolCallResponse = await this.responseTransform.apply({
         toolName,
         upstreamName: route.upstreamName,
-        content: result.content as unknown[],
+        content: result.content as ToolContent[],
         isError: result.isError as boolean | undefined,
       });
 
@@ -170,7 +189,7 @@ export class GatewayService {
 
       return response;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       const upstreamError = new McpUpstreamError(
         route.upstreamName,
         message,
@@ -217,9 +236,9 @@ export class GatewayService {
       const result = await (readTimeoutMs
         ? this.withTimeout(readPromise, `readResource:${uri}`, readTimeoutMs)
         : readPromise);
-      return { contents: result.contents as unknown[] };
+      return { contents: result.contents as ResourceContent[] };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       const upstreamError = new McpUpstreamError(
         resource.upstreamName,
         message,
@@ -282,10 +301,10 @@ export class GatewayService {
         : promptPromise);
       return {
         description: result.description,
-        messages: result.messages as unknown[],
+        messages: result.messages as PromptMessage[],
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       const upstreamError = new McpUpstreamError(
         prompt.upstreamName,
         message,

@@ -12,6 +12,7 @@ import type {
   McpClientModuleOptions,
 } from './interfaces/client-options.interface';
 import { McpClient } from './mcp-client.service';
+import { formatErrorMessage } from './utils/format-error-message';
 
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS dynamic modules require a class for @Module() decorator and module self-reference
@@ -53,14 +54,8 @@ export class McpClientModule {
 
     const connectionsProvider = {
       provide: 'MCP_CLIENT_CONNECTIONS',
-      useFactory: async (opts: McpClientModuleOptions) => {
-        const clients: McpClient[] = [];
-        for (const conn of opts.connections) {
-          const client = new McpClient(conn.name, conn);
-          clients.push(client);
-        }
-        return clients;
-      },
+      useFactory: (opts: McpClientModuleOptions) =>
+        opts.connections.map((conn) => new McpClient(conn.name, conn)),
       inject: [MCP_CLIENT_OPTIONS],
     };
 
@@ -110,20 +105,15 @@ export class McpClientModule {
 
 export class McpClientBootstrap implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger('McpClientBootstrap');
-  private readonly clients: McpClient[] = [];
 
-  constructor(clients: McpClient[]) {
-    this.clients = clients;
-  }
+  constructor(private readonly clients: McpClient[]) {}
 
   async onApplicationBootstrap(): Promise<void> {
     for (const client of this.clients) {
       try {
         await client.connect();
       } catch (err: unknown) {
-        this.logger.error(
-          `Failed to connect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
-        );
+        this.logger.error(`Failed to connect client "${client.name}": ${formatErrorMessage(err)}`);
       }
     }
   }
@@ -134,7 +124,7 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
         await client.disconnect();
       } catch (err: unknown) {
         this.logger.error(
-          `Failed to disconnect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to disconnect client "${client.name}": ${formatErrorMessage(err)}`,
         );
       }
     }

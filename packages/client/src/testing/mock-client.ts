@@ -1,14 +1,35 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  CallToolRequest,
+  CallToolResult,
+  GetPromptRequest,
+  GetPromptResult,
+  Implementation,
+  ListPromptsRequest,
+  ListPromptsResult,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ListToolsRequest,
+  ListToolsResult,
+  ReadResourceRequest,
+  ReadResourceResult,
+  ServerCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
+
+type PingResult = Awaited<ReturnType<Client['ping']>>;
+
 export class MockMcpClient {
   readonly name: string;
   private _connected = false;
 
-  private _callToolResult: unknown = { content: [] };
-  private _readResourceResult: unknown = { contents: [] };
-  private _listToolsResult: unknown = { tools: [] };
-  private _listResourcesResult: unknown = { resources: [] };
-  private _getPromptResult: unknown = { messages: [] };
-  private _listPromptsResult: unknown = { prompts: [] };
-  private _pingResult: unknown = {};
+  private _callToolResult: CallToolResult = { content: [] };
+  private _readResourceResult: ReadResourceResult = { contents: [] };
+  private _listToolsResult: ListToolsResult = { tools: [] };
+  private _listResourcesResult: ListResourcesResult = { resources: [] };
+  private _getPromptResult: GetPromptResult = { messages: [] };
+  private _listPromptsResult: ListPromptsResult = { prompts: [] };
+  private _pingResult: PingResult = {};
 
   constructor(name = 'mock') {
     this.name = name;
@@ -26,73 +47,91 @@ export class MockMcpClient {
     return this._connected;
   }
 
-  async callTool(_params: unknown, _options?: unknown) {
+  async callTool(
+    _params: CallToolRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<CallToolResult> {
     return this._callToolResult;
   }
 
-  async readResource(_params: unknown, _options?: unknown) {
+  async readResource(
+    _params: ReadResourceRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<ReadResourceResult> {
     return this._readResourceResult;
   }
 
-  async listTools(_params?: unknown, _options?: unknown) {
+  async listTools(
+    _params?: ListToolsRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<ListToolsResult> {
     return this._listToolsResult;
   }
 
-  async listResources(_params?: unknown, _options?: unknown) {
+  async listResources(
+    _params?: ListResourcesRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<ListResourcesResult> {
     return this._listResourcesResult;
   }
 
-  async getPrompt(_params: unknown, _options?: unknown) {
+  async getPrompt(
+    _params: GetPromptRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<GetPromptResult> {
     return this._getPromptResult;
   }
 
-  async listPrompts(_params?: unknown, _options?: unknown) {
+  async listPrompts(
+    _params?: ListPromptsRequest['params'],
+    _options?: RequestOptions,
+  ): Promise<ListPromptsResult> {
     return this._listPromptsResult;
   }
 
-  async ping(_options?: unknown) {
+  async ping(_options?: RequestOptions): Promise<PingResult> {
     return this._pingResult;
   }
 
-  getServerCapabilities() {
+  getServerCapabilities(): ServerCapabilities | undefined {
     return undefined;
   }
 
-  getServerVersion() {
+  getServerVersion(): Implementation | undefined {
     return undefined;
   }
 
-  getClient() {
-    return null as unknown;
+  getClient(): Client | null {
+    return null;
   }
 
   // Helpers for setting mock return values
-  setCallToolResult(result: unknown): this {
+  setCallToolResult(result: CallToolResult): this {
     this._callToolResult = result;
     return this;
   }
 
-  setReadResourceResult(result: unknown): this {
+  setReadResourceResult(result: ReadResourceResult): this {
     this._readResourceResult = result;
     return this;
   }
 
-  setListToolsResult(result: unknown): this {
+  setListToolsResult(result: ListToolsResult): this {
     this._listToolsResult = result;
     return this;
   }
 
-  setListResourcesResult(result: unknown): this {
+  setListResourcesResult(result: ListResourcesResult): this {
     this._listResourcesResult = result;
     return this;
   }
 
-  setGetPromptResult(result: unknown): this {
+  setGetPromptResult(result: GetPromptResult): this {
     this._getPromptResult = result;
     return this;
   }
 
-  setListPromptsResult(result: unknown): this {
+  setListPromptsResult(result: ListPromptsResult): this {
     this._listPromptsResult = result;
     return this;
   }

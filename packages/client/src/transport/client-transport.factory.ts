@@ -12,9 +12,11 @@ export function createClientTransport(connection: McpClientConnection): Transpor
       return createSseTransport(connection);
     case 'stdio':
       return createStdioTransport(connection);
-    default:
+    default: {
+      const _exhaustive: never = connection;
       throw new Error(
-        `Unsupported transport type: ${(connection as Record<string, unknown>).transport}`,
+        `Unsupported transport type: ${(_exhaustive as McpClientConnection).transport}`,
       );
+    }
   }
 }

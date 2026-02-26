@@ -44,13 +44,17 @@ describe('MockMcpClient', () => {
 
   describe('set* methods', () => {
     it('setCallToolResult should change callTool return value', async () => {
-      const result = { content: [{ type: 'text', text: 'hello' }] };
+      const result = { content: [{ type: 'text' as const, text: 'hello' }] };
       mock.setCallToolResult(result);
       expect(await mock.callTool({ name: 'x' })).toEqual(result);
     });
 
     it('setListToolsResult should change listTools return value', async () => {
-      const result = { tools: [{ name: 'tool-a', description: 'A tool' }] };
+      const result = {
+        tools: [
+          { name: 'tool-a', description: 'A tool', inputSchema: { type: 'object' as const } },
+        ],
+      };
       mock.setListToolsResult(result);
       expect(await mock.listTools()).toEqual(result);
     });
@@ -82,6 +86,12 @@ describe('MockMcpClient', () => {
 
     it('should use provided name', () => {
       expect(mock.name).toBe('test');
+    });
+  });
+
+  describe('getClient', () => {
+    it('should return null', () => {
+      expect(mock.getClient()).toBeNull();
     });
   });
 });

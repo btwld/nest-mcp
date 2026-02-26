@@ -2,7 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
+import { extractErrorMessage } from '../utils/error-utils';
+import type { UpstreamConfig, UpstreamStatus, UpstreamTransportType } from './upstream.interface';
 
 interface ManagedUpstream {
   config: UpstreamConfig;
@@ -51,22 +52,27 @@ export class UpstreamManagerService implements OnModuleDestroy {
       managed.lastHealthCheck = new Date();
       this.logger.log(`Connected to upstream "${config.name}" at ${config.url}`);
     } catch (error) {
-      managed.error = error instanceof Error ? error.message : String(error);
+      managed.error = extractErrorMessage(error);
       this.logger.error(`Failed to connect to upstream "${config.name}": ${managed.error}`);
     }
   }
 
-  private createTransport(config: UpstreamConfig) {
-    const url = new URL(config.url);
+  private static readonly transportFactories = new Map<
+    UpstreamTransportType,
+    (url: URL) => SSEClientTransport | StreamableHTTPClientTransport
+  >([
+    ['streamable-http', (url) => new StreamableHTTPClientTransport(url)],
+    ['sse', (url) => new SSEClientTransport(url)],
+  ]);
 
-    switch (config.transport) {
-      case 'streamable-http':
-        return new StreamableHTTPClientTransport(url);
-      case 'sse':
-        return new SSEClientTransport(url);
-      default:
-        throw new Error(`Unsupported upstream transport: ${config.transport}`);
+  private createTransport(
+    config: UpstreamConfig,
+  ): SSEClientTransport | StreamableHTTPClientTransport {
+    const factory = UpstreamManagerService.transportFactories.get(config.transport);
+    if (!factory) {
+      throw new Error(`Unsupported upstream transport: ${config.transport}`);
     }
+    return factory(new URL(config.url));
   }
 
   getClient(name: string): Client | undefined {

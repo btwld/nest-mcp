@@ -1,4 +1,7 @@
+import type { PromptArgument } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
+import { collectFulfilled } from '../utils/settled-results';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -9,7 +12,7 @@ export interface AggregatedPrompt {
   description?: string;
   upstreamName: string;
   originalName: string;
-  arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+  arguments?: PromptArgument[];
 }
 
 @Injectable()
@@ -24,17 +27,10 @@ export class PromptAggregatorService {
 
   async aggregateAll(): Promise<AggregatedPrompt[]> {
     const names = this.upstreamManager.getAllNames();
-    const allPrompts: AggregatedPrompt[] = [];
-
     const results = await Promise.allSettled(
       names.map((name) => this.fetchPromptsFromUpstream(name)),
     );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allPrompts.push(...result.value);
-      }
-    }
+    const allPrompts = collectFulfilled(results);
 
     this.cachedPrompts = allPrompts;
     this.logger.log(`Aggregated ${allPrompts.length} prompts from ${names.length} upstreams`);
@@ -59,13 +55,11 @@ export class PromptAggregatorService {
         description: prompt.description,
         upstreamName,
         originalName: prompt.name,
-        arguments: prompt.arguments as
-          | Array<{ name: string; description?: string; required?: boolean }>
-          | undefined,
+        arguments: prompt.arguments as PromptArgument[] | undefined,
       }));
     } catch (error) {
       this.logger.error(
-        `Failed to fetch prompts from "${upstreamName}": ${error instanceof Error ? error.message : error}`,
+        `Failed to fetch prompts from "${upstreamName}": ${extractErrorMessage(error)}`,
       );
       return [];
     }

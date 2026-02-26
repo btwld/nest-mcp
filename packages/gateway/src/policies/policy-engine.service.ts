@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { matchGlobPattern } from '../utils/pattern-matcher';
 import type {
   PoliciesConfig,
   PolicyEffect,
@@ -22,7 +23,7 @@ export class PolicyEngineService {
 
   evaluate(toolName: string): PolicyEvaluationResult {
     for (const rule of this.rules) {
-      if (this.matchPattern(toolName, rule.pattern)) {
+      if (matchGlobPattern(toolName, rule.pattern)) {
         return {
           effect: rule.effect,
           matchedRule: rule,
@@ -32,14 +33,5 @@ export class PolicyEngineService {
     }
 
     return { effect: this.defaultEffect };
-  }
-
-  private matchPattern(toolName: string, pattern: string): boolean {
-    const regexStr = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*/g, '.*')
-      .replace(/\?/g, '.');
-
-    return new RegExp(`^${regexStr}$`).test(toolName);
   }
 }

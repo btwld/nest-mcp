@@ -5,18 +5,21 @@ import type { ResolvedRoute, RoutingConfig } from './route-config.interface';
 @Injectable()
 export class RouterService {
   private readonly logger = new Logger(RouterService.name);
-  private readonly prefixMap = new Map<string, string>();
+  private readonly prefixToName = new Map<string, string>();
+  private readonly nameToPrefix = new Map<string, string>();
 
   configure(upstreams: UpstreamConfig[], _routing: RoutingConfig): void {
-    this.prefixMap.clear();
+    this.prefixToName.clear();
+    this.nameToPrefix.clear();
 
     for (const upstream of upstreams) {
       if (upstream.enabled === false) continue;
       const prefix = upstream.toolPrefix ?? upstream.name;
-      this.prefixMap.set(prefix, upstream.name);
+      this.prefixToName.set(prefix, upstream.name);
+      this.nameToPrefix.set(upstream.name, prefix);
     }
 
-    this.logger.log(`Configured prefix routing for ${this.prefixMap.size} upstreams`);
+    this.logger.log(`Configured prefix routing for ${this.prefixToName.size} upstreams`);
   }
 
   resolve(toolName: string): ResolvedRoute | undefined {
@@ -24,7 +27,7 @@ export class RouterService {
     if (separatorIndex === -1) return undefined;
 
     const prefix = toolName.substring(0, separatorIndex);
-    const upstreamName = this.prefixMap.get(prefix);
+    const upstreamName = this.prefixToName.get(prefix);
 
     if (!upstreamName) return undefined;
 
@@ -39,9 +42,6 @@ export class RouterService {
   }
 
   getPrefixForUpstream(upstreamName: string): string | undefined {
-    for (const [prefix, name] of this.prefixMap.entries()) {
-      if (name === upstreamName) return prefix;
-    }
-    return undefined;
+    return this.nameToPrefix.get(upstreamName);
   }
 }

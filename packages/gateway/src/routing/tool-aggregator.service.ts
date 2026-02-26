@@ -1,13 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { extractErrorMessage } from '../utils/error-utils';
+import { collectFulfilled } from '../utils/settled-results';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RouterService } from './router.service';
 
+export interface ToolInputSchema {
+  type: 'object';
+  properties?: Record<string, unknown>;
+  required?: string[];
+  [key: string]: unknown;
+}
+
 export interface AggregatedTool {
   name: string;
   description?: string;
-  inputSchema: Record<string, unknown>;
+  inputSchema: ToolInputSchema;
   upstreamName: string;
   originalName: string;
 }
@@ -24,17 +33,10 @@ export class ToolAggregatorService {
 
   async aggregateAll(): Promise<AggregatedTool[]> {
     const names = this.upstreamManager.getAllNames();
-    const allTools: AggregatedTool[] = [];
-
     const results = await Promise.allSettled(
       names.map((name) => this.fetchToolsFromUpstream(name)),
     );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allTools.push(...result.value);
-      }
-    }
+    const allTools = collectFulfilled(results);
 
     this.cachedTools = allTools;
     this.logger.log(`Aggregated ${allTools.length} tools from ${names.length} upstreams`);
@@ -57,13 +59,13 @@ export class ToolAggregatorService {
       return (result.tools ?? []).map((tool) => ({
         name: prefix ? this.router.buildPrefixedName(prefix, tool.name) : tool.name,
         description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, unknown>,
+        inputSchema: tool.inputSchema as ToolInputSchema,
         upstreamName,
         originalName: tool.name,
       }));
     } catch (error) {
       this.logger.error(
-        `Failed to fetch tools from "${upstreamName}": ${error instanceof Error ? error.message : error}`,
+        `Failed to fetch tools from "${upstreamName}": ${extractErrorMessage(error)}`,
       );
       return [];
     }

@@ -1,4 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { matchGlobPattern } from '../utils/pattern-matcher';
 import type { CacheConfig, CacheEntry, CacheRule } from './cache.interface';
 
 @Injectable()
@@ -80,20 +81,11 @@ export class ResponseCacheService implements OnModuleDestroy {
 
   private getTtlForTool(toolName: string): number {
     for (const rule of this.rules) {
-      if (this.matchPattern(toolName, rule.pattern)) {
+      if (matchGlobPattern(toolName, rule.pattern)) {
         return rule.ttl;
       }
     }
     return this.defaultTtl;
-  }
-
-  private matchPattern(toolName: string, pattern: string): boolean {
-    const regexStr = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*/g, '.*')
-      .replace(/\?/g, '.');
-
-    return new RegExp(`^${regexStr}$`).test(toolName);
   }
 
   private evictExpired(): void {

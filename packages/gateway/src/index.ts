@@ -12,7 +12,7 @@ export type { GatewayReadResourceResult, GatewayGetPromptResult } from './gatewa
 // Routing
 export { RouterService } from './routing/router.service';
 export { ToolAggregatorService } from './routing/tool-aggregator.service';
-export type { AggregatedTool } from './routing/tool-aggregator.service';
+export type { AggregatedTool, ToolInputSchema } from './routing/tool-aggregator.service';
 export { ResourceAggregatorService } from './routing/resource-aggregator.service';
 export type { AggregatedResource } from './routing/resource-aggregator.service';
 export { PromptAggregatorService } from './routing/prompt-aggregator.service';
@@ -60,3 +60,7 @@ export type {
   ResponseTransformFn,
   ToolCallResponse,
 } from './transform/response-transform.service';
+
+// Utils
+export { matchGlobPattern } from './utils/pattern-matcher';
+export { collectFulfilled } from './utils/settled-results';

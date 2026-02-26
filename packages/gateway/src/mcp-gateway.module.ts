@@ -249,10 +249,9 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         name: prompt.name,
         description: prompt.description ?? `Proxied prompt from ${prompt.upstreamName}`,
         handler: async (args: Record<string, unknown>) => {
-          const stringArgs: Record<string, string> = {};
-          for (const [key, value] of Object.entries(args)) {
-            stringArgs[key] = String(value);
-          }
+          const stringArgs = Object.fromEntries(
+            Object.entries(args).map(([key, value]) => [key, String(value)]),
+          );
           const result = await this.gatewayService.getPrompt(prompt.name, stringArgs);
           return result as {
             description?: string;
