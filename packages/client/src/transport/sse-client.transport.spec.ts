@@ -59,4 +59,27 @@ describe('createSseTransport', () => {
     const headers = new Headers(options?.requestInit?.headers);
     expect(headers.get('Authorization')).toBe('Bearer tok');
   });
+
+  it('should pass authProvider to the SDK transport constructor', () => {
+    const mockAuthProvider = {
+      get redirectUrl() { return 'http://localhost/callback'; },
+      get clientId() { return 'test-client'; },
+      clientMetadata: { redirect_uris: ['http://localhost/callback'] },
+      tokens: vi.fn().mockResolvedValue(undefined),
+      saveTokens: vi.fn().mockResolvedValue(undefined),
+      redirectToAuthorization: vi.fn().mockResolvedValue(undefined),
+      saveCodeVerifier: vi.fn().mockResolvedValue(undefined),
+      codeVerifier: vi.fn().mockResolvedValue('verifier'),
+    };
+
+    createSseTransport({
+      name: 'test',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+      authProvider: mockAuthProvider,
+    });
+
+    const [, options] = vi.mocked(SSEClientTransport).mock.calls[0];
+    expect(options?.authProvider).toBe(mockAuthProvider);
+  });
 });

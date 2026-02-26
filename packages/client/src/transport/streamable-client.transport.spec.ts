@@ -60,6 +60,29 @@ describe('createStreamableHttpTransport', () => {
     expect(headers.get('Authorization')).toBe('Bearer tok');
   });
 
+  it('should pass authProvider to the SDK transport constructor', () => {
+    const mockAuthProvider = {
+      get redirectUrl() { return 'http://localhost/callback'; },
+      get clientId() { return 'test-client'; },
+      clientMetadata: { redirect_uris: ['http://localhost/callback'] },
+      tokens: vi.fn().mockResolvedValue(undefined),
+      saveTokens: vi.fn().mockResolvedValue(undefined),
+      redirectToAuthorization: vi.fn().mockResolvedValue(undefined),
+      saveCodeVerifier: vi.fn().mockResolvedValue(undefined),
+      codeVerifier: vi.fn().mockResolvedValue('verifier'),
+    };
+
+    createStreamableHttpTransport({
+      name: 'test',
+      transport: 'streamable-http',
+      url: 'http://localhost:3000/mcp',
+      authProvider: mockAuthProvider,
+    });
+
+    const [, options] = vi.mocked(StreamableHTTPClientTransport).mock.calls[0];
+    expect(options?.authProvider).toBe(mockAuthProvider);
+  });
+
   it('should return the created transport', () => {
     const transport = createStreamableHttpTransport({
       name: 'test',

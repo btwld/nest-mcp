@@ -1,3 +1,4 @@
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { InjectionToken, ModuleMetadata } from '@nestjs/common';
 
 export type McpClientTransportType = 'streamable-http' | 'sse' | 'stdio';
@@ -21,6 +22,7 @@ interface McpClientConnectionBase {
 export interface McpClientHttpConnectionBase extends McpClientConnectionBase {
   url: string;
   auth?: McpClientAuthOptions;
+  authProvider?: OAuthClientProvider;
   requestInit?: RequestInit;
 }
 

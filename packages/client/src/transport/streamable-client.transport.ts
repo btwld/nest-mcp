@@ -8,5 +8,8 @@ export function createStreamableHttpTransport(
 ): Transport {
   const url = new URL(connection.url);
   const requestInit = applyAuthHeaders(connection.requestInit, connection.auth);
-  return new StreamableHTTPClientTransport(url, { requestInit });
+  return new StreamableHTTPClientTransport(url, {
+    requestInit,
+    authProvider: connection.authProvider,
+  });
 }

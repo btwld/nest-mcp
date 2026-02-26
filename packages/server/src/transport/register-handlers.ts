@@ -1,6 +1,6 @@
-import { extractZodDescriptions } from '@btwld/mcp-common';
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   CancelledNotificationSchema,
   ListPromptsRequestSchema,
@@ -9,7 +9,6 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import type { RegisteredPrompt, RegisteredTool } from '../discovery/registry.service';
 import type { McpRegistryService } from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
 
@@ -70,6 +69,7 @@ function registerTools(
         // for dynamically-registered tools that only have JSON schemas.
         // A schema is always required so the SDK passes args to the callback.
         inputSchema: tool.parameters ?? PASSTHROUGH_SCHEMA,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations,
       },
       async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
@@ -125,9 +125,14 @@ function registerResourceTemplates(
   ctx: McpExecutionContext,
 ): void {
   for (const template of registry.getAllResourceTemplates()) {
-    (server as unknown as { resource: (...args: unknown[]) => void }).resource(
+    const resourceTemplate = new ResourceTemplate(template.uriTemplate, { list: undefined });
+    (
+      server as unknown as {
+        registerResource: (...args: unknown[]) => void;
+      }
+    ).registerResource(
       template.name,
-      template.uriTemplate,
+      resourceTemplate,
       template.mimeType ? { mimeType: template.mimeType } : {},
       async (uri: URL) => {
         return pipeline.readResource(uri.href, ctx);
@@ -143,11 +148,16 @@ function registerPrompts(
   ctx: McpExecutionContext,
 ): void {
   for (const prompt of registry.getAllPrompts()) {
-    const promptArgs = prompt.parameters ? getPromptArgs(prompt) : {};
-    (server as unknown as { prompt: (...args: unknown[]) => void }).prompt(
+    (
+      server as unknown as {
+        registerPrompt: (...args: unknown[]) => void;
+      }
+    ).registerPrompt(
       prompt.name,
-      prompt.description,
-      promptArgs,
+      {
+        description: prompt.description,
+        argsSchema: prompt.parameters?.shape,
+      },
       async (args: Record<string, unknown>) => {
         return pipeline.getPrompt(prompt.name, args, ctx);
       },
@@ -210,19 +220,4 @@ function registerListHandlers(
     const result = await pipeline.listPrompts(cursor);
     return { prompts: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
   });
-}
-
-function getPromptArgs(
-  prompt: RegisteredPrompt,
-): Record<string, { description: string; required: boolean }> {
-  if (!prompt.parameters) return {};
-  const descriptions = extractZodDescriptions(prompt.parameters);
-  const args: Record<string, { description: string; required: boolean }> = {};
-  for (const desc of descriptions) {
-    args[desc.name] = {
-      description: desc.description ?? '',
-      required: desc.required,
-    };
-  }
-  return args;
 }

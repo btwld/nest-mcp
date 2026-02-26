@@ -3,12 +3,16 @@ import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.j
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   CallToolRequest,
+  CompleteRequest,
   GetPromptRequest,
   ListPromptsRequest,
   ListResourcesRequest,
   ListResourceTemplatesRequest,
   ListToolsRequest,
+  LoggingLevel,
   ReadResourceRequest,
+  SubscribeRequest,
+  UnsubscribeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import type {
@@ -117,6 +121,31 @@ export class McpClient {
   async ping(options?: RequestOptions) {
     this.assertConnected();
     return this.client.ping(options);
+  }
+
+  async subscribeResource(params: SubscribeRequest['params'], options?: RequestOptions) {
+    this.assertConnected();
+    return this.client.subscribeResource(params, options);
+  }
+
+  async unsubscribeResource(params: UnsubscribeRequest['params'], options?: RequestOptions) {
+    this.assertConnected();
+    return this.client.unsubscribeResource(params, options);
+  }
+
+  async setLoggingLevel(level: LoggingLevel, options?: RequestOptions) {
+    this.assertConnected();
+    return this.client.setLoggingLevel(level, options);
+  }
+
+  async complete(params: CompleteRequest['params'], options?: RequestOptions) {
+    this.assertConnected();
+    return this.client.complete(params, options);
+  }
+
+  async sendRootsListChanged(): Promise<void> {
+    this.assertConnected();
+    return this.client.sendRootsListChanged();
   }
 
   onNotification(

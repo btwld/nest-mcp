@@ -21,7 +21,9 @@ describe('registerHandlers', () => {
       tool: vi.fn(),
       registerTool: vi.fn(),
       resource: vi.fn(),
+      registerResource: vi.fn(),
       prompt: vi.fn(),
+      registerPrompt: vi.fn(),
       server: mockInnerServer,
     };
 
@@ -56,7 +58,8 @@ describe('registerHandlers', () => {
 
     expect((mockServer.registerTool as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
     expect((mockServer.resource as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
-    expect((mockServer.prompt as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect((mockServer.registerResource as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect((mockServer.registerPrompt as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
   });
 
   it('registers tools via registerTool with config object', () => {
@@ -80,6 +83,24 @@ describe('registerHandlers', () => {
     expect(config.inputSchema).toBe(schema);
     expect(config.annotations).toEqual({ readOnlyHint: true });
     expect(typeof callback).toBe('function');
+  });
+
+  it('passes outputSchema to registerTool config when present', () => {
+    const outputSchema = z.object({ result: z.string() });
+    mockRegistry.getAllTools.mockReturnValue([
+      {
+        name: 'compute',
+        description: 'Compute',
+        parameters: null,
+        outputSchema,
+      },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const [, config] = registerTool.mock.calls[0];
+    expect(config.outputSchema).toBe(outputSchema);
   });
 
   it('registers tools with passthrough schema when no parameters', () => {
@@ -125,21 +146,26 @@ describe('registerHandlers', () => {
     expect(metadata).toEqual({});
   });
 
-  it('registers resource templates with mimeType metadata', () => {
+  it('registers resource templates via registerResource with ResourceTemplate instance', () => {
     mockRegistry.getAllResourceTemplates.mockReturnValue([
       { name: 'user', uriTemplate: 'data://users/{id}', mimeType: 'application/json' },
     ]);
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
-    const [name, uriTemplate, metadata] = resource.mock.calls[0];
+    const registerResource = mockServer.registerResource as ReturnType<typeof vi.fn>;
+    expect(registerResource).toHaveBeenCalledTimes(1);
+    const [name, templateInstance, metadata, callback] = registerResource.mock.calls[0];
     expect(name).toBe('user');
-    expect(uriTemplate).toBe('data://users/{id}');
+    // Should be a ResourceTemplate instance, not a plain string
+    expect(templateInstance).toBeDefined();
+    expect(typeof templateInstance).toBe('object');
+    expect(templateInstance.uriTemplate).toBeDefined();
     expect(metadata).toEqual({ mimeType: 'application/json' });
+    expect(typeof callback).toBe('function');
   });
 
-  it('registers prompts with name, description, args, and callback', () => {
+  it('registers prompts via registerPrompt with Zod argsSchema', () => {
     const schema = z.object({
       code: z.string().describe('The code to review'),
       language: z.string().optional().describe('Programming language'),
@@ -150,28 +176,28 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
-    expect(prompt).toHaveBeenCalledTimes(1);
-    const [name, desc, args, callback] = prompt.mock.calls[0];
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    expect(registerPrompt).toHaveBeenCalledTimes(1);
+    const [name, config, callback] = registerPrompt.mock.calls[0];
     expect(name).toBe('code_review');
-    expect(desc).toBe('Review code');
-    expect(args).toEqual({
-      code: { description: 'The code to review', required: true },
-      language: { description: 'Programming language', required: false },
-    });
+    expect(config.description).toBe('Review code');
+    // argsSchema should be the raw Zod shape from ZodObject.shape
+    expect(config.argsSchema).toBe(schema.shape);
+    expect(config.argsSchema.code).toBeDefined();
+    expect(config.argsSchema.language).toBeDefined();
     expect(typeof callback).toBe('function');
   });
 
-  it('registers prompts with empty args when no parameters', () => {
+  it('registers prompts with undefined argsSchema when no parameters', () => {
     mockRegistry.getAllPrompts.mockReturnValue([
       { name: 'greeting', description: 'Greet', parameters: null },
     ]);
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
-    const [, , args] = prompt.mock.calls[0];
-    expect(args).toEqual({});
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    const [, config] = registerPrompt.mock.calls[0];
+    expect(config.argsSchema).toBeUndefined();
   });
 
   it('tool callback delegates to pipeline.callTool with signal in context', async () => {
@@ -215,8 +241,8 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
-    const callback = prompt.mock.calls[0][3];
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    const callback = registerPrompt.mock.calls[0][2];
     await callback({ name: 'Alice' });
     expect(mockPipeline.getPrompt).toHaveBeenCalledWith('greet', { name: 'Alice' }, ctx);
   });

@@ -11,6 +11,11 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
     getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
     ping: vi.fn().mockResolvedValue({}),
+    subscribeResource: vi.fn().mockResolvedValue({}),
+    unsubscribeResource: vi.fn().mockResolvedValue({}),
+    setLoggingLevel: vi.fn().mockResolvedValue({}),
+    complete: vi.fn().mockResolvedValue({ completion: { values: [] } }),
+    sendRootsListChanged: vi.fn().mockResolvedValue(undefined),
     getServerCapabilities: vi.fn().mockReturnValue({}),
     getServerVersion: vi.fn().mockReturnValue({ name: 'test', version: '1.0' }),
     _notificationHandlers: new Map(),
@@ -185,6 +190,47 @@ describe('McpClient', () => {
 
       const clientInstance = MockedClient.mock.results[0].value;
       expect(clientInstance.ping).toHaveBeenCalledWith(undefined);
+    });
+
+    it('should delegate subscribeResource to the SDK client', async () => {
+      const params = { uri: 'file:///test' };
+      await mcpClient.subscribeResource(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.subscribeResource).toHaveBeenCalledWith(params, undefined);
+    });
+
+    it('should delegate unsubscribeResource to the SDK client', async () => {
+      const params = { uri: 'file:///test' };
+      await mcpClient.unsubscribeResource(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.unsubscribeResource).toHaveBeenCalledWith(params, undefined);
+    });
+
+    it('should delegate setLoggingLevel to the SDK client', async () => {
+      await mcpClient.setLoggingLevel('info');
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.setLoggingLevel).toHaveBeenCalledWith('info', undefined);
+    });
+
+    it('should delegate complete to the SDK client', async () => {
+      const params = {
+        ref: { type: 'ref/prompt' as const, name: 'test' },
+        argument: { name: 'arg', value: 'val' },
+      };
+      await mcpClient.complete(params);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.complete).toHaveBeenCalledWith(params, undefined);
+    });
+
+    it('should delegate sendRootsListChanged to the SDK client', async () => {
+      await mcpClient.sendRootsListChanged();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.sendRootsListChanged).toHaveBeenCalled();
     });
   });
 
