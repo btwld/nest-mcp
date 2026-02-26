@@ -31,6 +31,18 @@ export const MCP_METHODS = {
   // Sampling (server → client)
   SAMPLING_CREATE_MESSAGE: 'sampling/createMessage',
 
+  // Tasks (server → client)
+  TASKS_GET: 'tasks/get',
+  TASKS_RESULT: 'tasks/result',
+  TASKS_LIST: 'tasks/list',
+  TASKS_CANCEL: 'tasks/cancel',
+
+  // Elicitation (server → client)
+  ELICITATION_CREATE: 'elicitation/create',
+
+  // Roots (server → client)
+  ROOTS_LIST: 'roots/list',
+
   // Notifications
   NOTIFICATION_INITIALIZED: 'notifications/initialized',
   NOTIFICATION_CANCELLED: 'notifications/cancelled',
@@ -40,6 +52,9 @@ export const MCP_METHODS = {
   NOTIFICATION_RESOURCES_UPDATED: 'notifications/resources/updated',
   NOTIFICATION_PROMPTS_LIST_CHANGED: 'notifications/prompts/list_changed',
   NOTIFICATION_MESSAGE: 'notifications/message',
+  NOTIFICATION_TASKS_STATUS: 'notifications/tasks/status',
+  NOTIFICATION_ELICITATION_COMPLETE: 'notifications/elicitation/complete',
+  NOTIFICATION_ROOTS_LIST_CHANGED: 'notifications/roots/list_changed',
 } as const;
 
 export type McpMethod = (typeof MCP_METHODS)[keyof typeof MCP_METHODS];

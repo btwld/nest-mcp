@@ -3,6 +3,7 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { McpAuthModuleOptions } from './interfaces/auth-module-options.interface';
+import type { OAuthProviderAdapter } from './interfaces/oauth-provider.interface';
 import { createOAuthController } from './oauth/oauth.controller';
 import { createWellKnownController } from './oauth/well-known.controller';
 import { AuthAuditService } from './services/auth-audit.service';
@@ -44,5 +45,15 @@ export class McpAuthModule {
         MCP_OAUTH_STORE,
       ],
     };
+  }
+
+  static forProvider(
+    adapter: OAuthProviderAdapter,
+    options: Omit<McpAuthModuleOptions, 'validateUser'>,
+  ): DynamicModule {
+    return McpAuthModule.forRoot({
+      ...options,
+      validateUser: (req) => adapter.validateUser(req),
+    });
   }
 }

@@ -59,6 +59,7 @@ export { OAuthClientService, MCP_OAUTH_STORE } from './auth/services/client.serv
 export { MemoryOAuthStore } from './auth/stores/memory-store.service';
 export type { IOAuthStore } from './auth/stores/oauth-store.interface';
 export type { McpAuthModuleOptions } from './auth/interfaces/auth-module-options.interface';
+export type { OAuthProviderAdapter, OAuthProviderUser } from './auth/interfaces/oauth-provider.interface';
 export type {
   OAuthClient,
   AuthorizationCode,

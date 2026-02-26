@@ -83,4 +83,26 @@ describe('protocol constants', () => {
     expect(MCP_METHODS.PROMPTS_LIST).toBe('prompts/list');
     expect(MCP_METHODS.PROMPTS_GET).toBe('prompts/get');
   });
+
+  it('should define task methods', () => {
+    expect(MCP_METHODS.TASKS_GET).toBe('tasks/get');
+    expect(MCP_METHODS.TASKS_RESULT).toBe('tasks/result');
+    expect(MCP_METHODS.TASKS_LIST).toBe('tasks/list');
+    expect(MCP_METHODS.TASKS_CANCEL).toBe('tasks/cancel');
+  });
+
+  it('should define elicitation and roots methods', () => {
+    expect(MCP_METHODS.ELICITATION_CREATE).toBe('elicitation/create');
+    expect(MCP_METHODS.ROOTS_LIST).toBe('roots/list');
+  });
+
+  it('should define all notification methods', () => {
+    expect(MCP_METHODS.NOTIFICATION_TASKS_STATUS).toBe('notifications/tasks/status');
+    expect(MCP_METHODS.NOTIFICATION_ELICITATION_COMPLETE).toBe('notifications/elicitation/complete');
+    expect(MCP_METHODS.NOTIFICATION_ROOTS_LIST_CHANGED).toBe('notifications/roots/list_changed');
+  });
+
+  it('should have exactly 29 methods to guard against drift', () => {
+    expect(Object.keys(MCP_METHODS)).toHaveLength(31);
+  });
 });

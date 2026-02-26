@@ -118,6 +118,7 @@ export class McpRegistryService {
       this.logger.warn(`Duplicate tool name: ${enriched.name}. Overwriting.`);
     }
 
+    this.warnIfMissingDescription('Tool', enriched.name, enriched.description);
     this.tools.set(enriched.name, enriched);
     this.logger.log(`Registered tool: ${enriched.name}`);
   }
@@ -135,6 +136,7 @@ export class McpRegistryService {
     if (!metadata) return;
 
     const registered: RegisteredResource = { ...metadata, instance };
+    this.warnIfMissingDescription('Resource', registered.name, registered.description);
     this.resources.set(registered.uri, registered);
     this.logger.log(`Registered resource: ${registered.uri}`);
   }
@@ -152,6 +154,7 @@ export class McpRegistryService {
     if (!metadata) return;
 
     const registered: RegisteredResourceTemplate = { ...metadata, instance };
+    this.warnIfMissingDescription('ResourceTemplate', registered.name, registered.description);
     this.resourceTemplates.set(registered.uriTemplate, registered);
     this.logger.log(`Registered resource template: ${registered.uriTemplate}`);
   }
@@ -169,6 +172,7 @@ export class McpRegistryService {
     if (!metadata) return;
 
     const registered: RegisteredPrompt = { ...metadata, instance };
+    this.warnIfMissingDescription('Prompt', registered.name, registered.description);
     this.prompts.set(registered.name, registered);
     this.logger.log(`Registered prompt: ${registered.name}`);
   }
@@ -210,6 +214,7 @@ export class McpRegistryService {
   // ---- Dynamic registration ----
 
   registerTool(tool: RegisteredTool): void {
+    this.warnIfMissingDescription('Tool', tool.name, tool.description);
     this.tools.set(tool.name, tool);
     this.logger.log(`Dynamically registered tool: ${tool.name}`);
     this.events.emit('tool.registered', tool);
@@ -225,6 +230,7 @@ export class McpRegistryService {
   }
 
   registerResource(resource: RegisteredResource): void {
+    this.warnIfMissingDescription('Resource', resource.name, resource.description);
     this.resources.set(resource.uri, resource);
     this.logger.log(`Dynamically registered resource: ${resource.uri}`);
     this.events.emit('resource.registered', resource);
@@ -239,9 +245,18 @@ export class McpRegistryService {
   }
 
   registerPrompt(prompt: RegisteredPrompt): void {
+    this.warnIfMissingDescription('Prompt', prompt.name, prompt.description);
     this.prompts.set(prompt.name, prompt);
     this.logger.log(`Dynamically registered prompt: ${prompt.name}`);
     this.events.emit('prompt.registered', prompt);
+  }
+
+  private warnIfMissingDescription(type: string, name: string, description?: string): void {
+    if (!description) {
+      this.logger.warn(
+        `${type} "${name}" registered without a description. Descriptions are strongly recommended by the MCP specification.`,
+      );
+    }
   }
 
   unregisterPrompt(name: string): boolean {

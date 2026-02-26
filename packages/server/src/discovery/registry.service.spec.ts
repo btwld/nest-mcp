@@ -44,6 +44,17 @@ class TestResources {
   }
 }
 
+class TestResourceNoDescription {
+  @Resource({
+    uri: 'file:///bare.json',
+    name: 'bare',
+    mimeType: 'application/json',
+  })
+  getBare() {
+    return {};
+  }
+}
+
 class TestResourceTemplates {
   @ResourceTemplate({
     uriTemplate: 'file:///users/{userId}',
@@ -520,6 +531,55 @@ describe('McpRegistryService', () => {
       registry.unregisterPrompt('nonexistent');
 
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('description warnings', () => {
+    it('does not warn when tool has a description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      registry.registerProvider(new TestTools());
+
+      const descWarnings = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('registered without a description'),
+      );
+      expect(descWarnings).toHaveLength(0);
+    });
+
+    it('warns when resource has no description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      registry.registerProvider(new TestResourceNoDescription());
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Resource "bare" registered without a description. Descriptions are strongly recommended by the MCP specification.',
+      );
+    });
+
+    it('warns when dynamically registered tool has no description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      const tool: RegisteredTool = {
+        name: 'no-desc-tool',
+        description: '',
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerTool(tool);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Tool "no-desc-tool" registered without a description. Descriptions are strongly recommended by the MCP specification.',
+      );
     });
   });
 });
