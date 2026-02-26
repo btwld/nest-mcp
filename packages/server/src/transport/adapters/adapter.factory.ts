@@ -4,17 +4,16 @@ import { ExpressAdapter } from './express.adapter';
 import { FastifyAdapter } from './fastify.adapter';
 
 const logger = new Logger('HttpAdapterFactory');
-let cachedAdapter: McpHttpAdapter | null = null;
-let cachedType: HttpAdapterType | null = null;
+const adapterCache = new Map<HttpAdapterType, McpHttpAdapter>();
 
 export function getHttpAdapter(request: unknown): McpHttpAdapter {
   const type = detectAdapterType(request);
-  if (cachedAdapter && cachedType === type) return cachedAdapter;
-
-  cachedType = type;
-  cachedAdapter = type === 'fastify' ? new FastifyAdapter() : new ExpressAdapter();
+  const cached = adapterCache.get(type);
+  if (cached) return cached;
+  const adapter = type === 'fastify' ? new FastifyAdapter() : new ExpressAdapter();
+  adapterCache.set(type, adapter);
   logger.log(`Detected HTTP adapter: ${type}`);
-  return cachedAdapter;
+  return adapter;
 }
 
 function detectAdapterType(request: unknown): HttpAdapterType {

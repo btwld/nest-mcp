@@ -34,6 +34,11 @@ export function createOAuthController(basePath: string): Type<unknown> {
   @Controller(basePath)
   @UseGuards(AuthRateLimitGuard)
   class OAuthController {
+    private readonly grantHandlers = new Map<string, (body: Record<string, unknown>) => Promise<TokenResponse>>([
+      ['authorization_code', (body) => this.handleAuthorizationCode(body)],
+      ['refresh_token', (body) => this.handleRefreshToken(body)],
+    ]);
+
     constructor(
       @Inject(MCP_AUTH_OPTIONS)
       private readonly options: McpAuthModuleOptions,
@@ -168,15 +173,12 @@ export function createOAuthController(basePath: string): Type<unknown> {
     async token(@Body() body: Record<string, unknown>): Promise<TokenResponse> {
       const { grant_type } = body as { grant_type?: string };
 
-      if (grant_type === 'authorization_code') {
-        return this.handleAuthorizationCode(body);
+      const handler = this.grantHandlers.get(grant_type ?? '');
+      if (!handler) {
+        throw new HttpException('Unsupported grant_type', HttpStatus.BAD_REQUEST);
       }
 
-      if (grant_type === 'refresh_token') {
-        return this.handleRefreshToken(body);
-      }
-
-      throw new HttpException('Unsupported grant_type', HttpStatus.BAD_REQUEST);
+      return handler(body);
     }
 
     @Post('revoke')

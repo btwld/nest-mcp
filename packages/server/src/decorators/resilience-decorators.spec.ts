@@ -4,11 +4,13 @@ import {
   MCP_MIDDLEWARE_METADATA,
   MCP_RATE_LIMIT_METADATA,
   MCP_RETRY_METADATA,
+  MCP_TIMEOUT_METADATA,
 } from '@btwld/mcp-common';
 import type { McpMiddleware } from '@btwld/mcp-common';
 import { CircuitBreaker } from './circuit-breaker.decorator';
 import { RateLimit } from './rate-limit.decorator';
 import { Retry } from './retry.decorator';
+import { Timeout } from './timeout.decorator';
 import { UseMiddleware } from './use-middleware.decorator';
 
 describe('Resilience decorators', () => {
@@ -104,6 +106,25 @@ describe('Resilience decorators', () => {
         minRequests: 10,
         halfOpenTimeout: 30000,
       });
+    });
+  });
+
+  describe('@Timeout', () => {
+    it('stores timeout value in milliseconds', () => {
+      class TestService {
+        @Timeout(5000)
+        slowMethod() {
+          return 'ok';
+        }
+      }
+
+      const value = Reflect.getMetadata(
+        MCP_TIMEOUT_METADATA,
+        TestService.prototype,
+        'slowMethod',
+      );
+
+      expect(value).toBe(5000);
     });
   });
 });

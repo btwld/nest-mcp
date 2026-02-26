@@ -36,6 +36,7 @@ export * from './errors/upstream.error';
 export * from './utils/schema-converter';
 export * from './utils/uri-template';
 export * from './utils/capabilities-builder';
+export * from './utils/duration';
 
 // Decorators
 export * from './decorators/metadata.utils';

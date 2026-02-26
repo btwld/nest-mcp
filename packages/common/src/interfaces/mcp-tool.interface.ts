@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import type { McpGuardClass } from './mcp-auth.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
 import type {
   CircuitBreakerConfig,
@@ -33,7 +34,7 @@ export interface ToolMetadata {
   isPublic?: boolean;
   requiredScopes?: string[];
   requiredRoles?: string[];
-  guards?: Array<abstract new (...args: unknown[]) => unknown>;
+  guards?: McpGuardClass[];
   // Resilience
   timeout?: number;
   rateLimit?: RateLimitConfig;

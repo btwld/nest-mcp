@@ -1,5 +1,6 @@
 import type { PromptGetResult, ResourceReadResult, ToolCallResult } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
+import { type DynamicModule, type ForwardReference, type Provider, type Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { McpRegistryService } from '../discovery/registry.service';
@@ -17,10 +18,8 @@ export interface McpTestApp {
 }
 
 export interface CreateTestAppOptions {
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS DI requires broad provider/module types
-  providers: any[];
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS DI requires broad module types
-  imports?: any[];
+  providers: Provider[];
+  imports?: Array<Type<unknown> | DynamicModule | ForwardReference>;
 }
 
 export async function createMcpTestApp(options: CreateTestAppOptions): Promise<McpTestApp> {
@@ -39,7 +38,8 @@ export async function createMcpTestApp(options: CreateTestAppOptions): Promise<M
   // Scan all providers
   for (const provider of options.providers) {
     try {
-      const instance = moduleRef.get(provider);
+      const token = typeof provider === 'function' ? provider : (provider as { provide: unknown }).provide;
+      const instance = moduleRef.get(token as Type<unknown>);
       if (instance) registry.registerProvider(instance);
     } catch {
       // Skip non-injectable providers

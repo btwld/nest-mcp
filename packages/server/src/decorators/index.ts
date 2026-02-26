@@ -10,3 +10,4 @@ export { UseMiddleware } from './use-middleware.decorator';
 export { RateLimit } from './rate-limit.decorator';
 export { Retry } from './retry.decorator';
 export { CircuitBreaker } from './circuit-breaker.decorator';
+export { Timeout } from './timeout.decorator';

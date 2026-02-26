@@ -53,18 +53,17 @@ export class CircuitBreakerService {
   }
 
   private getOrCreateCircuit(toolName: string): CircuitState {
-    let circuit = this.circuits.get(toolName);
-    if (!circuit) {
-      circuit = {
-        state: CircuitBreakerState.CLOSED,
-        failures: 0,
-        successes: 0,
-        totalRequests: 0,
-        lastFailureTime: 0,
-        nextRetryTime: 0,
-      };
-      this.circuits.set(toolName, circuit);
-    }
+    const existing = this.circuits.get(toolName);
+    if (existing) return existing;
+    const circuit: CircuitState = {
+      state: CircuitBreakerState.CLOSED,
+      failures: 0,
+      successes: 0,
+      totalRequests: 0,
+      lastFailureTime: 0,
+      nextRetryTime: 0,
+    };
+    this.circuits.set(toolName, circuit);
     return circuit;
   }
 

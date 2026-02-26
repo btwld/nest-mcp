@@ -8,6 +8,7 @@ import {
   type OnModuleDestroy,
   Optional,
 } from '@nestjs/common';
+import { parseDurationMs } from '@btwld/mcp-common';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { AuthAuditService } from '../services/auth-audit.service';
 import { MCP_AUTH_OPTIONS } from '../services/jwt-token.service';
@@ -30,7 +31,7 @@ export class AuthRateLimitGuard implements CanActivate, OnModuleDestroy {
   ) {
     const config = this.options.authRateLimit;
     this.max = config?.max ?? 20;
-    this.windowMs = this.parseWindow(config?.window ?? '1m');
+    this.windowMs = parseDurationMs(config?.window ?? '1m', 60_000);
     this.cleanupTimer = setInterval(() => this.cleanup(), this.windowMs);
   }
 
@@ -45,11 +46,7 @@ export class AuthRateLimitGuard implements CanActivate, OnModuleDestroy {
     const ip = this.extractIp(request);
     const now = Date.now();
 
-    let bucket = this.buckets.get(ip);
-    if (!bucket || now >= bucket.resetAt) {
-      bucket = { count: 0, resetAt: now + this.windowMs };
-      this.buckets.set(ip, bucket);
-    }
+    const bucket = this.getOrCreateBucket(ip, now);
 
     bucket.count++;
 
@@ -77,21 +74,14 @@ export class AuthRateLimitGuard implements CanActivate, OnModuleDestroy {
     return request.ip ?? request.socket?.remoteAddress ?? 'unknown';
   }
 
-  private parseWindow(window: string): number {
-    const match = window.match(/^(\d+)([smh])$/);
-    if (!match) return 60_000;
-    const num = Number.parseInt(match[1], 10);
-    const unit = match[2];
-    switch (unit) {
-      case 's':
-        return num * 1000;
-      case 'm':
-        return num * 60_000;
-      case 'h':
-        return num * 3_600_000;
-      default:
-        return 60_000;
+  private getOrCreateBucket(ip: string, now: number): RateLimitBucket {
+    const existing = this.buckets.get(ip);
+    if (existing && now < existing.resetAt) {
+      return existing;
     }
+    const bucket: RateLimitBucket = { count: 0, resetAt: now + this.windowMs };
+    this.buckets.set(ip, bucket);
+    return bucket;
   }
 
   private cleanup(): void {

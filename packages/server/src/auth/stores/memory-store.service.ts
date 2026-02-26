@@ -1,3 +1,4 @@
+import { McpError } from '@btwld/mcp-common';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-types.interface';
 import type { IOAuthStore } from './oauth-store.interface';
@@ -26,7 +27,7 @@ export class MemoryOAuthStore implements IOAuthStore, OnModuleInit, OnModuleDest
 
   async storeClient(client: OAuthClient): Promise<OAuthClient> {
     if (this.clients.size >= MAX_CLIENTS && !this.clients.has(client.client_id)) {
-      throw new Error('Maximum number of registered clients reached');
+      throw new McpError('Maximum number of registered clients reached');
     }
     this.clients.set(client.client_id, client);
     return client;
@@ -66,24 +67,24 @@ export class MemoryOAuthStore implements IOAuthStore, OnModuleInit, OnModuleDest
 
   private cleanup(): void {
     const now = Date.now();
-    let removedCodes = 0;
-    let removedTokens = 0;
 
     // Remove expired auth codes
+    const codesBefore = this.authCodes.size;
     for (const [code, authCode] of this.authCodes) {
       if (now > authCode.expires_at) {
         this.authCodes.delete(code);
-        removedCodes++;
       }
     }
+    const removedCodes = codesBefore - this.authCodes.size;
 
     // Remove revoked tokens older than TTL
+    const tokensBefore = this.revokedTokens.size;
     for (const [jti, revokedAt] of this.revokedTokens) {
       if (now - revokedAt > REVOKED_TOKEN_TTL_MS) {
         this.revokedTokens.delete(jti);
-        removedTokens++;
       }
     }
+    const removedTokens = tokensBefore - this.revokedTokens.size;
 
     if (removedCodes > 0 || removedTokens > 0) {
       this.logger.debug(

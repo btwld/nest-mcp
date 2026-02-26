@@ -1,4 +1,4 @@
-import { MCP_RATE_LIMIT_EXCEEDED, McpError, type RateLimitConfig } from '@btwld/mcp-common';
+import { MCP_RATE_LIMIT_EXCEEDED, McpError, type RateLimitConfig, parseDurationMs } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 
 interface RateLimitEntry {
@@ -18,16 +18,10 @@ export class RateLimiterService {
 
   async checkLimit(toolName: string, config: RateLimitConfig, userId?: string): Promise<void> {
     const key = config.perUser && userId ? `${toolName}:${userId}` : toolName;
-    const windowMs = parseWindow(config.window);
+    const windowMs = parseDurationMs(config.window, 1_000);
     const now = Date.now();
 
-    let entry = this.buckets.get(key);
-
-    if (!entry || now >= entry.resetAt) {
-      entry = { count: 0, resetAt: now + windowMs };
-      this.buckets.set(key, entry);
-    }
-
+    const entry = this.getOrCreateEntry(key, windowMs);
     entry.count++;
 
     if (entry.count > config.max) {
@@ -38,6 +32,15 @@ export class RateLimiterService {
         { retryAfter },
       );
     }
+  }
+
+  private getOrCreateEntry(key: string, windowMs: number): RateLimitEntry {
+    const now = Date.now();
+    const existing = this.buckets.get(key);
+    if (existing && now < existing.resetAt) return existing;
+    const entry: RateLimitEntry = { count: 0, resetAt: now + windowMs };
+    this.buckets.set(key, entry);
+    return entry;
   }
 
   private cleanup(): void {
@@ -51,21 +54,5 @@ export class RateLimiterService {
 
   onModuleDestroy(): void {
     clearInterval(this.cleanupInterval);
-  }
-}
-
-function parseWindow(window: string): number {
-  const match = window.match(/^(\d+)(s|m|h)$/);
-  if (!match) throw new Error(`Invalid rate limit window: ${window}`);
-  const value = Number.parseInt(match[1], 10);
-  switch (match[2]) {
-    case 's':
-      return value * 1000;
-    case 'm':
-      return value * 60 * 1000;
-    case 'h':
-      return value * 60 * 60 * 1000;
-    default:
-      return value * 1000;
   }
 }

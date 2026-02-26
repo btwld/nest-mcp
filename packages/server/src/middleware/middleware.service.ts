@@ -11,20 +11,13 @@ export class MiddlewareService {
     args: unknown,
     handler: () => Promise<unknown>,
   ): Promise<unknown> {
-    if (middleware.length === 0) {
-      return handler();
-    }
+    if (middleware.length === 0) return handler();
 
-    let index = 0;
-
-    const next = async (): Promise<unknown> => {
-      if (index >= middleware.length) {
-        return handler();
-      }
-      const mw = middleware[index++];
-      return mw(ctx, args, next);
+    const dispatch = (i: number): Promise<unknown> => {
+      if (i >= middleware.length) return handler();
+      return middleware[i](ctx, args, () => dispatch(i + 1));
     };
 
-    return next();
+    return dispatch(0);
   }
 }

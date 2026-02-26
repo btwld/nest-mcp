@@ -1,3 +1,4 @@
+import type { McpGuardClass } from './mcp-auth.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
 import type {
   CircuitBreakerConfig,
@@ -16,7 +17,7 @@ export interface McpModuleOptions {
   transportOptions?: TransportOptions;
 
   // Auth
-  guards?: Array<abstract new (...args: unknown[]) => unknown>;
+  guards?: McpGuardClass[];
   allowUnauthenticatedAccess?: boolean;
 
   // Resilience (global defaults)

@@ -110,11 +110,10 @@ describe('RateLimiterService', () => {
       await expect(service.checkLimit('tool-h', config)).resolves.toBeUndefined();
     });
 
-    it('throws on invalid window format', async () => {
+    it('falls back to default window on invalid format', async () => {
       const config = { max: 10, window: 'abc' };
-      await expect(service.checkLimit('tool-bad', config)).rejects.toThrow(
-        'Invalid rate limit window: abc',
-      );
+      // Invalid window format falls back to 1s default — does not throw
+      await expect(service.checkLimit('tool-bad', config)).resolves.toBeUndefined();
     });
   });
 });

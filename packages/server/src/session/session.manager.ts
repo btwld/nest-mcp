@@ -1,3 +1,4 @@
+import { McpError } from '@btwld/mcp-common';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   DEFAULT_CLEANUP_INTERVAL,
@@ -39,7 +40,7 @@ export class SessionManager implements OnModuleDestroy {
       this.logger.warn(`Max concurrent sessions (${this.maxConcurrent}) reached`);
       this.cleanup(); // Force cleanup before rejecting
       if (this.sessions.size >= this.maxConcurrent) {
-        throw new Error(`Maximum concurrent sessions (${this.maxConcurrent}) exceeded`);
+        throw new McpError(`Maximum concurrent sessions (${this.maxConcurrent}) exceeded`);
       }
     }
 
@@ -72,13 +73,11 @@ export class SessionManager implements OnModuleDestroy {
 
   private cleanup(): void {
     const now = Date.now();
-    let cleaned = 0;
+    const sizeBefore = this.sessions.size;
     for (const [id, session] of this.sessions) {
-      if (now - session.lastActivityAt > this.timeout) {
-        this.sessions.delete(id);
-        cleaned++;
-      }
+      if (now - session.lastActivityAt > this.timeout) this.sessions.delete(id);
     }
+    const cleaned = sizeBefore - this.sessions.size;
     if (cleaned > 0) {
       this.logger.log(`Cleaned up ${cleaned} expired sessions`);
     }

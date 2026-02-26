@@ -20,6 +20,7 @@ import {
   MCP_RETRY_METADATA,
   MCP_ROLES_METADATA,
   MCP_SCOPES_METADATA,
+  MCP_TIMEOUT_METADATA,
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
@@ -108,6 +109,7 @@ export class McpRegistryService {
       rateLimit: Reflect.getMetadata(MCP_RATE_LIMIT_METADATA, prototype, methodName),
       retry: Reflect.getMetadata(MCP_RETRY_METADATA, prototype, methodName),
       circuitBreaker: Reflect.getMetadata(MCP_CIRCUIT_BREAKER_METADATA, prototype, methodName),
+      timeout: Reflect.getMetadata(MCP_TIMEOUT_METADATA, prototype, methodName),
     };
 
     if (this.tools.has(enriched.name)) {

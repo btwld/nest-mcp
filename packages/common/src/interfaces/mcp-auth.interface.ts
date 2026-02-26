@@ -1,6 +1,16 @@
+export type McpGuardClass = abstract new (...args: unknown[]) => McpGuard;
+
 export interface McpAuthConfig {
-  guards?: Array<abstract new (...args: unknown[]) => unknown>;
+  guards?: McpGuardClass[];
   allowUnauthenticatedAccess?: boolean;
+}
+
+export interface AuthorizableItem {
+  name: string;
+  isPublic?: boolean;
+  requiredScopes?: string[];
+  requiredRoles?: string[];
+  guards?: McpGuardClass[];
 }
 
 export interface McpGuard {

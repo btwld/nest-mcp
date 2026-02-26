@@ -1,3 +1,4 @@
+import { McpError } from '@btwld/mcp-common';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -14,7 +15,7 @@ import { MemoryOAuthStore } from './stores/memory-store.service';
 export class McpAuthModule {
   static forRoot(options: McpAuthModuleOptions): DynamicModule {
     if (!options.jwtSecret || options.jwtSecret.length < 32) {
-      throw new Error('McpAuthModule: jwtSecret must be at least 32 characters');
+      throw new McpError('McpAuthModule: jwtSecret must be at least 32 characters');
     }
 
     const oauthBasePath = options.serverUrl ? new URL(options.serverUrl).pathname : '';

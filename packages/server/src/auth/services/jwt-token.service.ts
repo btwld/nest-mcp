@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AuthorizationError, parseDurationSeconds } from '@btwld/mcp-common';
 import { Inject, Injectable } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
@@ -22,8 +23,8 @@ export class JwtTokenService {
     const iss = this.options.issuer ?? this.options.serverUrl ?? 'http://localhost:3000';
     const aud = this.options.audience ?? 'mcp-client';
 
-    const accessExpiresIn = this.parseExpiresIn(this.options.accessTokenExpiresIn ?? '1d');
-    const refreshExpiresIn = this.parseExpiresIn(this.options.refreshTokenExpiresIn ?? '30d');
+    const accessExpiresIn = parseDurationSeconds(this.options.accessTokenExpiresIn ?? '1d', 86400);
+    const refreshExpiresIn = parseDurationSeconds(this.options.refreshTokenExpiresIn ?? '30d', 86400);
 
     const accessToken = jwt.sign(
       {
@@ -72,26 +73,8 @@ export class JwtTokenService {
         algorithms: ['HS256'],
       }) as TokenPayload;
     } catch (error) {
-      throw new Error(`Invalid token: ${(error as Error).message}`);
+      throw new AuthorizationError(`Invalid token: ${(error as Error).message}`);
     }
   }
 
-  private parseExpiresIn(value: string): number {
-    const match = value.match(/^(\d+)([smhd])$/);
-    if (!match) return 86400;
-    const num = Number.parseInt(match[1], 10);
-    const unit = match[2];
-    switch (unit) {
-      case 's':
-        return num;
-      case 'm':
-        return num * 60;
-      case 'h':
-        return num * 3600;
-      case 'd':
-        return num * 86400;
-      default:
-        return 86400;
-    }
-  }
 }

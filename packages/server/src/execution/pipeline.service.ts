@@ -1,13 +1,16 @@
 import type {
+  CircuitBreakerConfig,
   McpExecutionContext,
   McpGuardContext,
   McpMiddleware,
+  McpModuleOptions,
   PromptGetResult,
   ResourceReadResult,
+  RetryConfig,
   ToolCallResult,
 } from '@btwld/mcp-common';
+import type { McpGuard, McpGuardClass } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
-import type { McpModuleOptions } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ModuleRef } from '@nestjs/core';
@@ -15,7 +18,6 @@ import { ModuleRef } from '@nestjs/core';
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
-import type { RegisteredTool } from '../discovery/registry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { MiddlewareService } from '../middleware/middleware.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -74,7 +76,6 @@ export class ExecutionPipelineService {
     ];
 
     const startTime = Date.now();
-    let success = true;
 
     try {
       const result = await this.middlewareService.executeChain(middleware, ctx, args, async () => {
@@ -88,32 +89,21 @@ export class ExecutionPipelineService {
         const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
         const retryConfig = tool.retry ?? this.options.resilience?.retry;
 
-        // Build execution function
-        let executionFn = () => this.executor.callTool(name, args, ctx);
-
-        // Wrap with retry if configured
-        if (retryConfig) {
-          const innerFn = executionFn;
-          executionFn = () => this.retry.execute(name, retryConfig, innerFn);
-        }
-
-        // Wrap with circuit breaker if configured
-        if (cbConfig) {
-          const innerFn = executionFn;
-          executionFn = () => this.circuitBreaker.execute(name, cbConfig, innerFn);
-        }
+        // Build execution chain with resilience wrappers
+        const baseFn = () => this.executor.callTool(name, args, ctx);
+        const executionFn = this.buildExecutionChain(baseFn, name, { retry: retryConfig, circuitBreaker: cbConfig });
 
         const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
         return timeoutMs ? this.withTimeout(executionFn(), name, timeoutMs) : executionFn();
       });
 
+      const duration = Date.now() - startTime;
+      this.metrics.recordCall(name, duration, true);
       return result as ToolCallResult;
     } catch (error) {
-      success = false;
-      throw error;
-    } finally {
       const duration = Date.now() - startTime;
-      this.metrics.recordCall(name, duration, success);
+      this.metrics.recordCall(name, duration, false);
+      throw error;
     }
   }
 
@@ -128,9 +118,8 @@ export class ExecutionPipelineService {
 
     if (resource) {
       const guardContext = this.buildGuardContext(ctx, { resourceUri: uri });
-      // Resources use the same auth guard with a tool-like shape
       await this.authGuard.checkAuthorization(
-        { ...resource, name: resource.uri, isPublic: false } as unknown as RegisteredTool,
+        { ...resource, name: resource.uri, isPublic: false },
         guardContext,
       );
     }
@@ -161,7 +150,7 @@ export class ExecutionPipelineService {
     if (prompt) {
       const guardContext = this.buildGuardContext(ctx, { promptName: name });
       await this.authGuard.checkAuthorization(
-        { ...prompt, isPublic: false } as unknown as RegisteredTool,
+        { ...prompt, isPublic: false },
         guardContext,
       );
     }
@@ -207,15 +196,7 @@ export class ExecutionPipelineService {
     const guardContext = this.buildGuardContext(ctx, extra);
 
     for (const GuardClass of this.options.guards) {
-      // biome-ignore lint/suspicious/noExplicitAny: Guard classes have varying constructor signatures
-      let guard: any;
-      try {
-        guard = this.moduleRef.get(GuardClass, { strict: false });
-      } catch {
-        // Guard not in DI — instantiate directly (for simple guards)
-        // biome-ignore lint/suspicious/noExplicitAny: Guard classes have varying constructor signatures
-        guard = new (GuardClass as any)();
-      }
+      const guard = this.resolveGuard(GuardClass);
 
       if (typeof guard.canActivate === 'function') {
         await guard.canActivate(guardContext);
@@ -228,16 +209,36 @@ export class ExecutionPipelineService {
     }
   }
 
-  private withTimeout<T>(
-    promise: Promise<T>,
-    operationName: string,
-    timeoutMs: number,
-  ): Promise<T> {
-    let timer: ReturnType<typeof setTimeout>;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new McpTimeoutError(operationName, timeoutMs)), timeoutMs);
+  private resolveGuard(GuardClass: McpGuardClass): McpGuard {
+    try {
+      return this.moduleRef.get(GuardClass, { strict: false });
+    } catch {
+      // Guard not in DI — instantiate directly (for simple guards)
+      return new (GuardClass as new () => McpGuard)();
+    }
+  }
+
+  private buildExecutionChain(
+    baseFn: () => Promise<ToolCallResult>,
+    name: string,
+    config: { retry?: RetryConfig; circuitBreaker?: CircuitBreakerConfig },
+  ): () => Promise<ToolCallResult> {
+    const withRetry = config.retry
+      ? () => this.retry.execute(name, config.retry!, baseFn)
+      : baseFn;
+
+    const withCircuitBreaker = config.circuitBreaker
+      ? () => this.circuitBreaker.execute(name, config.circuitBreaker!, withRetry)
+      : withRetry;
+
+    return withCircuitBreaker;
+  }
+
+  private withTimeout<T>(promise: Promise<T>, operationName: string, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new McpTimeoutError(operationName, timeoutMs)), timeoutMs);
+      promise.then(resolve, reject).finally(() => clearTimeout(timer));
     });
-    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 
   private buildGuardContext(

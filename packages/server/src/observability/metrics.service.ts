@@ -16,18 +16,7 @@ export class MetricsService {
   private readonly metrics = new Map<string, ToolMetrics>();
 
   recordCall(toolName: string, durationMs: number, success: boolean): void {
-    let metric = this.metrics.get(toolName);
-    if (!metric) {
-      metric = {
-        name: toolName,
-        totalCalls: 0,
-        successCount: 0,
-        errorCount: 0,
-        totalDurationMs: 0,
-        avgDurationMs: 0,
-      };
-      this.metrics.set(toolName, metric);
-    }
+    const metric = this.getOrCreateMetric(toolName);
 
     metric.totalCalls++;
     metric.totalDurationMs += durationMs;
@@ -41,6 +30,21 @@ export class MetricsService {
     }
   }
 
+  private getOrCreateMetric(toolName: string): ToolMetrics {
+    const existing = this.metrics.get(toolName);
+    if (existing) return existing;
+    const metric: ToolMetrics = {
+      name: toolName,
+      totalCalls: 0,
+      successCount: 0,
+      errorCount: 0,
+      totalDurationMs: 0,
+      avgDurationMs: 0,
+    };
+    this.metrics.set(toolName, metric);
+    return metric;
+  }
+
   getMetrics(): ToolMetrics[] {
     return Array.from(this.metrics.values());
   }
@@ -50,26 +54,17 @@ export class MetricsService {
   }
 
   toPrometheus(): string {
-    const lines: string[] = [];
-
-    lines.push('# HELP mcp_tool_calls_total Total number of tool calls');
-    lines.push('# TYPE mcp_tool_calls_total counter');
-    for (const m of this.metrics.values()) {
-      lines.push(`mcp_tool_calls_total{tool="${m.name}"} ${m.totalCalls}`);
-    }
-
-    lines.push('# HELP mcp_tool_errors_total Total number of tool errors');
-    lines.push('# TYPE mcp_tool_errors_total counter');
-    for (const m of this.metrics.values()) {
-      lines.push(`mcp_tool_errors_total{tool="${m.name}"} ${m.errorCount}`);
-    }
-
-    lines.push('# HELP mcp_tool_duration_ms_avg Average tool call duration in milliseconds');
-    lines.push('# TYPE mcp_tool_duration_ms_avg gauge');
-    for (const m of this.metrics.values()) {
-      lines.push(`mcp_tool_duration_ms_avg{tool="${m.name}"} ${m.avgDurationMs.toFixed(2)}`);
-    }
-
+    const metrics = Array.from(this.metrics.values());
+    const sections = [
+      { help: 'mcp_tool_calls_total', type: 'counter', helpText: 'Total number of tool calls', fn: (m: ToolMetrics) => `mcp_tool_calls_total{tool="${m.name}"} ${m.totalCalls}` },
+      { help: 'mcp_tool_errors_total', type: 'counter', helpText: 'Total number of tool errors', fn: (m: ToolMetrics) => `mcp_tool_errors_total{tool="${m.name}"} ${m.errorCount}` },
+      { help: 'mcp_tool_duration_ms_avg', type: 'gauge', helpText: 'Average tool call duration in milliseconds', fn: (m: ToolMetrics) => `mcp_tool_duration_ms_avg{tool="${m.name}"} ${m.avgDurationMs.toFixed(2)}` },
+    ];
+    const lines = sections.flatMap(({ help, type, helpText, fn }) => [
+      `# HELP ${help} ${helpText}`,
+      `# TYPE ${help} ${type}`,
+      ...metrics.map(fn),
+    ]);
     return `${lines.join('\n')}\n`;
   }
 }

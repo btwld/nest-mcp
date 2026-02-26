@@ -17,6 +17,7 @@ import { McpExecutorService } from '../../execution/executor.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
+import type { HttpResponse } from '../http-response.interface';
 import { registerHandlers } from '../register-handlers';
 
 @Injectable()
@@ -81,8 +82,7 @@ export class SseService implements OnModuleDestroy {
     const sessionId = url.searchParams.get('sessionId');
 
     if (!sessionId || !this.transports.has(sessionId)) {
-      // biome-ignore lint/suspicious/noExplicitAny: HTTP response shape varies by framework
-      const resObj = res as any;
+      const resObj = res as HttpResponse;
       resObj.status?.(404)?.json?.({ error: 'Session not found' }) ??
         resObj.code?.(404)?.send?.({ error: 'Session not found' });
       return;

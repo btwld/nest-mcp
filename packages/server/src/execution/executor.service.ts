@@ -10,6 +10,7 @@ import {
   zodToJsonSchema,
 } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
+import type { ZodType } from 'zod';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
@@ -42,22 +43,9 @@ export class McpExecutorService {
       throw new ToolExecutionError(name, `Tool '${name}' not found`);
     }
 
-    // Validate input
-    let validatedArgs: Record<string, unknown> = args;
-    if (tool.parameters) {
-      const parsed = tool.parameters.safeParse(args);
-      if (!parsed.success) {
-        throw new ValidationError(
-          `Invalid parameters for tool '${name}'`,
-          parsed.error.issues.map((issue) => ({
-            path: issue.path.join('.'),
-            message: issue.message,
-            code: issue.code,
-          })),
-        );
-      }
-      validatedArgs = parsed.data as Record<string, unknown>;
-    }
+    const validatedArgs = tool.parameters
+      ? this.validateInput(tool.parameters, args, `tool '${name}'`)
+      : args;
 
     try {
       const handler = tool.instance[tool.methodName] as
@@ -75,6 +63,21 @@ export class McpExecutorService {
         error instanceof Error ? error : undefined,
       );
     }
+  }
+
+  private validateInput(schema: ZodType, args: Record<string, unknown>, label: string): Record<string, unknown> {
+    const parsed = schema.safeParse(args);
+    if (!parsed.success) {
+      throw new ValidationError(
+        `Invalid parameters for ${label}`,
+        parsed.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+          code: issue.code,
+        })),
+      );
+    }
+    return parsed.data as Record<string, unknown>;
   }
 
   private normalizeToolResult(result: unknown): ToolCallResult {
@@ -188,22 +191,9 @@ export class McpExecutorService {
       throw new ToolExecutionError('prompts/get', `Prompt '${name}' not found`);
     }
 
-    // Validate parameters
-    let validatedArgs: Record<string, unknown> = args;
-    if (prompt.parameters) {
-      const parsed = prompt.parameters.safeParse(args);
-      if (!parsed.success) {
-        throw new ValidationError(
-          `Invalid parameters for prompt '${name}'`,
-          parsed.error.issues.map((issue) => ({
-            path: issue.path.join('.'),
-            message: issue.message,
-            code: issue.code,
-          })),
-        );
-      }
-      validatedArgs = parsed.data as Record<string, unknown>;
-    }
+    const validatedArgs = prompt.parameters
+      ? this.validateInput(prompt.parameters, args, `prompt '${name}'`)
+      : args;
 
     const handler = prompt.instance[prompt.methodName] as
       // biome-ignore lint/complexity/noBannedTypes: dynamic method call

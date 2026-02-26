@@ -35,29 +35,19 @@ export class RetryService {
     throw lastError;
   }
 
+  private static readonly DELAY_STRATEGIES: Record<string, (attempt: number, initialDelay: number, maxDelay: number) => number> = {
+    exponential: (a, i, m) => Math.random() * Math.min(m, i * 2 ** (a - 1)),
+    linear: (a, i) => i * a,
+  };
+
   private calculateDelay(
     attempt: number,
     backoff: RetryConfig['backoff'],
     initialDelay: number,
     maxDelay: number,
   ): number {
-    let delay: number;
-
-    switch (backoff) {
-      case 'exponential': {
-        // Full jitter: random value in [0, min(maxDelay, initialDelay * 2^(attempt-1))]
-        const ceiling = Math.min(maxDelay, initialDelay * 2 ** (attempt - 1));
-        delay = Math.random() * ceiling;
-        break;
-      }
-      case 'linear':
-        delay = initialDelay * attempt;
-        break;
-      default:
-        delay = initialDelay;
-        break;
-    }
-
+    const strategy = RetryService.DELAY_STRATEGIES[backoff ?? 'fixed'];
+    const delay = strategy ? strategy(attempt, initialDelay, maxDelay) : initialDelay;
     return Math.min(delay, maxDelay);
   }
 

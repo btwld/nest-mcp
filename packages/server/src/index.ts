@@ -17,6 +17,7 @@ export {
   RateLimit,
   Retry,
   CircuitBreaker,
+  Timeout,
 } from './decorators';
 
 // Discovery
