@@ -19,3 +19,5 @@ export const MCP_RATE_LIMIT_EXCEEDED = 1007;
 export const MCP_CIRCUIT_OPEN = 1008;
 export const MCP_SESSION_EXPIRED = 1009;
 export const MCP_TRANSPORT_ERROR = 1010;
+export const MCP_TIMEOUT_ERROR = 1011;
+export const MCP_UPSTREAM_ERROR = 1012;

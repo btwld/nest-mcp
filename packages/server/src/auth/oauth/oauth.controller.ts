@@ -6,14 +6,24 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  Optional,
   Post,
   Query,
   Req,
   Res,
   type Type,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
-import type { OAuthClient, TokenPayload, TokenResponse } from '../interfaces/oauth-types.interface';
+import type {
+  OAuthClient,
+  TokenIntrospectionResponse,
+  TokenPayload,
+  TokenResponse,
+} from '../interfaces/oauth-types.interface';
+// biome-ignore lint/style/useImportType: AuthAuditService needed as value for emitDecoratorMetadata
+import { AuthAuditService } from '../services/auth-audit.service';
 // biome-ignore lint/style/useImportType: OAuthClientService needed as value for emitDecoratorMetadata
 import { MCP_OAUTH_STORE, OAuthClientService } from '../services/client.service';
 // biome-ignore lint/style/useImportType: JwtTokenService needed as value for emitDecoratorMetadata
@@ -22,6 +32,7 @@ import type { IOAuthStore } from '../stores/oauth-store.interface';
 
 export function createOAuthController(basePath: string): Type<unknown> {
   @Controller(basePath)
+  @UseGuards(AuthRateLimitGuard)
   class OAuthController {
     constructor(
       @Inject(MCP_AUTH_OPTIONS)
@@ -29,6 +40,7 @@ export function createOAuthController(basePath: string): Type<unknown> {
       private readonly jwtService: JwtTokenService,
       private readonly clientService: OAuthClientService,
       @Inject(MCP_OAUTH_STORE) private readonly store: IOAuthStore,
+      @Optional() private readonly auditService?: AuthAuditService,
     ) {}
 
     @Get('authorize')
@@ -120,6 +132,7 @@ export function createOAuthController(basePath: string): Type<unknown> {
 
       const user = await this.options.validateUser(req);
       if (!user) {
+        this.auditService?.logAuthorizationDenied(clientId, 'User authentication failed');
         const params = new URLSearchParams({
           error: 'access_denied',
           error_description: 'User authentication failed',
@@ -144,6 +157,8 @@ export function createOAuthController(basePath: string): Type<unknown> {
         resource,
         expires_at: Date.now() + expiresIn * 1000,
       });
+
+      this.auditService?.logAuthorizationGranted(clientId, user.id);
 
       const params = new URLSearchParams({ code, state });
       res.redirect(302, `${redirectUri}?${params}`);
@@ -175,12 +190,42 @@ export function createOAuthController(basePath: string): Type<unknown> {
         const payload = this.jwtService.validateToken(token);
         if (payload.jti) {
           await this.store.revokeToken(payload.jti);
+          this.auditService?.logTokenRevoked(payload.jti);
         }
       } catch {
         // RFC 7009: invalid tokens are treated as already revoked
       }
 
       return { success: true };
+    }
+
+    @Post('introspect')
+    async introspect(@Body() body: Record<string, unknown>): Promise<TokenIntrospectionResponse> {
+      const { token } = body as { token?: string };
+      if (!token) {
+        throw new HttpException('token parameter is required', HttpStatus.BAD_REQUEST);
+      }
+
+      try {
+        const payload = this.jwtService.validateToken(token);
+
+        // Check if token has been revoked
+        if (payload.jti && (await this.store.isTokenRevoked(payload.jti))) {
+          return { active: false };
+        }
+
+        return {
+          active: true,
+          sub: payload.sub,
+          client_id: payload.client_id ?? payload.azp,
+          scope: payload.scope,
+          exp: payload.exp,
+          iat: payload.iat,
+          token_type: payload.type === 'access' ? 'Bearer' : undefined,
+        };
+      } catch {
+        return { active: false };
+      }
     }
 
     @Post('register')
@@ -202,7 +247,13 @@ export function createOAuthController(basePath: string): Type<unknown> {
         );
       }
 
-      return this.clientService.registerClient(client_name, redirect_uris, grant_types);
+      const registeredClient = await this.clientService.registerClient(
+        client_name,
+        redirect_uris,
+        grant_types,
+      );
+      this.auditService?.logClientRegistered(registeredClient.client_id, client_name);
+      return registeredClient;
     }
 
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: PKCE code exchange has inherent branching for validation
@@ -246,12 +297,14 @@ export function createOAuthController(basePath: string): Type<unknown> {
       // Remove used code
       await this.store.removeAuthCode(code);
 
-      return this.jwtService.generateTokenPair(
+      const tokenResponse = this.jwtService.generateTokenPair(
         authCode.user_id,
         authCode.client_id,
         authCode.scope,
         authCode.resource,
       );
+      this.auditService?.logTokenIssued(authCode.client_id, authCode.user_id);
+      return tokenResponse;
     }
 
     private async handleRefreshToken(body: Record<string, unknown>): Promise<TokenResponse> {
@@ -281,11 +334,14 @@ export function createOAuthController(basePath: string): Type<unknown> {
         await this.store.revokeToken(payload.jti);
       }
 
-      return this.jwtService.generateTokenPair(
+      const clientId = payload.client_id ?? payload.azp ?? '';
+      const refreshResponse = this.jwtService.generateTokenPair(
         payload.sub,
-        payload.client_id ?? payload.azp ?? '',
+        clientId,
         payload.scope,
       );
+      this.auditService?.logTokenIssued(clientId, payload.sub);
+      return refreshResponse;
     }
   }
 

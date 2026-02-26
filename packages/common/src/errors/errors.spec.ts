@@ -4,12 +4,16 @@ import {
   JSON_RPC_INVALID_PARAMS,
   MCP_AUTHENTICATION_ERROR,
   MCP_AUTHORIZATION_ERROR,
+  MCP_TIMEOUT_ERROR,
   MCP_TRANSPORT_ERROR,
+  MCP_UPSTREAM_ERROR,
 } from '../constants/error-codes';
 import { AuthenticationError, AuthorizationError } from './auth.error';
 import { McpError } from './mcp-error';
+import { McpTimeoutError } from './timeout.error';
 import { ToolExecutionError } from './tool-execution.error';
 import { TransportError } from './transport.error';
+import { McpUpstreamError } from './upstream.error';
 import { ValidationError } from './validation.error';
 
 describe('McpError', () => {
@@ -18,6 +22,7 @@ describe('McpError', () => {
     expect(error.message).toBe('Something went wrong');
     expect(error.code).toBe(JSON_RPC_INTERNAL_ERROR);
     expect(error.data).toBeUndefined();
+    expect(error.isRetriable).toBe(false);
     expect(error.name).toBe('McpError');
   });
 
@@ -144,5 +149,84 @@ describe('AuthorizationError', () => {
   it('should be an instance of McpError', () => {
     const error = new AuthorizationError();
     expect(error).toBeInstanceOf(McpError);
+  });
+});
+
+describe('McpTimeoutError', () => {
+  it('should format message with operation name and timeout', () => {
+    const error = new McpTimeoutError('get-weather', 5000);
+    expect(error.message).toBe("Operation 'get-weather' timed out after 5000ms");
+    expect(error.operationName).toBe('get-weather');
+    expect(error.timeoutMs).toBe(5000);
+    expect(error.code).toBe(MCP_TIMEOUT_ERROR);
+    expect(error.name).toBe('McpTimeoutError');
+  });
+
+  it('should be retriable', () => {
+    const error = new McpTimeoutError('op', 1000);
+    expect(error.isRetriable).toBe(true);
+  });
+
+  it('should store operation details in data', () => {
+    const error = new McpTimeoutError('my-tool', 3000);
+    expect(error.data).toEqual({ operationName: 'my-tool', timeoutMs: 3000 });
+  });
+
+  it('should be an instance of McpError', () => {
+    const error = new McpTimeoutError('op', 1000);
+    expect(error).toBeInstanceOf(McpError);
+  });
+});
+
+describe('McpUpstreamError', () => {
+  it('should format message with upstream name', () => {
+    const error = new McpUpstreamError('weather-api', 'connection refused');
+    expect(error.message).toBe("Upstream 'weather-api' error: connection refused");
+    expect(error.upstreamName).toBe('weather-api');
+    expect(error.code).toBe(MCP_UPSTREAM_ERROR);
+    expect(error.name).toBe('McpUpstreamError');
+  });
+
+  it('should be retriable', () => {
+    const error = new McpUpstreamError('api', 'fail');
+    expect(error.isRetriable).toBe(true);
+  });
+
+  it('should store the original error', () => {
+    const original = new Error('root cause');
+    const error = new McpUpstreamError('api', 'fail', original);
+    expect(error.originalError).toBe(original);
+  });
+
+  it('should be an instance of McpError', () => {
+    const error = new McpUpstreamError('api', 'fail');
+    expect(error).toBeInstanceOf(McpError);
+  });
+});
+
+describe('isRetriable', () => {
+  it('defaults to false for base McpError', () => {
+    expect(new McpError('test').isRetriable).toBe(false);
+  });
+
+  it('can be set to true via constructor', () => {
+    const error = new McpError('test', -32603, undefined, true);
+    expect(error.isRetriable).toBe(true);
+  });
+
+  it('is false for AuthenticationError', () => {
+    expect(new AuthenticationError().isRetriable).toBe(false);
+  });
+
+  it('is false for AuthorizationError', () => {
+    expect(new AuthorizationError().isRetriable).toBe(false);
+  });
+
+  it('is true for McpTimeoutError', () => {
+    expect(new McpTimeoutError('op', 1000).isRetriable).toBe(true);
+  });
+
+  it('is true for McpUpstreamError', () => {
+    expect(new McpUpstreamError('api', 'fail').isRetriable).toBe(true);
   });
 });

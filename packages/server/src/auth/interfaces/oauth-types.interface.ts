@@ -39,3 +39,13 @@ export interface TokenResponse {
   token_type: 'Bearer';
   expires_in: number;
 }
+
+export interface TokenIntrospectionResponse {
+  active: boolean;
+  sub?: string;
+  client_id?: string;
+  scope?: string;
+  exp?: number;
+  iat?: number;
+  token_type?: string;
+}

@@ -29,6 +29,8 @@ export * from './errors/tool-execution.error';
 export * from './errors/validation.error';
 export * from './errors/transport.error';
 export * from './errors/auth.error';
+export * from './errors/timeout.error';
+export * from './errors/upstream.error';
 
 // Utils
 export * from './utils/schema-converter';

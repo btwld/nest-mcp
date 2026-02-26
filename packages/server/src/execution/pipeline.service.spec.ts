@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
+import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
 import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { mockMcpContext } from '../testing/mock-context';
 import { ExecutionPipelineService } from './pipeline.service';
@@ -412,6 +412,58 @@ describe('ExecutionPipelineService', () => {
       await pipeline.callTool('test', {}, ctx);
 
       expect(order).toEqual([1, 2]);
+    });
+  });
+
+  // --- timeouts ---
+
+  describe('timeouts', () => {
+    it('throws McpTimeoutError when tool execution exceeds timeout', async () => {
+      options.resilience = { timeout: 10 };
+      registry.getTool.mockReturnValue({ name: 'slow', isPublic: true });
+      executor.callTool.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ content: [] }), 500)),
+      );
+
+      await expect(pipeline.callTool('slow', {}, ctx)).rejects.toThrow(McpTimeoutError);
+    });
+
+    it('uses per-tool timeout over global timeout', async () => {
+      options.resilience = { timeout: 5000 };
+      registry.getTool.mockReturnValue({ name: 'slow', isPublic: true, timeout: 10 });
+      executor.callTool.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ content: [] }), 500)),
+      );
+
+      await expect(pipeline.callTool('slow', {}, ctx)).rejects.toThrow(McpTimeoutError);
+    });
+
+    it('does not timeout when execution is fast enough', async () => {
+      options.resilience = { timeout: 5000 };
+      registry.getTool.mockReturnValue({ name: 'fast', isPublic: true });
+
+      const result = await pipeline.callTool('fast', {}, ctx);
+      expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+    });
+
+    it('throws McpTimeoutError when readResource exceeds timeout', async () => {
+      options.resilience = { timeout: 10 };
+      registry.getResource.mockReturnValue(undefined);
+      executor.readResource.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ contents: [] }), 500)),
+      );
+
+      await expect(pipeline.readResource('file:///slow', ctx)).rejects.toThrow(McpTimeoutError);
+    });
+
+    it('throws McpTimeoutError when getPrompt exceeds timeout', async () => {
+      options.resilience = { timeout: 10 };
+      registry.getPrompt.mockReturnValue(undefined);
+      executor.getPrompt.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ messages: [] }), 500)),
+      );
+
+      await expect(pipeline.getPrompt('slow-prompt', {}, ctx)).rejects.toThrow(McpTimeoutError);
     });
   });
 

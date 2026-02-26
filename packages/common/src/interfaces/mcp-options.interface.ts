@@ -21,6 +21,7 @@ export interface McpModuleOptions {
 
   // Resilience (global defaults)
   resilience?: {
+    timeout?: number;
     rateLimit?: RateLimitConfig;
     retry?: RetryConfig;
     circuitBreaker?: CircuitBreakerConfig;

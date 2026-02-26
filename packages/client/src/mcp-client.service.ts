@@ -43,7 +43,9 @@ export class McpClient {
     this.transport.onerror = (err) => this.logger.error(`Transport error: ${err.message}`);
 
     try {
-      await this.client.connect(this.transport);
+      const connectPromise = this.client.connect(this.transport);
+      const connectTimeout = this.connection.connectTimeout ?? 10_000;
+      await this.withTimeout(connectPromise, connectTimeout);
       this.connected = true;
       this.reconnectAttempts = 0;
       this.logger.log(`Connected to MCP server "${this.name}"`);
@@ -148,7 +150,8 @@ export class McpClient {
         `Reconnecting to "${this.name}" (attempt ${this.reconnectAttempts}/${maxAttempts})...`,
       );
 
-      await this.sleep(delay * this.reconnectAttempts);
+      const backoff = Math.min(30_000, delay * 2 ** (this.reconnectAttempts - 1));
+      await this.sleep(Math.random() * backoff);
 
       try {
         this.client = new Client(
@@ -159,7 +162,8 @@ export class McpClient {
         this.transport.onclose = () => this.handleDisconnect();
         this.transport.onerror = (err) => this.logger.error(`Transport error: ${err.message}`);
 
-        await this.client.connect(this.transport);
+        const reconnectTimeout = this.connection.connectTimeout ?? 10_000;
+        await this.withTimeout(this.client.connect(this.transport), reconnectTimeout);
         this.connected = true;
         this.reconnectAttempts = 0;
         this.reconnecting = false;
@@ -174,6 +178,17 @@ export class McpClient {
 
     this.reconnecting = false;
     this.logger.error(`Failed to reconnect to "${this.name}" after ${maxAttempts} attempts`);
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Connection to "${this.name}" timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 
   private sleep(ms: number): Promise<void> {

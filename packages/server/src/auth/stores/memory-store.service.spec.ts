@@ -155,4 +155,90 @@ describe('MemoryOAuthStore', () => {
       expect(await store.isTokenRevoked('jti-3')).toBe(false);
     });
   });
+
+  // --- Bounded Store ---
+
+  describe('storeClient bounds', () => {
+    it('throws when max clients reached', async () => {
+      // Store MAX_CLIENTS (10_000) clients
+      for (let i = 0; i < 10_000; i++) {
+        await store.storeClient({
+          client_id: `client-${i}`,
+          client_name: `Client ${i}`,
+          redirect_uris: [],
+          token_endpoint_auth_method: 'none',
+          grant_types: [],
+          created_at: Date.now(),
+        });
+      }
+
+      // The next one should throw
+      await expect(
+        store.storeClient({
+          client_id: 'client-overflow',
+          client_name: 'Overflow',
+          redirect_uris: [],
+          token_endpoint_auth_method: 'none',
+          grant_types: [],
+          created_at: Date.now(),
+        }),
+      ).rejects.toThrow('Maximum number of registered clients reached');
+    });
+
+    it('allows updating existing client when at max capacity', async () => {
+      for (let i = 0; i < 10_000; i++) {
+        await store.storeClient({
+          client_id: `client-${i}`,
+          client_name: `Client ${i}`,
+          redirect_uris: [],
+          token_endpoint_auth_method: 'none',
+          grant_types: [],
+          created_at: Date.now(),
+        });
+      }
+
+      // Updating existing client should work
+      const updated = await store.storeClient({
+        client_id: 'client-0',
+        client_name: 'Updated Client',
+        redirect_uris: ['http://new'],
+        token_endpoint_auth_method: 'none',
+        grant_types: [],
+        created_at: Date.now(),
+      });
+
+      expect(updated.client_name).toBe('Updated Client');
+    });
+  });
+
+  describe('lifecycle cleanup', () => {
+    it('starts and stops cleanup timer', () => {
+      store.onModuleInit();
+      store.onModuleDestroy();
+      // Should not throw
+    });
+
+    it('cleanup removes expired auth codes', async () => {
+      const expiredCode: AuthorizationCode = {
+        code: 'expired-code',
+        client_id: 'client-1',
+        user_id: 'user-1',
+        redirect_uri: 'http://localhost/callback',
+        code_challenge: 'challenge',
+        code_challenge_method: 'S256',
+        scope: 'read',
+        expires_at: Date.now() - 1000,
+      };
+
+      await store.storeAuthCode(expiredCode);
+
+      // Access private cleanup method
+      // biome-ignore lint/suspicious/noExplicitAny: test access to private method
+      (store as any).cleanup();
+
+      // Expired code should be cleaned up
+      const result = await store.getAuthCode('expired-code');
+      expect(result).toBeUndefined();
+    });
+  });
 });

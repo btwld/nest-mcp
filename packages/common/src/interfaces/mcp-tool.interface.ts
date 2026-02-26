@@ -35,6 +35,7 @@ export interface ToolMetadata {
   requiredRoles?: string[];
   guards?: Array<abstract new (...args: unknown[]) => unknown>;
   // Resilience
+  timeout?: number;
   rateLimit?: RateLimitConfig;
   retry?: RetryConfig;
   circuitBreaker?: CircuitBreakerConfig;

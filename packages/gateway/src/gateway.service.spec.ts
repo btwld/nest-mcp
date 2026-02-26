@@ -43,6 +43,7 @@ describe('GatewayService', () => {
 
     upstreamManager = {
       getClient: vi.fn(),
+      getConfig: vi.fn().mockReturnValue(undefined),
       isHealthy: vi.fn().mockReturnValue(true),
     };
 

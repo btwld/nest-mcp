@@ -1,3 +1,4 @@
+import { McpTimeoutError, McpUpstreamError } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResponseCacheService } from './cache/response-cache.service';
@@ -140,10 +141,14 @@ export class GatewayService {
 
     try {
       // Forward the call to the upstream
-      const result = await client.callTool({
+      const timeoutMs = this.upstreamManager.getConfig(route.upstreamName)?.timeout;
+      const callPromise = client.callTool({
         name: request.toolName,
         arguments: request.arguments,
       });
+      const result = await (timeoutMs
+        ? this.withTimeout(callPromise, `callTool:${toolName}`, timeoutMs)
+        : callPromise);
 
       // Apply response transforms
       const transformed: ToolCallResponse = await this.responseTransform.apply({
@@ -166,7 +171,12 @@ export class GatewayService {
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error calling tool "${toolName}" on "${route.upstreamName}": ${message}`);
+      const upstreamError = new McpUpstreamError(
+        route.upstreamName,
+        message,
+        error instanceof Error ? error : undefined,
+      );
+      this.logger.error(upstreamError.message);
 
       return {
         content: [{ type: 'text', text: `Error forwarding to upstream: ${message}` }],
@@ -202,13 +212,20 @@ export class GatewayService {
     }
 
     try {
-      const result = await client.readResource({ uri: resource.originalUri });
+      const readTimeoutMs = this.upstreamManager.getConfig(resource.upstreamName)?.timeout;
+      const readPromise = client.readResource({ uri: resource.originalUri });
+      const result = await (readTimeoutMs
+        ? this.withTimeout(readPromise, `readResource:${uri}`, readTimeoutMs)
+        : readPromise);
       return { contents: result.contents as unknown[] };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Error reading resource "${uri}" from "${resource.upstreamName}": ${message}`,
+      const upstreamError = new McpUpstreamError(
+        resource.upstreamName,
+        message,
+        error instanceof Error ? error : undefined,
       );
+      this.logger.error(upstreamError.message);
       return { contents: [{ uri, text: `Error reading resource: ${message}` }] };
     }
   }
@@ -258,14 +275,23 @@ export class GatewayService {
     }
 
     try {
-      const result = await client.getPrompt({ name: prompt.originalName, arguments: args });
+      const promptTimeoutMs = this.upstreamManager.getConfig(prompt.upstreamName)?.timeout;
+      const promptPromise = client.getPrompt({ name: prompt.originalName, arguments: args });
+      const result = await (promptTimeoutMs
+        ? this.withTimeout(promptPromise, `getPrompt:${name}`, promptTimeoutMs)
+        : promptPromise);
       return {
         description: result.description,
         messages: result.messages as unknown[],
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error getting prompt "${name}" from "${prompt.upstreamName}": ${message}`);
+      const upstreamError = new McpUpstreamError(
+        prompt.upstreamName,
+        message,
+        error instanceof Error ? error : undefined,
+      );
+      this.logger.error(upstreamError.message);
       return {
         messages: [
           {
@@ -275,5 +301,17 @@ export class GatewayService {
         ],
       };
     }
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    operationName: string,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new McpTimeoutError(operationName, timeoutMs)), timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 }

@@ -51,7 +51,7 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
 
     // OAuth2 / JWT authentication
     McpAuthModule.forRoot({
-      jwtSecret: 'playground-demo-secret-key-at-least-32chars!',
+      jwtSecret: process.env.JWT_SECRET || 'playground-demo-secret-key-at-least-32chars!',
       issuer: 'http://localhost:3000',
       serverUrl: 'http://localhost:3000',
       resourceUrl: 'http://localhost:3000/mcp',

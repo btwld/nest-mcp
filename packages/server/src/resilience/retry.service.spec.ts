@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { AuthenticationError, McpTimeoutError } from '@btwld/mcp-common';
 import { RetryService } from './retry.service';
 
 describe('RetryService', () => {
@@ -65,9 +66,9 @@ describe('RetryService', () => {
     expect(sleepSpy).toHaveBeenNthCalledWith(3, 300); // 100 * 3
   });
 
-  it('uses exponential backoff with delay capped at maxDelay', async () => {
-    // Mock Math.random to remove jitter variability
-    vi.spyOn(Math, 'random').mockReturnValue(0.5); // jitter factor = 0.75 + 0.5*0.5 = 1.0
+  it('uses exponential backoff with full jitter capped at maxDelay', async () => {
+    // Full jitter: delay = random * min(maxDelay, initialDelay * 2^(attempt-1))
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
     const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
@@ -83,15 +84,14 @@ describe('RetryService', () => {
     ).rejects.toThrow('fail');
 
     expect(sleepSpy).toHaveBeenCalledTimes(4);
-    // With random=0.5, jitter = 0.75 + 0.25 = 1.0
-    // attempt 1: 100 * 2^0 * 1.0 = 100
-    expect(sleepSpy).toHaveBeenNthCalledWith(1, 100);
-    // attempt 2: 100 * 2^1 * 1.0 = 200
-    expect(sleepSpy).toHaveBeenNthCalledWith(2, 200);
-    // attempt 3: 100 * 2^2 * 1.0 = 400
-    expect(sleepSpy).toHaveBeenNthCalledWith(3, 400);
-    // attempt 4: 100 * 2^3 * 1.0 = 800 -> capped at 500
-    expect(sleepSpy).toHaveBeenNthCalledWith(4, 500);
+    // attempt 1: 0.5 * min(500, 100 * 2^0) = 0.5 * 100 = 50
+    expect(sleepSpy).toHaveBeenNthCalledWith(1, 50);
+    // attempt 2: 0.5 * min(500, 100 * 2^1) = 0.5 * 200 = 100
+    expect(sleepSpy).toHaveBeenNthCalledWith(2, 100);
+    // attempt 3: 0.5 * min(500, 100 * 2^2) = 0.5 * 400 = 200
+    expect(sleepSpy).toHaveBeenNthCalledWith(3, 200);
+    // attempt 4: 0.5 * min(500, 100 * 2^3) = 0.5 * 500 = 250
+    expect(sleepSpy).toHaveBeenNthCalledWith(4, 250);
   });
 
   it('does not sleep after last failed attempt', async () => {
@@ -106,5 +106,41 @@ describe('RetryService', () => {
 
     // Only 1 sleep call (after attempt 1, not after attempt 2)
     expect(sleepSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // --- Error discrimination ---
+
+  describe('error discrimination', () => {
+    it('throws immediately for non-retriable McpError without retrying', async () => {
+      const fn = vi.fn().mockRejectedValue(new AuthenticationError('invalid token'));
+
+      await expect(
+        service.execute('tool-a', { maxAttempts: 3, backoff: 'fixed' }, fn),
+      ).rejects.toThrow('invalid token');
+
+      // Should not retry — only 1 call
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries retriable McpError (e.g. McpTimeoutError)', async () => {
+      const fn = vi.fn().mockRejectedValue(new McpTimeoutError('op', 1000));
+
+      await expect(
+        service.execute('tool-a', { maxAttempts: 3, backoff: 'fixed' }, fn),
+      ).rejects.toThrow(McpTimeoutError);
+
+      // Should retry all 3 attempts
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries plain Error (non-McpError)', async () => {
+      const fn = vi.fn().mockRejectedValue(new Error('network failure'));
+
+      await expect(
+        service.execute('tool-a', { maxAttempts: 3, backoff: 'fixed' }, fn),
+      ).rejects.toThrow('network failure');
+
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
   });
 });

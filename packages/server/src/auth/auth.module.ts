@@ -1,8 +1,10 @@
 import { type DynamicModule, Module } from '@nestjs/common';
+import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { McpAuthModuleOptions } from './interfaces/auth-module-options.interface';
 import { createOAuthController } from './oauth/oauth.controller';
 import { createWellKnownController } from './oauth/well-known.controller';
+import { AuthAuditService } from './services/auth-audit.service';
 import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
 import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
 import { MemoryOAuthStore } from './stores/memory-store.service';
@@ -29,6 +31,8 @@ export class McpAuthModule {
         JwtTokenService,
         OAuthClientService,
         JwtAuthGuard,
+        AuthRateLimitGuard,
+        AuthAuditService,
       ],
       controllers: [OAuthCtrl, WellKnownCtrl],
       exports: [

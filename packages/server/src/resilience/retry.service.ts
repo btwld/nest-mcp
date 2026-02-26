@@ -1,4 +1,5 @@
 import type { RetryConfig } from '@btwld/mcp-common';
+import { McpError } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
@@ -15,6 +16,11 @@ export class RetryService {
         return await fn();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Non-retriable MCP errors should not be retried
+        if (error instanceof McpError && !error.isRetriable) {
+          throw error;
+        }
 
         if (attempt < maxAttempts) {
           const delay = this.calculateDelay(attempt, backoff, initialDelay, maxDelay);
@@ -38,11 +44,12 @@ export class RetryService {
     let delay: number;
 
     switch (backoff) {
-      case 'exponential':
-        delay = initialDelay * 2 ** (attempt - 1);
-        // Add jitter (±25%)
-        delay = delay * (0.75 + Math.random() * 0.5);
+      case 'exponential': {
+        // Full jitter: random value in [0, min(maxDelay, initialDelay * 2^(attempt-1))]
+        const ceiling = Math.min(maxDelay, initialDelay * 2 ** (attempt - 1));
+        delay = Math.random() * ceiling;
         break;
+      }
       case 'linear':
         delay = initialDelay * attempt;
         break;

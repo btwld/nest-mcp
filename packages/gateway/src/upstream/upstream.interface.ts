@@ -5,6 +5,7 @@ export interface UpstreamConfig {
   url: string;
   transport: UpstreamTransportType;
   toolPrefix?: string;
+  timeout?: number;
   enabled?: boolean;
   healthCheck?: {
     enabled?: boolean;

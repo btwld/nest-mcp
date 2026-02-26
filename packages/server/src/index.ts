@@ -50,6 +50,9 @@ export { MiddlewareService } from './middleware/middleware.service';
 export { ToolAuthGuardService } from './auth/guards/tool-auth.guard';
 export { McpAuthModule } from './auth/auth.module';
 export { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+export { AuthRateLimitGuard } from './auth/guards/auth-rate-limit.guard';
+export { AuthAuditService } from './auth/services/auth-audit.service';
+export type { AuditLogEntry } from './auth/services/auth-audit.service';
 export { JwtTokenService, MCP_AUTH_OPTIONS } from './auth/services/jwt-token.service';
 export { OAuthClientService, MCP_OAUTH_STORE } from './auth/services/client.service';
 export { MemoryOAuthStore } from './auth/stores/memory-store.service';
@@ -60,6 +63,7 @@ export type {
   AuthorizationCode,
   TokenPayload,
   TokenResponse,
+  TokenIntrospectionResponse,
 } from './auth/interfaces/oauth-types.interface';
 
 // Session

@@ -73,6 +73,10 @@ export class UpstreamManagerService implements OnModuleDestroy {
     return this.upstreams.get(name)?.client;
   }
 
+  getConfig(name: string): UpstreamConfig | undefined {
+    return this.upstreams.get(name)?.config;
+  }
+
   getManaged(name: string): ManagedUpstream | undefined {
     return this.upstreams.get(name);
   }

@@ -6,7 +6,7 @@ import type {
   ResourceReadResult,
   ToolCallResult,
 } from '@btwld/mcp-common';
-import { MCP_OPTIONS, ToolExecutionError } from '@btwld/mcp-common';
+import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -103,7 +103,8 @@ export class ExecutionPipelineService {
           executionFn = () => this.circuitBreaker.execute(name, cbConfig, innerFn);
         }
 
-        return executionFn();
+        const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
+        return timeoutMs ? this.withTimeout(executionFn(), name, timeoutMs) : executionFn();
       });
 
       return result as ToolCallResult;
@@ -137,9 +138,11 @@ export class ExecutionPipelineService {
     // Collect middleware: global only (resources don't have per-item middleware)
     const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    return this.middlewareService.executeChain(middleware, ctx, { uri }, () =>
-      this.executor.readResource(uri, ctx),
-    ) as Promise<ResourceReadResult>;
+    const timeoutMs = this.options.resilience?.timeout;
+    return this.middlewareService.executeChain(middleware, ctx, { uri }, () => {
+      const promise = this.executor.readResource(uri, ctx);
+      return timeoutMs ? this.withTimeout(promise, `resource:${uri}`, timeoutMs) : promise;
+    }) as Promise<ResourceReadResult>;
   }
 
   // ---- Prompts ----
@@ -166,9 +169,13 @@ export class ExecutionPipelineService {
     // Collect middleware: global only (prompts don't have per-item middleware)
     const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    return this.middlewareService.executeChain(middleware, ctx, args, () =>
-      this.executor.getPrompt(name, args, ctx),
-    ) as Promise<PromptGetResult>;
+    const promptTimeoutMs = this.options.resilience?.timeout;
+    return this.middlewareService.executeChain(middleware, ctx, args, () => {
+      const promise = this.executor.getPrompt(name, args, ctx);
+      return promptTimeoutMs
+        ? this.withTimeout(promise, `prompt:${name}`, promptTimeoutMs)
+        : promise;
+    }) as Promise<PromptGetResult>;
   }
 
   // ---- List methods (delegate directly) ----
@@ -219,6 +226,18 @@ export class ExecutionPipelineService {
     if (guardContext.user) {
       ctx.user = guardContext.user;
     }
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    operationName: string,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new McpTimeoutError(operationName, timeoutMs)), timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 
   private buildGuardContext(

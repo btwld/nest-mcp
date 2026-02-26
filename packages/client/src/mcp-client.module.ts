@@ -14,10 +14,8 @@ import type {
 import { McpClient } from './mcp-client.service';
 
 @Module({})
-// biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes for DI
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS dynamic modules require a class for @Module() decorator and module self-reference
 export class McpClientModule {
-  private static readonly logger = new Logger('McpClientModule');
-
   static forRoot(options: McpClientModuleOptions): DynamicModule {
     const connectionProviders = McpClientModule.createConnectionProviders(options);
 

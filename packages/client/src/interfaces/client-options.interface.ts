@@ -14,6 +14,7 @@ export interface McpClientAuthOptions {
 
 interface McpClientConnectionBase {
   name: string;
+  connectTimeout?: number;
   reconnect?: McpClientReconnectOptions;
 }
 
