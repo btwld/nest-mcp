@@ -5,17 +5,24 @@ import { z } from 'zod';
 import { registerHandlers } from './register-handlers';
 
 describe('registerHandlers', () => {
-  let mockServer: Record<string, ReturnType<typeof vi.fn>>;
+  let mockInnerServer: Record<string, ReturnType<typeof vi.fn>>;
+  let mockServer: Record<string, unknown>;
   let mockRegistry: Record<string, ReturnType<typeof vi.fn>>;
   let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
   let ctx: McpExecutionContext;
 
   beforeEach(() => {
+    mockInnerServer = {
+      setNotificationHandler: vi.fn(),
+      setRequestHandler: vi.fn(),
+    };
+
     mockServer = {
       tool: vi.fn(),
       registerTool: vi.fn(),
       resource: vi.fn(),
       prompt: vi.fn(),
+      server: mockInnerServer,
     };
 
     mockRegistry = {
@@ -29,6 +36,10 @@ describe('registerHandlers', () => {
       callTool: vi.fn().mockResolvedValue({ content: [] }),
       readResource: vi.fn().mockResolvedValue({ contents: [] }),
       getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
+      listTools: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
+      listResources: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
+      listResourceTemplates: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
+      listPrompts: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
     };
 
     ctx = {
@@ -43,9 +54,9 @@ describe('registerHandlers', () => {
   it('registers nothing when registry is empty', () => {
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.registerTool).not.toHaveBeenCalled();
-    expect(mockServer.resource).not.toHaveBeenCalled();
-    expect(mockServer.prompt).not.toHaveBeenCalled();
+    expect((mockServer.registerTool as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect((mockServer.resource as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect((mockServer.prompt as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
   });
 
   it('registers tools via registerTool with config object', () => {
@@ -61,8 +72,9 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.registerTool).toHaveBeenCalledTimes(1);
-    const [name, config, callback] = mockServer.registerTool.mock.calls[0];
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    expect(registerTool).toHaveBeenCalledTimes(1);
+    const [name, config, callback] = registerTool.mock.calls[0];
     expect(name).toBe('get_weather');
     expect(config.description).toBe('Get weather');
     expect(config.inputSchema).toBe(schema);
@@ -77,7 +89,8 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const [, config] = mockServer.registerTool.mock.calls[0];
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const [, config] = registerTool.mock.calls[0];
     // When no Zod schema is provided, a passthrough schema is used so the SDK
     // always passes arguments to the handler callback.
     expect(config.inputSchema).toBeDefined();
@@ -91,8 +104,9 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.resource).toHaveBeenCalledTimes(1);
-    const [name, uri, metadata, callback] = mockServer.resource.mock.calls[0];
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    expect(resource).toHaveBeenCalledTimes(1);
+    const [name, uri, metadata, callback] = resource.mock.calls[0];
     expect(name).toBe('config');
     expect(uri).toBe('data://config');
     expect(metadata).toEqual({ mimeType: 'application/json' });
@@ -106,7 +120,8 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const [, , metadata] = mockServer.resource.mock.calls[0];
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    const [, , metadata] = resource.mock.calls[0];
     expect(metadata).toEqual({});
   });
 
@@ -117,7 +132,8 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const [name, uriTemplate, metadata] = mockServer.resource.mock.calls[0];
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    const [name, uriTemplate, metadata] = resource.mock.calls[0];
     expect(name).toBe('user');
     expect(uriTemplate).toBe('data://users/{id}');
     expect(metadata).toEqual({ mimeType: 'application/json' });
@@ -134,8 +150,9 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    expect(mockServer.prompt).toHaveBeenCalledTimes(1);
-    const [name, desc, args, callback] = mockServer.prompt.mock.calls[0];
+    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
+    expect(prompt).toHaveBeenCalledTimes(1);
+    const [name, desc, args, callback] = prompt.mock.calls[0];
     expect(name).toBe('code_review');
     expect(desc).toBe('Review code');
     expect(args).toEqual({
@@ -152,11 +169,12 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const [, , args] = mockServer.prompt.mock.calls[0];
+    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
+    const [, , args] = prompt.mock.calls[0];
     expect(args).toEqual({});
   });
 
-  it('tool callback delegates to pipeline.callTool', async () => {
+  it('tool callback delegates to pipeline.callTool with signal in context', async () => {
     mockRegistry.getAllTools.mockReturnValue([
       { name: 'echo', description: 'Echo', parameters: null },
     ]);
@@ -164,9 +182,16 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const callback = mockServer.registerTool.mock.calls[0][2];
-    const result = await callback({ message: 'hi' });
-    expect(mockPipeline.callTool).toHaveBeenCalledWith('echo', { message: 'hi' }, ctx);
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const callback = registerTool.mock.calls[0][2];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-1' };
+    const result = await callback({ message: 'hi' }, mockExtra);
+
+    expect(mockPipeline.callTool).toHaveBeenCalledWith(
+      'echo',
+      { message: 'hi' },
+      expect.objectContaining({ sessionId: 'test-session', signal: expect.any(AbortSignal) }),
+    );
     expect(result).toEqual({ content: [{ type: 'text', text: 'hi' }] });
   });
 
@@ -177,7 +202,8 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const callback = mockServer.resource.mock.calls[0][3];
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    const callback = resource.mock.calls[0][3];
     await callback(new URL('data://config'));
     expect(mockPipeline.readResource).toHaveBeenCalledWith('data://config', ctx);
   });
@@ -189,8 +215,141 @@ describe('registerHandlers', () => {
 
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    const callback = mockServer.prompt.mock.calls[0][3];
+    const prompt = mockServer.prompt as ReturnType<typeof vi.fn>;
+    const callback = prompt.mock.calls[0][3];
     await callback({ name: 'Alice' });
     expect(mockPipeline.getPrompt).toHaveBeenCalledWith('greet', { name: 'Alice' }, ctx);
+  });
+
+  // --- Cancellation ---
+
+  it('registers notifications/cancelled handler on inner server', () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    expect(mockInnerServer.setNotificationHandler).toHaveBeenCalledWith(
+      expect.objectContaining({ shape: expect.any(Object) }),
+      expect.any(Function),
+    );
+  });
+
+  it('cancellation handler aborts in-flight request', async () => {
+    mockRegistry.getAllTools.mockReturnValue([
+      { name: 'slow', description: 'Slow', parameters: null },
+    ]);
+
+    // Make callTool block until we resolve it
+    let resolveCall!: (value: unknown) => void;
+    mockPipeline.callTool.mockImplementation(
+      () => new Promise((resolve) => { resolveCall = resolve; }),
+    );
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const callback = registerTool.mock.calls[0][2];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-42' };
+
+    // Start the tool call (don't await)
+    const callPromise = callback({}, mockExtra);
+
+    // Get the signal passed to the pipeline
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.signal).toBeDefined();
+    expect(passedCtx.signal!.aborted).toBe(false);
+
+    // Invoke the cancellation handler
+    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
+    await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-42' } });
+
+    // Signal should now be aborted
+    expect(passedCtx.signal!.aborted).toBe(true);
+
+    // Resolve the blocked call to clean up
+    resolveCall({ content: [] });
+    await callPromise;
+  });
+
+  // --- Pagination ---
+
+  it('registers custom list request handlers on inner server', () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    // 4 list handlers + 1 notification handler
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(4);
+  });
+
+  it('list tools handler passes cursor and returns paginated result', async () => {
+    mockPipeline.listTools.mockResolvedValue({
+      items: [{ name: 'tool-a' }],
+      nextCursor: 'abc123',
+    });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    // Find the ListToolsRequest handler
+    const listToolsCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tools/list',
+    );
+    expect(listToolsCall).toBeDefined();
+
+    const handler = listToolsCall![1];
+    const result = await handler({ method: 'tools/list', params: { cursor: 'abc123' } });
+
+    expect(mockPipeline.listTools).toHaveBeenCalledWith('abc123');
+    expect(result).toEqual({ tools: [{ name: 'tool-a' }], nextCursor: 'abc123' });
+  });
+
+  it('list tools handler omits nextCursor when undefined', async () => {
+    mockPipeline.listTools.mockResolvedValue({
+      items: [{ name: 'tool-a' }],
+      nextCursor: undefined,
+    });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const listToolsCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tools/list',
+    );
+    const handler = listToolsCall![1];
+    const result = await handler({ method: 'tools/list', params: {} });
+
+    expect(result).toEqual({ tools: [{ name: 'tool-a' }] });
+    expect(result).not.toHaveProperty('nextCursor');
+  });
+
+  it('list resources handler passes cursor and returns paginated result', async () => {
+    mockPipeline.listResources.mockResolvedValue({
+      items: [{ uri: 'file:///a' }],
+      nextCursor: 'next',
+    });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const listResourcesCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'resources/list',
+    );
+    const handler = listResourcesCall![1];
+    const result = await handler({ method: 'resources/list', params: { cursor: 'next' } });
+
+    expect(mockPipeline.listResources).toHaveBeenCalledWith('next');
+    expect(result).toEqual({ resources: [{ uri: 'file:///a' }], nextCursor: 'next' });
+  });
+
+  it('list prompts handler passes cursor and returns paginated result', async () => {
+    mockPipeline.listPrompts.mockResolvedValue({
+      items: [{ name: 'greet' }],
+      nextCursor: undefined,
+    });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const listPromptsCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'prompts/list',
+    );
+    const handler = listPromptsCall![1];
+    const result = await handler({ method: 'prompts/list', params: {} });
+
+    expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined);
+    expect(result).toEqual({ prompts: [{ name: 'greet' }] });
   });
 });

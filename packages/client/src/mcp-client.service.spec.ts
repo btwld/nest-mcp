@@ -7,11 +7,13 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
     readResource: vi.fn().mockResolvedValue({ contents: [] }),
     listTools: vi.fn().mockResolvedValue({ tools: [] }),
     listResources: vi.fn().mockResolvedValue({ resources: [] }),
+    listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
     getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
     ping: vi.fn().mockResolvedValue({}),
     getServerCapabilities: vi.fn().mockReturnValue({}),
     getServerVersion: vi.fn().mockReturnValue({ name: 'test', version: '1.0' }),
+    _notificationHandlers: new Map(),
   }));
   return { Client: MockClient };
 });
@@ -156,6 +158,13 @@ describe('McpClient', () => {
       expect(clientInstance.listResources).toHaveBeenCalledWith(undefined, undefined);
     });
 
+    it('should delegate listResourceTemplates to the SDK client', async () => {
+      await mcpClient.listResourceTemplates();
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance.listResourceTemplates).toHaveBeenCalledWith(undefined, undefined);
+    });
+
     it('should delegate getPrompt to the SDK client', async () => {
       const params = { name: 'my-prompt' };
       await mcpClient.getPrompt(params);
@@ -176,6 +185,43 @@ describe('McpClient', () => {
 
       const clientInstance = MockedClient.mock.results[0].value;
       expect(clientInstance.ping).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  describe('onNotification', () => {
+    it('should register a notification handler on the internal map', async () => {
+      await mcpClient.connect();
+
+      const handler = vi.fn();
+      mcpClient.onNotification('notifications/tools/list_changed', handler);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(clientInstance._notificationHandlers.has('notifications/tools/list_changed')).toBe(
+        true,
+      );
+    });
+
+    it('should invoke the handler when the internal map handler is called', async () => {
+      await mcpClient.connect();
+
+      const handler = vi.fn();
+      mcpClient.onNotification('notifications/resources/updated', handler);
+
+      const clientInstance = MockedClient.mock.results[0].value;
+      const internalHandler = clientInstance._notificationHandlers.get(
+        'notifications/resources/updated',
+      );
+
+      const notification = { method: 'notifications/resources/updated', params: { uri: 'test' } };
+      await internalHandler(notification);
+
+      expect(handler).toHaveBeenCalledWith(notification);
+    });
+
+    it('should throw if not connected', () => {
+      expect(() =>
+        mcpClient.onNotification('notifications/tools/list_changed', vi.fn()),
+      ).toThrow('is not connected');
     });
   });
 

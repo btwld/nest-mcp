@@ -25,7 +25,10 @@ vi.mock('./transport/client-transport.factory', () => ({
   }),
 }));
 
+import 'reflect-metadata';
 import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
+import type { ModulesContainer } from '@nestjs/core';
+import { MCP_NOTIFICATION_METADATA } from './decorators/on-notification.decorator';
 import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 import type {
   McpClientSseConnection,
@@ -43,7 +46,7 @@ interface DynamicProvider {
 
 describe('McpClientModule', () => {
   describe('forRoot', () => {
-    it('includes McpClientBootstrap provider', () => {
+    it('includes McpClientBootstrap provider with ModulesContainer injection', () => {
       const mod = McpClientModule.forRoot({
         connections: [
           {
@@ -199,5 +202,186 @@ describe('McpClientBootstrap', () => {
 
     expect(mockClients[0].disconnect).toHaveBeenCalled();
     expect(mockClients[1].disconnect).toHaveBeenCalled();
+  });
+
+  it('works without modulesContainer (backward compat)', async () => {
+    const clients = [
+      {
+        name: 'a',
+        connect: vi.fn().mockResolvedValue(undefined),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      } as unknown as McpClient,
+    ];
+    const boot = new McpClientBootstrap(clients);
+
+    await expect(boot.onApplicationBootstrap()).resolves.toBeUndefined();
+    expect(clients[0].connect).toHaveBeenCalled();
+  });
+});
+
+describe('McpClientBootstrap notification wiring', () => {
+  function createMockModulesContainer(
+    providers: Array<{ instance: unknown }>,
+  ): ModulesContainer {
+    const moduleProviders = new Map(
+      providers.map((p, i) => [String(i), { instance: p.instance }]),
+    );
+    const moduleRef = { providers: moduleProviders };
+    return new Map([['testModule', moduleRef]]) as unknown as ModulesContainer;
+  }
+
+  it('wires @OnMcpNotification handlers to the correct client', async () => {
+    const onNotificationFn = vi.fn();
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(true),
+      onNotification: onNotificationFn,
+    } as unknown as McpClient;
+
+    class TestHandler {
+      handleToolsChanged() {}
+    }
+    const handlerInstance = new TestHandler();
+    Reflect.defineMetadata(
+      MCP_NOTIFICATION_METADATA,
+      { connectionName: 'server-a', method: 'notifications/tools/list_changed' },
+      TestHandler.prototype.handleToolsChanged,
+    );
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: handlerInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await boot.onApplicationBootstrap();
+
+    expect(onNotificationFn).toHaveBeenCalledWith(
+      'notifications/tools/list_changed',
+      expect.any(Function),
+    );
+  });
+
+  it('skips handlers when no matching client name', async () => {
+    const onNotificationFn = vi.fn();
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(true),
+      onNotification: onNotificationFn,
+    } as unknown as McpClient;
+
+    class TestHandler {
+      handleNotification() {}
+    }
+    const handlerInstance = new TestHandler();
+    Reflect.defineMetadata(
+      MCP_NOTIFICATION_METADATA,
+      { connectionName: 'unknown-server', method: 'notifications/tools/list_changed' },
+      TestHandler.prototype.handleNotification,
+    );
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: handlerInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await boot.onApplicationBootstrap();
+
+    expect(onNotificationFn).not.toHaveBeenCalled();
+  });
+
+  it('skips handlers when client is not connected', async () => {
+    const onNotificationFn = vi.fn();
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(false),
+      onNotification: onNotificationFn,
+    } as unknown as McpClient;
+
+    class TestHandler {
+      handleNotification() {}
+    }
+    const handlerInstance = new TestHandler();
+    Reflect.defineMetadata(
+      MCP_NOTIFICATION_METADATA,
+      { connectionName: 'server-a', method: 'notifications/tools/list_changed' },
+      TestHandler.prototype.handleNotification,
+    );
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: handlerInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await boot.onApplicationBootstrap();
+
+    expect(onNotificationFn).not.toHaveBeenCalled();
+  });
+
+  it('binds the handler to the correct instance', async () => {
+    let capturedHandler: Function | undefined;
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(true),
+      onNotification: vi.fn().mockImplementation((_method: string, handler: Function) => {
+        capturedHandler = handler;
+      }),
+    } as unknown as McpClient;
+
+    class TestHandler {
+      value = 'bound-correctly';
+      handleNotification() {
+        return this.value;
+      }
+    }
+    const handlerInstance = new TestHandler();
+    Reflect.defineMetadata(
+      MCP_NOTIFICATION_METADATA,
+      { connectionName: 'server-a', method: 'notifications/resources/updated' },
+      TestHandler.prototype.handleNotification,
+    );
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: handlerInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await boot.onApplicationBootstrap();
+
+    expect(capturedHandler).toBeDefined();
+    const result = capturedHandler!({});
+    expect(result).toBe('bound-correctly');
+  });
+
+  it('ignores providers without notification metadata', async () => {
+    const onNotificationFn = vi.fn();
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(true),
+      onNotification: onNotificationFn,
+    } as unknown as McpClient;
+
+    class PlainService {
+      doSomething() {}
+    }
+    const plainInstance = new PlainService();
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: plainInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await boot.onApplicationBootstrap();
+
+    expect(onNotificationFn).not.toHaveBeenCalled();
   });
 });

@@ -2,8 +2,12 @@ export type UpstreamTransportType = 'streamable-http' | 'sse' | 'stdio';
 
 export interface UpstreamConfig {
   name: string;
-  url: string;
   transport: UpstreamTransportType;
+  url?: string; // required for 'sse' | 'streamable-http'
+  command?: string; // required for 'stdio'
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
   toolPrefix?: string;
   timeout?: number;
   enabled?: boolean;

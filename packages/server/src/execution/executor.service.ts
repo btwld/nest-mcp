@@ -1,5 +1,6 @@
 import {
   type McpExecutionContext,
+  type PaginatedResult,
   type PromptGetResult,
   type ResourceReadResult,
   type ToolCallResult,
@@ -7,6 +8,7 @@ import {
   ValidationError,
   extractZodDescriptions,
   matchUriTemplate,
+  paginate,
   zodToJsonSchema,
 } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
@@ -23,14 +25,15 @@ export class McpExecutorService {
 
   // ---- Tools ----
 
-  async listTools(): Promise<Array<Record<string, unknown>>> {
-    return this.registry.getAllTools().map((tool) => ({
+  async listTools(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
+    const all = this.registry.getAllTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.parameters ? zodToJsonSchema(tool.parameters) : { type: 'object' },
       ...(tool.outputSchema ? { outputSchema: zodToJsonSchema(tool.outputSchema) } : {}),
       ...(tool.annotations ? { annotations: tool.annotations } : {}),
     }));
+    return paginate(all, cursor);
   }
 
   async callTool(
@@ -107,24 +110,24 @@ export class McpExecutorService {
 
   // ---- Resources ----
 
-  async listResources(): Promise<Array<Record<string, unknown>>> {
-    const resources = this.registry.getAllResources().map((r) => ({
+  async listResources(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
+    const all = this.registry.getAllResources().map((r) => ({
       uri: r.uri,
       name: r.name,
       ...(r.description ? { description: r.description } : {}),
       ...(r.mimeType ? { mimeType: r.mimeType } : {}),
     }));
-
-    return resources;
+    return paginate(all, cursor);
   }
 
-  async listResourceTemplates(): Promise<Array<Record<string, unknown>>> {
-    return this.registry.getAllResourceTemplates().map((t) => ({
+  async listResourceTemplates(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
+    const all = this.registry.getAllResourceTemplates().map((t) => ({
       uriTemplate: t.uriTemplate,
       name: t.name,
       ...(t.description ? { description: t.description } : {}),
       ...(t.mimeType ? { mimeType: t.mimeType } : {}),
     }));
+    return paginate(all, cursor);
   }
 
   async readResource(uri: string, ctx: McpExecutionContext): Promise<ResourceReadResult> {
@@ -169,8 +172,8 @@ export class McpExecutorService {
 
   // ---- Prompts ----
 
-  async listPrompts(): Promise<Array<Record<string, unknown>>> {
-    return this.registry.getAllPrompts().map((p) => ({
+  async listPrompts(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
+    const all = this.registry.getAllPrompts().map((p) => ({
       name: p.name,
       description: p.description,
       ...(p.parameters
@@ -183,6 +186,7 @@ export class McpExecutorService {
           }
         : {}),
     }));
+    return paginate(all, cursor);
   }
 
   async getPrompt(

@@ -1,243 +1,222 @@
-import { UpstreamManagerService } from './upstream-manager.service';
-import type { UpstreamConfig } from './upstream.interface';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the MCP SDK modules
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: vi.fn().mockImplementation(() => ({
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+  const MockClient = vi.fn().mockImplementation(() => ({
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
-
-vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => ({
-  SSEClientTransport: vi.fn(),
-}));
-
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
-  StreamableHTTPClientTransport: vi.fn(),
-}));
-
-const makeConfig = (overrides?: Partial<UpstreamConfig>): UpstreamConfig => ({
-  name: 'test-upstream',
-  url: 'http://localhost:3000',
-  transport: 'streamable-http',
-  ...overrides,
+  }));
+  return { Client: MockClient };
 });
+
+vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
+  const MockSSE = vi.fn().mockImplementation(() => ({}));
+  return { SSEClientTransport: MockSSE };
+});
+
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
+  const MockStreamable = vi.fn().mockImplementation(() => ({}));
+  return { StreamableHTTPClientTransport: MockStreamable };
+});
+
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
+  const MockStdio = vi.fn().mockImplementation(() => ({}));
+  return { StdioClientTransport: MockStdio };
+});
+
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { UpstreamConfig } from './upstream.interface';
+import { UpstreamManagerService } from './upstream-manager.service';
+
+const MockedClient = vi.mocked(Client);
+const MockedSSE = vi.mocked(SSEClientTransport);
+const MockedStreamable = vi.mocked(StreamableHTTPClientTransport);
+const MockedStdio = vi.mocked(StdioClientTransport);
 
 describe('UpstreamManagerService', () => {
   let service: UpstreamManagerService;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     service = new UpstreamManagerService();
   });
 
-  afterEach(async () => {
-    await service.onModuleDestroy();
-  });
+  describe('createTransport (via connect)', () => {
+    it('should create SSEClientTransport for sse transport', async () => {
+      const config: UpstreamConfig = {
+        name: 'sse-server',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
 
-  describe('connect', () => {
-    it('should connect to an upstream and mark it healthy', async () => {
-      const config = makeConfig();
       await service.connect(config);
 
-      expect(service.isConnected('test-upstream')).toBe(true);
-      expect(service.isHealthy('test-upstream')).toBe(true);
-      expect(service.getClient('test-upstream')).toBeDefined();
+      expect(MockedSSE).toHaveBeenCalledWith(new URL('http://localhost:3000/sse'));
+      expect(service.isConnected('sse-server')).toBe(true);
     });
 
-    it('should skip already-connected upstreams', async () => {
-      const config = makeConfig();
-      await service.connect(config);
+    it('should create StreamableHTTPClientTransport for streamable-http transport', async () => {
+      const config: UpstreamConfig = {
+        name: 'http-server',
+        transport: 'streamable-http',
+        url: 'http://localhost:3000/mcp',
+      };
+
       await service.connect(config);
 
-      expect(service.getAllNames()).toHaveLength(1);
+      expect(MockedStreamable).toHaveBeenCalledWith(new URL('http://localhost:3000/mcp'));
+      expect(service.isConnected('http-server')).toBe(true);
     });
 
-    it('should handle connection errors gracefully', async () => {
-      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-      vi.mocked(Client).mockImplementationOnce(
-        () =>
-          ({
-            connect: vi.fn().mockRejectedValue(new Error('connection refused')),
-            close: vi.fn().mockResolvedValue(undefined),
-          }) as never,
-      );
+    it('should support stdio transport', async () => {
+      const config: UpstreamConfig = {
+        name: 'stdio-server',
+        transport: 'stdio',
+        command: 'node',
+        args: ['server.js'],
+        env: { NODE_ENV: 'production' },
+        cwd: '/tmp',
+      };
 
-      const config = makeConfig();
       await service.connect(config);
 
-      expect(service.isConnected('test-upstream')).toBe(false);
-      expect(service.isHealthy('test-upstream')).toBe(false);
-      const status = service.getStatus('test-upstream');
-      expect(status?.error).toBe('connection refused');
+      expect(MockedStdio).toHaveBeenCalledWith({
+        command: 'node',
+        args: ['server.js'],
+        env: { NODE_ENV: 'production' },
+        cwd: '/tmp',
+      });
+      expect(service.isConnected('stdio-server')).toBe(true);
     });
 
-    it('should support SSE transport', async () => {
-      const config = makeConfig({ transport: 'sse' });
+    it('should store error for stdio config missing command', async () => {
+      const config: UpstreamConfig = {
+        name: 'bad-stdio',
+        transport: 'stdio',
+      };
+
       await service.connect(config);
 
-      expect(service.isConnected('test-upstream')).toBe(true);
+      expect(MockedStdio).not.toHaveBeenCalled();
+      expect(service.isConnected('bad-stdio')).toBe(false);
+      const status = service.getStatus('bad-stdio');
+      expect(status?.error).toContain('missing required "command" field');
     });
 
-    it('should throw for unsupported transport types', async () => {
-      const config = makeConfig({ transport: 'stdio' });
+    it('should store error for sse config missing url', async () => {
+      const config: UpstreamConfig = {
+        name: 'bad-sse',
+        transport: 'sse',
+      };
 
       await service.connect(config);
 
-      // stdio is not supported - should fail with error stored
-      expect(service.isConnected('test-upstream')).toBe(false);
-      const status = service.getStatus('test-upstream');
+      expect(MockedSSE).not.toHaveBeenCalled();
+      expect(service.isConnected('bad-sse')).toBe(false);
+      const status = service.getStatus('bad-sse');
+      expect(status?.error).toContain('missing required "url" field');
+    });
+
+    it('should store error for streamable-http config missing url', async () => {
+      const config: UpstreamConfig = {
+        name: 'bad-http',
+        transport: 'streamable-http',
+      };
+
+      await service.connect(config);
+
+      expect(MockedStreamable).not.toHaveBeenCalled();
+      expect(service.isConnected('bad-http')).toBe(false);
+      const status = service.getStatus('bad-http');
+      expect(status?.error).toContain('missing required "url" field');
+    });
+
+    it('should throw for unsupported transport type', async () => {
+      const config = {
+        name: 'bad-transport',
+        transport: 'websocket' as UpstreamConfig['transport'],
+      } as UpstreamConfig;
+
+      await service.connect(config);
+
+      expect(service.isConnected('bad-transport')).toBe(false);
+      const status = service.getStatus('bad-transport');
       expect(status?.error).toContain('Unsupported upstream transport');
     });
   });
 
+  describe('connect', () => {
+    it('should skip already connected upstream', async () => {
+      const config: UpstreamConfig = {
+        name: 'server',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await service.connect(config);
+      await service.connect(config);
+
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('connectAll', () => {
-    it('should connect all enabled upstreams', async () => {
-      const configs = [
-        makeConfig({ name: 'a', transport: 'sse' }),
-        makeConfig({ name: 'b', transport: 'streamable-http' }),
+    it('should connect only enabled upstreams', async () => {
+      const configs: UpstreamConfig[] = [
+        { name: 'enabled', transport: 'sse', url: 'http://localhost:3000/sse' },
+        { name: 'disabled', transport: 'sse', url: 'http://localhost:3001/sse', enabled: false },
       ];
 
       await service.connectAll(configs);
 
-      expect(service.getAllNames()).toHaveLength(2);
-    });
-
-    it('should skip disabled upstreams', async () => {
-      const configs = [
-        makeConfig({ name: 'enabled' }),
-        makeConfig({ name: 'disabled', enabled: false }),
-      ];
-
-      await service.connectAll(configs);
-
-      expect(service.getAllNames()).toEqual(['enabled']);
-    });
-  });
-
-  describe('getters', () => {
-    beforeEach(async () => {
-      await service.connect(makeConfig());
-    });
-
-    it('should return undefined for unknown upstream client', () => {
-      expect(service.getClient('unknown')).toBeUndefined();
-    });
-
-    it('should return config for connected upstream', () => {
-      expect(service.getConfig('test-upstream')).toEqual(makeConfig());
-    });
-
-    it('should return undefined config for unknown upstream', () => {
-      expect(service.getConfig('unknown')).toBeUndefined();
-    });
-
-    it('should return false for unknown upstream health', () => {
-      expect(service.isHealthy('unknown')).toBe(false);
-    });
-
-    it('should return false for unknown upstream connection', () => {
-      expect(service.isConnected('unknown')).toBe(false);
-    });
-  });
-
-  describe('setHealthy', () => {
-    it('should update health status and error', async () => {
-      await service.connect(makeConfig());
-
-      service.setHealthy('test-upstream', false, 'ping failed');
-
-      expect(service.isHealthy('test-upstream')).toBe(false);
-      const status = service.getStatus('test-upstream');
-      expect(status?.error).toBe('ping failed');
-      expect(status?.lastHealthCheck).toBeInstanceOf(Date);
-    });
-
-    it('should no-op for unknown upstream', () => {
-      service.setHealthy('unknown', false);
-      expect(service.isHealthy('unknown')).toBe(false);
-    });
-  });
-
-  describe('getStatus / getAllStatuses', () => {
-    it('should return undefined for unknown upstream', () => {
-      expect(service.getStatus('unknown')).toBeUndefined();
-    });
-
-    it('should return status for connected upstream', async () => {
-      await service.connect(makeConfig());
-
-      const status = service.getStatus('test-upstream');
-      expect(status).toEqual(
-        expect.objectContaining({
-          name: 'test-upstream',
-          connected: true,
-          healthy: true,
-          toolCount: 0,
-        }),
-      );
-    });
-
-    it('should return all statuses', async () => {
-      await service.connect(makeConfig({ name: 'a' }));
-      await service.connect(makeConfig({ name: 'b' }));
-
-      const statuses = service.getAllStatuses();
-      expect(statuses).toHaveLength(2);
-    });
-  });
-
-  describe('getAllConfigs', () => {
-    it('should return all configs', async () => {
-      await service.connect(makeConfig({ name: 'a' }));
-      await service.connect(makeConfig({ name: 'b' }));
-
-      const configs = service.getAllConfigs();
-      expect(configs).toHaveLength(2);
-      expect(configs.map((c) => c.name)).toEqual(['a', 'b']);
+      expect(service.isConnected('enabled')).toBe(true);
+      expect(service.getStatus('disabled')).toBeUndefined();
     });
   });
 
   describe('disconnect', () => {
-    it('should remove upstream after disconnect', async () => {
-      await service.connect(makeConfig());
+    it('should close client and remove from map', async () => {
+      const config: UpstreamConfig = {
+        name: 'server',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
 
-      await service.disconnect('test-upstream');
+      await service.connect(config);
+      await service.disconnect('server');
 
-      expect(service.getClient('test-upstream')).toBeUndefined();
-      expect(service.getAllNames()).toHaveLength(0);
+      expect(service.getClient('server')).toBeUndefined();
     });
 
-    it('should no-op for unknown upstream', async () => {
-      await service.disconnect('unknown');
-      expect(service.getAllNames()).toHaveLength(0);
-    });
-
-    it('should handle close errors gracefully', async () => {
-      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-      vi.mocked(Client).mockImplementationOnce(
-        () =>
-          ({
-            connect: vi.fn().mockResolvedValue(undefined),
-            close: vi.fn().mockRejectedValue(new Error('close failed')),
-          }) as never,
-      );
-
-      await service.connect(makeConfig());
-      await service.disconnect('test-upstream');
-
-      expect(service.getAllNames()).toHaveLength(0);
+    it('should be a no-op for unknown upstream', async () => {
+      await expect(service.disconnect('nonexistent')).resolves.toBeUndefined();
     });
   });
 
-  describe('disconnectAll', () => {
-    it('should disconnect all upstreams', async () => {
-      await service.connect(makeConfig({ name: 'a' }));
-      await service.connect(makeConfig({ name: 'b' }));
+  describe('status methods', () => {
+    it('should return all statuses', async () => {
+      await service.connect({ name: 'a', transport: 'sse', url: 'http://a' });
+      await service.connect({ name: 'b', transport: 'sse', url: 'http://b' });
 
-      await service.disconnectAll();
+      const statuses = service.getAllStatuses();
 
-      expect(service.getAllNames()).toHaveLength(0);
+      expect(statuses).toHaveLength(2);
+      expect(statuses.map((s) => s.name)).toEqual(['a', 'b']);
+    });
+
+    it('should return undefined status for unknown upstream', () => {
+      expect(service.getStatus('unknown')).toBeUndefined();
+    });
+
+    it('should update healthy state via setHealthy', async () => {
+      await service.connect({ name: 'a', transport: 'sse', url: 'http://a' });
+
+      service.setHealthy('a', false, 'timed out');
+
+      expect(service.isHealthy('a')).toBe(false);
+      expect(service.getStatus('a')?.error).toBe('timed out');
     });
   });
 });

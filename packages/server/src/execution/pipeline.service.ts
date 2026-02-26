@@ -10,7 +10,7 @@ import type {
   ToolCallResult,
 } from '@btwld/mcp-common';
 import type { McpGuard, McpGuardClass } from '@btwld/mcp-common';
-import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
+import { MCP_OPTIONS, MCP_REQUEST_CANCELLED, McpError, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ModuleRef } from '@nestjs/core';
@@ -97,7 +97,9 @@ export class ExecutionPipelineService {
         });
 
         const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
-        return timeoutMs ? this.withTimeout(executionFn(), name, timeoutMs) : executionFn();
+        return timeoutMs
+          ? this.withTimeout(executionFn(), name, timeoutMs, ctx.signal)
+          : executionFn();
       });
 
       const duration = Date.now() - startTime;
@@ -133,7 +135,9 @@ export class ExecutionPipelineService {
     const timeoutMs = this.options.resilience?.timeout;
     return this.middlewareService.executeChain(middleware, ctx, { uri }, () => {
       const promise = this.executor.readResource(uri, ctx);
-      return timeoutMs ? this.withTimeout(promise, `resource:${uri}`, timeoutMs) : promise;
+      return timeoutMs
+        ? this.withTimeout(promise, `resource:${uri}`, timeoutMs, ctx.signal)
+        : promise;
     }) as Promise<ResourceReadResult>;
   }
 
@@ -162,27 +166,27 @@ export class ExecutionPipelineService {
     return this.middlewareService.executeChain(middleware, ctx, args, () => {
       const promise = this.executor.getPrompt(name, args, ctx);
       return promptTimeoutMs
-        ? this.withTimeout(promise, `prompt:${name}`, promptTimeoutMs)
+        ? this.withTimeout(promise, `prompt:${name}`, promptTimeoutMs, ctx.signal)
         : promise;
     }) as Promise<PromptGetResult>;
   }
 
   // ---- List methods (delegate directly) ----
 
-  async listTools() {
-    return this.executor.listTools();
+  async listTools(cursor?: string) {
+    return this.executor.listTools(cursor);
   }
 
-  async listResources() {
-    return this.executor.listResources();
+  async listResources(cursor?: string) {
+    return this.executor.listResources(cursor);
   }
 
-  async listResourceTemplates() {
-    return this.executor.listResourceTemplates();
+  async listResourceTemplates(cursor?: string) {
+    return this.executor.listResourceTemplates(cursor);
   }
 
-  async listPrompts() {
-    return this.executor.listPrompts();
+  async listPrompts(cursor?: string) {
+    return this.executor.listPrompts(cursor);
   }
 
   // ---- Helpers ----
@@ -236,12 +240,31 @@ export class ExecutionPipelineService {
     promise: Promise<T>,
     operationName: string,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<T> {
+    // If already aborted, reject immediately
+    if (signal?.aborted) {
+      return Promise.reject(
+        new McpError('Request cancelled', MCP_REQUEST_CANCELLED),
+      );
+    }
+
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new McpTimeoutError(operationName, timeoutMs)),
         timeoutMs,
       );
+
+      // Listen for cancellation signal
+      signal?.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer);
+          reject(new McpError('Request cancelled', MCP_REQUEST_CANCELLED));
+        },
+        { once: true },
+      );
+
       promise.then(resolve, reject).finally(() => clearTimeout(timer));
     });
   }

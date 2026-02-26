@@ -1,6 +1,13 @@
 import { extractZodDescriptions } from '@btwld/mcp-common';
 import type { McpExecutionContext } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  CancelledNotificationSchema,
+  ListPromptsRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { RegisteredPrompt, RegisteredTool } from '../discovery/registry.service';
 import type { McpRegistryService } from '../discovery/registry.service';
@@ -14,9 +21,20 @@ import type { ExecutionPipelineService } from '../execution/pipeline.service';
 const PASSTHROUGH_SCHEMA = z.object({}).passthrough();
 
 /**
+ * Map of active request IDs to their AbortControllers.
+ * Used to cancel in-flight tool executions when a `notifications/cancelled`
+ * notification is received from the client.
+ */
+const activeRequests = new Map<string | number, AbortController>();
+
+/**
  * Registers all tools, resources, resource templates, and prompts from the
  * registry onto an McpServer instance, including parameter schemas, prompt
  * argument metadata, and resource mimeType information.
+ *
+ * Also registers:
+ * - A `notifications/cancelled` handler for server-side request cancellation
+ * - Custom list request handlers for cursor-based pagination
  *
  * Shared across all transport implementations (streamable HTTP, SSE, stdio).
  */
@@ -30,6 +48,8 @@ export function registerHandlers(
   registerResources(server, registry, pipeline, ctx);
   registerResourceTemplates(server, registry, pipeline, ctx);
   registerPrompts(server, registry, pipeline, ctx);
+  registerCancellationHandler(server);
+  registerListHandlers(server, pipeline);
 }
 
 function registerTools(
@@ -52,8 +72,29 @@ function registerTools(
         inputSchema: tool.parameters ?? PASSTHROUGH_SCHEMA,
         annotations: tool.annotations,
       },
-      async (args: Record<string, unknown>) => {
-        return pipeline.callTool(tool.name, args, ctx);
+      async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
+        // Create a local AbortController that is linked to the SDK's signal
+        // and tracked in the activeRequests map for explicit cancellation.
+        const controller = new AbortController();
+        const requestId = extra.requestId;
+
+        // Link the SDK's built-in signal to our controller
+        if (extra.signal.aborted) {
+          controller.abort();
+        } else {
+          extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
+        }
+
+        activeRequests.set(requestId, controller);
+
+        // Shallow-clone the context with the cancellation signal
+        const ctxWithSignal: McpExecutionContext = { ...ctx, signal: controller.signal };
+
+        try {
+          return await pipeline.callTool(tool.name, args, ctxWithSignal);
+        } finally {
+          activeRequests.delete(requestId);
+        }
       },
     );
   }
@@ -112,6 +153,63 @@ function registerPrompts(
       },
     );
   }
+}
+
+/**
+ * Registers a `notifications/cancelled` handler on the low-level SDK Server
+ * to abort in-flight tool executions when the client sends a cancellation.
+ */
+function registerCancellationHandler(server: McpServer): void {
+  server.server.setNotificationHandler(
+    CancelledNotificationSchema,
+    async (notification) => {
+      const requestId = notification.params?.requestId;
+      if (requestId != null) {
+        const controller = activeRequests.get(requestId);
+        if (controller) {
+          controller.abort();
+          activeRequests.delete(requestId);
+        }
+      }
+    },
+  );
+}
+
+/**
+ * Registers custom list request handlers on the low-level SDK Server to
+ * support cursor-based pagination. These override the SDK's default
+ * list handlers that were auto-registered by registerTool/resource/prompt.
+ */
+function registerListHandlers(
+  server: McpServer,
+  pipeline: ExecutionPipelineService,
+): void {
+  server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+    const cursor = request.params?.cursor;
+    const result = await pipeline.listTools(cursor);
+    return { tools: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+  });
+
+  server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    const cursor = request.params?.cursor;
+    const result = await pipeline.listResources(cursor);
+    return { resources: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+  });
+
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
+    const cursor = request.params?.cursor;
+    const result = await pipeline.listResourceTemplates(cursor);
+    return {
+      resourceTemplates: result.items,
+      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+    };
+  });
+
+  server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
+    const cursor = request.params?.cursor;
+    const result = await pipeline.listPrompts(cursor);
+    return { prompts: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+  });
 }
 
 function getPromptArgs(

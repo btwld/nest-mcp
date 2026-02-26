@@ -6,17 +6,24 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: ModulesContainer needed as value for DI injection
+import { ModulesContainer } from '@nestjs/core';
+import {
+  MCP_NOTIFICATION_METADATA,
+  type McpNotificationMetadata,
+} from './decorators/on-notification.decorator';
 import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 import type {
   McpClientModuleAsyncOptions,
   McpClientModuleOptions,
 } from './interfaces/client-options.interface';
 import { McpClient } from './mcp-client.service';
-import { formatErrorMessage } from './utils/format-error-message';
 
 @Module({})
-// biome-ignore lint/complexity/noStaticOnlyClass: NestJS dynamic modules require a class for @Module() decorator and module self-reference
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes for DI
 export class McpClientModule {
+  private static readonly logger = new Logger('McpClientModule');
+
   static forRoot(options: McpClientModuleOptions): DynamicModule {
     const connectionProviders = McpClientModule.createConnectionProviders(options);
 
@@ -28,8 +35,9 @@ export class McpClientModule {
 
     const bootstrapProvider = {
       provide: McpClientBootstrap,
-      useFactory: (clients: McpClient[]) => new McpClientBootstrap(clients),
-      inject: ['MCP_CLIENT_CONNECTIONS'],
+      useFactory: (clients: McpClient[], modulesContainer: ModulesContainer) =>
+        new McpClientBootstrap(clients, modulesContainer),
+      inject: ['MCP_CLIENT_CONNECTIONS', ModulesContainer],
     };
 
     return {
@@ -54,15 +62,22 @@ export class McpClientModule {
 
     const connectionsProvider = {
       provide: 'MCP_CLIENT_CONNECTIONS',
-      useFactory: (opts: McpClientModuleOptions) =>
-        opts.connections.map((conn) => new McpClient(conn.name, conn)),
+      useFactory: async (opts: McpClientModuleOptions) => {
+        const clients: McpClient[] = [];
+        for (const conn of opts.connections) {
+          const client = new McpClient(conn.name, conn);
+          clients.push(client);
+        }
+        return clients;
+      },
       inject: [MCP_CLIENT_OPTIONS],
     };
 
     const bootstrapProvider = {
       provide: McpClientBootstrap,
-      useFactory: (clients: McpClient[]) => new McpClientBootstrap(clients),
-      inject: ['MCP_CLIENT_CONNECTIONS'],
+      useFactory: (clients: McpClient[], modulesContainer: ModulesContainer) =>
+        new McpClientBootstrap(clients, modulesContainer),
+      inject: ['MCP_CLIENT_CONNECTIONS', ModulesContainer],
     };
 
     // When using forRootAsync, connection names are resolved at runtime.
@@ -105,17 +120,27 @@ export class McpClientModule {
 
 export class McpClientBootstrap implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger('McpClientBootstrap');
+  private readonly clients: McpClient[] = [];
 
-  constructor(private readonly clients: McpClient[]) {}
+  constructor(
+    clients: McpClient[],
+    private readonly modulesContainer?: ModulesContainer,
+  ) {
+    this.clients = clients;
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     for (const client of this.clients) {
       try {
         await client.connect();
       } catch (err: unknown) {
-        this.logger.error(`Failed to connect client "${client.name}": ${formatErrorMessage(err)}`);
+        this.logger.error(
+          `Failed to connect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
+
+    this.wireNotificationHandlers();
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -124,9 +149,62 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
         await client.disconnect();
       } catch (err: unknown) {
         this.logger.error(
-          `Failed to disconnect client "${client.name}": ${formatErrorMessage(err)}`,
+          `Failed to disconnect client "${client.name}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+    }
+  }
+
+  private wireNotificationHandlers(): void {
+    if (!this.modulesContainer) return;
+
+    let wiredCount = 0;
+
+    for (const [, moduleRef] of this.modulesContainer) {
+      for (const [, wrapper] of moduleRef.providers) {
+        const instance = wrapper?.instance;
+        if (!instance || !instance.constructor) continue;
+
+        const prototype = Object.getPrototypeOf(instance);
+        const methodNames = Object.getOwnPropertyNames(prototype).filter(
+          (name) => name !== 'constructor',
+        );
+
+        for (const methodName of methodNames) {
+          // NestJS SetMetadata stores metadata on the descriptor.value (the method
+          // function itself), so we read from prototype[methodName] rather than
+          // using the (target, propertyKey) overload.
+          const metadata: McpNotificationMetadata | undefined =
+            Reflect.getMetadata(MCP_NOTIFICATION_METADATA, prototype[methodName]);
+
+          if (!metadata) continue;
+
+          const client = this.clients.find((c) => c.name === metadata.connectionName);
+          if (!client) {
+            this.logger.warn(
+              `@OnMcpNotification on ${instance.constructor.name}.${methodName}: ` +
+                `no client named "${metadata.connectionName}" found, skipping`,
+            );
+            continue;
+          }
+
+          if (!client.isConnected()) {
+            this.logger.warn(
+              `@OnMcpNotification on ${instance.constructor.name}.${methodName}: ` +
+                `client "${metadata.connectionName}" is not connected, skipping`,
+            );
+            continue;
+          }
+
+          const boundHandler = (instance as Record<string, Function>)[methodName].bind(instance);
+          client.onNotification(metadata.method, boundHandler);
+          wiredCount++;
+        }
+      }
+    }
+
+    if (wiredCount > 0) {
+      this.logger.log(`Wired ${wiredCount} @OnMcpNotification handler(s)`);
     }
   }
 }

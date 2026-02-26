@@ -4,12 +4,11 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   CallToolRequest,
   GetPromptRequest,
-  Implementation,
   ListPromptsRequest,
   ListResourcesRequest,
+  ListResourceTemplatesRequest,
   ListToolsRequest,
   ReadResourceRequest,
-  ServerCapabilities,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import type {
@@ -17,7 +16,6 @@ import type {
   McpClientReconnectOptions,
 } from './interfaces/client-options.interface';
 import { createClientTransport } from './transport/client-transport.factory';
-import { formatErrorMessage } from './utils/format-error-message';
 
 export class McpClient {
   private readonly logger: Logger;
@@ -46,14 +44,14 @@ export class McpClient {
     this.transport.onerror = (err) => this.logger.error(`Transport error: ${err.message}`);
 
     try {
-      const connectPromise = this.client.connect(this.transport);
-      const connectTimeout = this.connection.connectTimeout ?? 10_000;
-      await this.withTimeout(connectPromise, connectTimeout);
+      await this.client.connect(this.transport);
       this.connected = true;
       this.reconnectAttempts = 0;
       this.logger.log(`Connected to MCP server "${this.name}"`);
     } catch (err: unknown) {
-      this.logger.error(`Failed to connect to "${this.name}": ${formatErrorMessage(err)}`);
+      this.logger.error(
+        `Failed to connect to "${this.name}": ${err instanceof Error ? err.message : String(err)}`,
+      );
       throw err;
     }
   }
@@ -78,64 +76,75 @@ export class McpClient {
     return this.client;
   }
 
-  async callTool(
-    params: CallToolRequest['params'],
-    options?: RequestOptions,
-  ): ReturnType<Client['callTool']> {
+  async callTool(params: CallToolRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.callTool(params, undefined, options);
   }
 
-  async readResource(
-    params: ReadResourceRequest['params'],
-    options?: RequestOptions,
-  ): ReturnType<Client['readResource']> {
+  async readResource(params: ReadResourceRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.readResource(params, options);
   }
 
-  async listTools(
-    params?: ListToolsRequest['params'],
-    options?: RequestOptions,
-  ): ReturnType<Client['listTools']> {
+  async listTools(params?: ListToolsRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listTools(params, options);
   }
 
-  async listResources(
-    params?: ListResourcesRequest['params'],
-    options?: RequestOptions,
-  ): ReturnType<Client['listResources']> {
+  async listResources(params?: ListResourcesRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listResources(params, options);
   }
 
-  async getPrompt(
-    params: GetPromptRequest['params'],
+  async listResourceTemplates(
+    params?: ListResourceTemplatesRequest['params'],
     options?: RequestOptions,
-  ): ReturnType<Client['getPrompt']> {
+  ) {
+    this.assertConnected();
+    return this.client.listResourceTemplates(params, options);
+  }
+
+  async getPrompt(params: GetPromptRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.getPrompt(params, options);
   }
 
-  async listPrompts(
-    params?: ListPromptsRequest['params'],
-    options?: RequestOptions,
-  ): ReturnType<Client['listPrompts']> {
+  async listPrompts(params?: ListPromptsRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listPrompts(params, options);
   }
 
-  async ping(options?: RequestOptions): ReturnType<Client['ping']> {
+  async ping(options?: RequestOptions) {
     this.assertConnected();
     return this.client.ping(options);
   }
 
-  getServerCapabilities(): ServerCapabilities | undefined {
+  onNotification(
+    method: string,
+    handler: (notification: { method: string; params?: Record<string, unknown> }) => void | Promise<void>,
+  ): void {
+    this.assertConnected();
+    // Access the internal notification handlers map directly because the SDK's
+    // setNotificationHandler() requires a Zod schema with a literal method field,
+    // which is not practical for arbitrary notification method strings.
+    const protocol = this.client as unknown as {
+      _notificationHandlers: Map<
+        string,
+        (notification: unknown) => Promise<void>
+      >;
+    };
+    protocol._notificationHandlers.set(method, (notification) =>
+      Promise.resolve(
+        handler(notification as { method: string; params?: Record<string, unknown> }),
+      ),
+    );
+  }
+
+  getServerCapabilities() {
     return this.client.getServerCapabilities();
   }
 
-  getServerVersion(): Implementation | undefined {
+  getServerVersion() {
     return this.client.getServerVersion();
   }
 
@@ -169,8 +178,7 @@ export class McpClient {
         `Reconnecting to "${this.name}" (attempt ${this.reconnectAttempts}/${maxAttempts})...`,
       );
 
-      const backoff = Math.min(30_000, delay * 2 ** (this.reconnectAttempts - 1));
-      await this.sleep(Math.random() * backoff);
+      await this.sleep(delay * this.reconnectAttempts);
 
       try {
         this.client = new Client(
@@ -181,8 +189,7 @@ export class McpClient {
         this.transport.onclose = () => this.handleDisconnect();
         this.transport.onerror = (err) => this.logger.error(`Transport error: ${err.message}`);
 
-        const reconnectTimeout = this.connection.connectTimeout ?? 10_000;
-        await this.withTimeout(this.client.connect(this.transport), reconnectTimeout);
+        await this.client.connect(this.transport);
         this.connected = true;
         this.reconnectAttempts = 0;
         this.reconnecting = false;
@@ -190,23 +197,13 @@ export class McpClient {
         return;
       } catch (err: unknown) {
         this.logger.warn(
-          `Reconnection attempt ${this.reconnectAttempts} failed: ${formatErrorMessage(err)}`,
+          `Reconnection attempt ${this.reconnectAttempts} failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
 
     this.reconnecting = false;
     this.logger.error(`Failed to reconnect to "${this.name}" after ${maxAttempts} attempts`);
-  }
-
-  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`Connection to "${this.name}" timed out after ${timeoutMs}ms`)),
-        timeoutMs,
-      );
-      promise.then(resolve, reject).finally(() => clearTimeout(timer));
-    });
   }
 
   private sleep(ms: number): Promise<void> {

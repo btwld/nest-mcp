@@ -36,11 +36,11 @@ describe('McpExecutorService', () => {
         parameters: schema,
       } as RegisteredTool);
 
-      const tools = await executor.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('greet');
-      expect(tools[0].description).toBe('Greet someone');
-      expect(tools[0].inputSchema).toEqual(
+      const result = await executor.listTools();
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].name).toBe('greet');
+      expect(result.items[0].description).toBe('Greet someone');
+      expect(result.items[0].inputSchema).toEqual(
         expect.objectContaining({ type: 'object', properties: expect.any(Object) }),
       );
     });
@@ -54,8 +54,8 @@ describe('McpExecutorService', () => {
         instance: { noop: vi.fn() },
       } as RegisteredTool);
 
-      const tools = await executor.listTools();
-      expect(tools[0].inputSchema).toEqual({ type: 'object' });
+      const result = await executor.listTools();
+      expect(result.items[0].inputSchema).toEqual({ type: 'object' });
     });
 
     it('includes outputSchema when present', async () => {
@@ -69,8 +69,8 @@ describe('McpExecutorService', () => {
         outputSchema,
       } as RegisteredTool);
 
-      const tools = await executor.listTools();
-      expect(tools[0].outputSchema).toBeDefined();
+      const result = await executor.listTools();
+      expect(result.items[0].outputSchema).toBeDefined();
     });
 
     it('includes annotations when present', async () => {
@@ -83,8 +83,8 @@ describe('McpExecutorService', () => {
         annotations: { readOnlyHint: true },
       } as RegisteredTool);
 
-      const tools = await executor.listTools();
-      expect(tools[0].annotations).toEqual({ readOnlyHint: true });
+      const result = await executor.listTools();
+      expect(result.items[0].annotations).toEqual({ readOnlyHint: true });
     });
 
     it('omits outputSchema and annotations when not present', async () => {
@@ -96,9 +96,22 @@ describe('McpExecutorService', () => {
         instance: { plain: vi.fn() },
       } as RegisteredTool);
 
-      const tools = await executor.listTools();
-      expect(tools[0]).not.toHaveProperty('outputSchema');
-      expect(tools[0]).not.toHaveProperty('annotations');
+      const result = await executor.listTools();
+      expect(result.items[0]).not.toHaveProperty('outputSchema');
+      expect(result.items[0]).not.toHaveProperty('annotations');
+    });
+
+    it('returns PaginatedResult with no nextCursor for small lists', async () => {
+      registry.registerTool({
+        name: 'a',
+        description: 'A',
+        methodName: 'a',
+        target: Object,
+        instance: { a: vi.fn() },
+      } as RegisteredTool);
+
+      const result = await executor.listTools();
+      expect(result.nextCursor).toBeUndefined();
     });
   });
 
@@ -357,11 +370,11 @@ describe('McpExecutorService', () => {
         parameters: schema,
       } as RegisteredPrompt);
 
-      const prompts = await executor.listPrompts();
-      expect(prompts).toHaveLength(1);
-      expect(prompts[0].name).toBe('greet');
-      expect(prompts[0].description).toBe('Greeting prompt');
-      expect(prompts[0].arguments).toEqual(
+      const result = await executor.listPrompts();
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].name).toBe('greet');
+      expect(result.items[0].description).toBe('Greeting prompt');
+      expect(result.items[0].arguments).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'name', description: 'The name', required: true }),
         ]),
@@ -377,8 +390,8 @@ describe('McpExecutorService', () => {
         instance: { simple: vi.fn() },
       } as RegisteredPrompt);
 
-      const prompts = await executor.listPrompts();
-      expect(prompts[0]).not.toHaveProperty('arguments');
+      const result = await executor.listPrompts();
+      expect(result.items[0]).not.toHaveProperty('arguments');
     });
   });
 

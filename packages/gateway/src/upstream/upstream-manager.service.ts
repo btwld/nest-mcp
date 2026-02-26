@@ -1,9 +1,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import { extractErrorMessage } from '../utils/error-utils';
-import type { UpstreamConfig, UpstreamStatus, UpstreamTransportType } from './upstream.interface';
+import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
 interface ManagedUpstream {
   config: UpstreamConfig;
@@ -50,37 +51,52 @@ export class UpstreamManagerService implements OnModuleDestroy {
       managed.connected = true;
       managed.healthy = true;
       managed.lastHealthCheck = new Date();
-      this.logger.log(`Connected to upstream "${config.name}" at ${config.url}`);
+      const target = config.url ?? config.command ?? 'unknown';
+      this.logger.log(`Connected to upstream "${config.name}" via ${config.transport} (${target})`);
     } catch (error) {
-      managed.error = extractErrorMessage(error);
+      managed.error = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to connect to upstream "${config.name}": ${managed.error}`);
     }
   }
 
-  private static readonly transportFactories = new Map<
-    UpstreamTransportType,
-    (url: URL) => SSEClientTransport | StreamableHTTPClientTransport
-  >([
-    ['streamable-http', (url) => new StreamableHTTPClientTransport(url)],
-    ['sse', (url) => new SSEClientTransport(url)],
-  ]);
-
-  private createTransport(
-    config: UpstreamConfig,
-  ): SSEClientTransport | StreamableHTTPClientTransport {
-    const factory = UpstreamManagerService.transportFactories.get(config.transport);
-    if (!factory) {
-      throw new Error(`Unsupported upstream transport: ${config.transport}`);
+  private createTransport(config: UpstreamConfig): Transport {
+    switch (config.transport) {
+      case 'stdio': {
+        if (!config.command) {
+          throw new Error(
+            `Upstream "${config.name}" uses stdio transport but is missing required "command" field`,
+          );
+        }
+        return new StdioClientTransport({
+          command: config.command,
+          args: config.args,
+          env: config.env,
+          cwd: config.cwd,
+        });
+      }
+      case 'streamable-http': {
+        if (!config.url) {
+          throw new Error(
+            `Upstream "${config.name}" uses ${config.transport} transport but is missing required "url" field`,
+          );
+        }
+        return new StreamableHTTPClientTransport(new URL(config.url));
+      }
+      case 'sse': {
+        if (!config.url) {
+          throw new Error(
+            `Upstream "${config.name}" uses ${config.transport} transport but is missing required "url" field`,
+          );
+        }
+        return new SSEClientTransport(new URL(config.url));
+      }
+      default:
+        throw new Error(`Unsupported upstream transport: ${config.transport}`);
     }
-    return factory(new URL(config.url));
   }
 
   getClient(name: string): Client | undefined {
     return this.upstreams.get(name)?.client;
-  }
-
-  getConfig(name: string): UpstreamConfig | undefined {
-    return this.upstreams.get(name)?.config;
   }
 
   getManaged(name: string): ManagedUpstream | undefined {
@@ -106,6 +122,10 @@ export class UpstreamManagerService implements OnModuleDestroy {
 
   getAllNames(): string[] {
     return Array.from(this.upstreams.keys());
+  }
+
+  getConfig(name: string): UpstreamConfig | undefined {
+    return this.upstreams.get(name)?.config;
   }
 
   getAllConfigs(): UpstreamConfig[] {

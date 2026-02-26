@@ -37,6 +37,7 @@ export * from './utils/schema-converter';
 export * from './utils/uri-template';
 export * from './utils/capabilities-builder';
 export * from './utils/duration';
+export { paginate, type PaginatedResult } from './utils/paginator';
 
 // Decorators
 export * from './decorators/metadata.utils';

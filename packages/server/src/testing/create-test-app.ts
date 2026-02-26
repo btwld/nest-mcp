@@ -1,4 +1,9 @@
-import type { PromptGetResult, ResourceReadResult, ToolCallResult } from '@btwld/mcp-common';
+import type {
+  PaginatedResult,
+  PromptGetResult,
+  ResourceReadResult,
+  ToolCallResult,
+} from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
 import type { DynamicModule, ForwardReference, Provider, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -10,9 +15,9 @@ import { McpExecutorService } from '../execution/executor.service';
 export interface McpTestApp {
   callTool(name: string, args?: Record<string, unknown>): Promise<ToolCallResult>;
   readResource(uri: string): Promise<ResourceReadResult>;
-  listTools(): Promise<Array<Record<string, unknown>>>;
-  listResources(): Promise<Array<Record<string, unknown>>>;
-  listPrompts(): Promise<Array<Record<string, unknown>>>;
+  listTools(): Promise<PaginatedResult<Record<string, unknown>>>;
+  listResources(): Promise<PaginatedResult<Record<string, unknown>>>;
+  listPrompts(): Promise<PaginatedResult<Record<string, unknown>>>;
   getPrompt(name: string, args?: Record<string, unknown>): Promise<PromptGetResult>;
   close(): Promise<void>;
 }

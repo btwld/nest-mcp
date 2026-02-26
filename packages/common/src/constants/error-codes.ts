@@ -8,6 +8,9 @@ export const JSON_RPC_INTERNAL_ERROR = -32603;
 // MCP-specific error codes
 export const MCP_URL_ELICITATION_REQUIRED = -32042;
 
+// MCP cancellation error code (JSON-RPC server-defined range)
+export const MCP_REQUEST_CANCELLED = -32800;
+
 // Application-level error codes
 export const MCP_TOOL_NOT_FOUND = 1001;
 export const MCP_RESOURCE_NOT_FOUND = 1002;
