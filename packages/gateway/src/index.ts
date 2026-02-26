@@ -7,7 +7,11 @@ export type { McpGatewayOptions, McpGatewayAsyncOptions } from './mcp-gateway.mo
 // Gateway service
 export { GatewayService } from './gateway.service';
 export type { GatewayCallToolResult } from './gateway.service';
-export type { GatewayReadResourceResult, GatewayGetPromptResult } from './gateway.service';
+export type {
+  GatewayReadResourceResult,
+  GatewayGetPromptResult,
+  GatewayCompleteResult,
+} from './gateway.service';
 
 // Routing
 export { RouterService } from './routing/router.service';
@@ -15,6 +19,8 @@ export { ToolAggregatorService } from './routing/tool-aggregator.service';
 export type { AggregatedTool, ToolInputSchema } from './routing/tool-aggregator.service';
 export { ResourceAggregatorService } from './routing/resource-aggregator.service';
 export type { AggregatedResource } from './routing/resource-aggregator.service';
+export { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
+export type { AggregatedResourceTemplate } from './routing/resource-template-aggregator.service';
 export { PromptAggregatorService } from './routing/prompt-aggregator.service';
 export type { AggregatedPrompt } from './routing/prompt-aggregator.service';
 export type {
@@ -37,6 +43,7 @@ export { PolicyEngineService } from './policies/policy-engine.service';
 export type {
   PolicyEffect,
   PolicyRule,
+  PolicyContext,
   PoliciesConfig,
   PolicyEvaluationResult,
 } from './policies/policy.interface';

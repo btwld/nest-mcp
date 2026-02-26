@@ -111,4 +111,180 @@ describe('PolicyEngineService', () => {
       expect(result.matchedRule).toEqual(rule);
     });
   });
+
+  describe('evaluate with PolicyContext', () => {
+    it('should match rule with roles when user has matching role', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'admin_*', effect: 'deny', roles: ['admin'] }],
+      });
+
+      const result = service.evaluate('admin_delete', { roles: ['admin', 'user'] });
+
+      expect(result.effect).toBe('deny');
+    });
+
+    it('should skip rule with roles when user lacks required role', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'admin_*', effect: 'deny', roles: ['admin'] }],
+      });
+
+      const result = service.evaluate('admin_delete', { roles: ['user'] });
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should skip rule with roles when no context provided', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'admin_*', effect: 'deny', roles: ['admin'] }],
+      });
+
+      const result = service.evaluate('admin_delete');
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should skip rule with roles when context has empty roles', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'admin_*', effect: 'deny', roles: ['admin'] }],
+      });
+
+      const result = service.evaluate('admin_delete', { roles: [] });
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should match rule with scopes on overlap', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'write_*', effect: 'deny', scopes: ['write', 'delete'] }],
+      });
+
+      const result = service.evaluate('write_file', { scopes: ['read', 'write'] });
+
+      expect(result.effect).toBe('deny');
+    });
+
+    it('should skip rule with scopes when no overlap', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'write_*', effect: 'deny', scopes: ['write'] }],
+      });
+
+      const result = service.evaluate('write_file', { scopes: ['read'] });
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should match rule with userMatch glob pattern', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'deploy_*', effect: 'deny', userMatch: 'bot-*' }],
+      });
+
+      const result = service.evaluate('deploy_prod', { userId: 'bot-ci' });
+
+      expect(result.effect).toBe('deny');
+    });
+
+    it('should skip rule with userMatch when userId does not match', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'deploy_*', effect: 'deny', userMatch: 'bot-*' }],
+      });
+
+      const result = service.evaluate('deploy_prod', { userId: 'human-alice' });
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should skip rule with userMatch when no userId provided', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [{ pattern: 'deploy_*', effect: 'deny', userMatch: 'bot-*' }],
+      });
+
+      const result = service.evaluate('deploy_prod', {});
+
+      expect(result.effect).toBe('allow');
+    });
+
+    it('should require all context fields to match when multiple are set', () => {
+      service.configure({
+        defaultEffect: 'allow',
+        rules: [
+          {
+            pattern: 'admin_*',
+            effect: 'deny',
+            roles: ['admin'],
+            scopes: ['dangerous'],
+            userMatch: 'bot-*',
+          },
+        ],
+      });
+
+      // All match
+      expect(
+        service.evaluate('admin_nuke', {
+          roles: ['admin'],
+          scopes: ['dangerous'],
+          userId: 'bot-ci',
+        }).effect,
+      ).toBe('deny');
+
+      // roles match, scopes don't
+      expect(
+        service.evaluate('admin_nuke', {
+          roles: ['admin'],
+          scopes: ['safe'],
+          userId: 'bot-ci',
+        }).effect,
+      ).toBe('allow');
+
+      // roles don't match
+      expect(
+        service.evaluate('admin_nuke', {
+          roles: ['user'],
+          scopes: ['dangerous'],
+          userId: 'bot-ci',
+        }).effect,
+      ).toBe('allow');
+
+      // userMatch doesn't match
+      expect(
+        service.evaluate('admin_nuke', {
+          roles: ['admin'],
+          scopes: ['dangerous'],
+          userId: 'human-alice',
+        }).effect,
+      ).toBe('allow');
+    });
+
+    it('should maintain backward compatibility — no context arg works as before', () => {
+      service.configure({
+        defaultEffect: 'deny',
+        rules: [{ pattern: 'gh_*', effect: 'allow' }],
+      });
+
+      expect(service.evaluate('gh_list').effect).toBe('allow');
+      expect(service.evaluate('other').effect).toBe('deny');
+    });
+
+    it('should fall through to next rule when context does not match', () => {
+      service.configure({
+        defaultEffect: 'deny',
+        rules: [
+          { pattern: 'gh_*', effect: 'deny', roles: ['blocked'] },
+          { pattern: 'gh_*', effect: 'allow' },
+        ],
+      });
+
+      // First rule skipped (no matching role), second rule matches
+      const result = service.evaluate('gh_list', { roles: ['user'] });
+      expect(result.effect).toBe('allow');
+    });
+  });
 });

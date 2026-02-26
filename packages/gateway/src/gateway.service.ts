@@ -10,13 +10,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ResponseCacheService } from './cache/response-cache.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService } from './policies/policy-engine.service';
-import type { PolicyEffect } from './policies/policy.interface';
+import type { PolicyContext, PolicyEffect } from './policies/policy.interface';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PromptAggregatorService } from './routing/prompt-aggregator.service';
 import type { AggregatedPrompt } from './routing/prompt-aggregator.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceAggregatorService } from './routing/resource-aggregator.service';
 import type { AggregatedResource } from './routing/resource-aggregator.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
+import type { AggregatedResourceTemplate } from './routing/resource-template-aggregator.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RouterService } from './routing/router.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -43,6 +46,12 @@ export interface GatewayReadResourceResult {
 export interface GatewayGetPromptResult {
   description?: string;
   messages: PromptMessage[];
+}
+
+export interface GatewayCompleteResult {
+  values: string[];
+  hasMore?: boolean;
+  total?: number;
 }
 
 @Injectable()
@@ -84,6 +93,7 @@ export class GatewayService {
     private readonly toolAggregator: ToolAggregatorService,
     private readonly resourceAggregator: ResourceAggregatorService,
     private readonly promptAggregator: PromptAggregatorService,
+    private readonly resourceTemplateAggregator: ResourceTemplateAggregatorService,
     private readonly upstreamManager: UpstreamManagerService,
     private readonly policyEngine: PolicyEngineService,
     private readonly responseCache: ResponseCacheService,
@@ -99,9 +109,13 @@ export class GatewayService {
     return this.toolAggregator.getCachedTools();
   }
 
-  async callTool(toolName: string, args: Record<string, unknown>): Promise<GatewayCallToolResult> {
+  async callTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    context?: PolicyContext,
+  ): Promise<GatewayCallToolResult> {
     // Evaluate policy
-    const policy = this.policyEngine.evaluate(toolName);
+    const policy = this.policyEngine.evaluate(toolName, context);
     const denial = GatewayService.policyDenialHandlers.get(policy.effect)?.(
       toolName,
       policy.reason,
@@ -320,6 +334,80 @@ export class GatewayService {
         ],
       };
     }
+  }
+
+  async listResourceTemplates(): Promise<AggregatedResourceTemplate[]> {
+    return this.resourceTemplateAggregator.aggregateAll();
+  }
+
+  getCachedResourceTemplates(): AggregatedResourceTemplate[] {
+    return this.resourceTemplateAggregator.getCachedTemplates();
+  }
+
+  async complete(
+    ref: { type: string; name?: string; uri?: string },
+    argument: { name: string; value: string },
+  ): Promise<GatewayCompleteResult> {
+    try {
+      if (ref.type === 'ref/prompt' && ref.name) {
+        return await this.completePrompt(ref.name, argument);
+      }
+
+      if (ref.type === 'ref/resource' && ref.uri) {
+        return await this.completeResourceTemplate(ref.uri, argument);
+      }
+
+      return { values: [] };
+    } catch (error) {
+      this.logger.error(`Completion error: ${extractErrorMessage(error)}`);
+      return { values: [] };
+    }
+  }
+
+  private async completePrompt(
+    name: string,
+    argument: { name: string; value: string },
+  ): Promise<GatewayCompleteResult> {
+    const cached = this.promptAggregator.getCachedPrompts();
+    const prompt = cached.find((p) => p.name === name);
+    if (!prompt) return { values: [] };
+
+    const client = this.upstreamManager.getClient(prompt.upstreamName);
+    if (!client) return { values: [] };
+
+    const result = await client.complete({
+      ref: { type: 'ref/prompt', name: prompt.originalName },
+      argument,
+    });
+
+    return {
+      values: result.completion.values,
+      hasMore: result.completion.hasMore,
+      total: result.completion.total,
+    };
+  }
+
+  private async completeResourceTemplate(
+    uri: string,
+    argument: { name: string; value: string },
+  ): Promise<GatewayCompleteResult> {
+    const cached = this.resourceTemplateAggregator.getCachedTemplates();
+    const template = cached.find((t) => t.uriTemplate === uri);
+    if (!template) return { values: [] };
+
+    const client = this.upstreamManager.getClient(template.upstreamName);
+    if (!client) return { values: [] };
+
+    const result = await client.complete({
+      ref: { type: 'ref/resource', uri: template.originalUriTemplate },
+      argument,
+    });
+
+    return {
+      values: result.completion.values,
+      hasMore: result.completion.hasMore,
+      total: result.completion.total,
+    };
   }
 
   private withTimeout<T>(

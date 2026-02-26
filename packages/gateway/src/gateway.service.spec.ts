@@ -3,6 +3,7 @@ import { GatewayService } from './gateway.service';
 import type { PolicyEngineService } from './policies/policy-engine.service';
 import type { PromptAggregatorService } from './routing/prompt-aggregator.service';
 import type { ResourceAggregatorService } from './routing/resource-aggregator.service';
+import type { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 import type { RouterService } from './routing/router.service';
 import type { ToolAggregatorService } from './routing/tool-aggregator.service';
 import type { RequestTransformService } from './transform/request-transform.service';
@@ -15,6 +16,7 @@ describe('GatewayService', () => {
   let toolAggregator: Record<string, ReturnType<typeof vi.fn>>;
   let resourceAggregator: Record<string, ReturnType<typeof vi.fn>>;
   let promptAggregator: Record<string, ReturnType<typeof vi.fn>>;
+  let resourceTemplateAggregator: Record<string, ReturnType<typeof vi.fn>>;
   let upstreamManager: Record<string, ReturnType<typeof vi.fn>>;
   let policyEngine: Record<string, ReturnType<typeof vi.fn>>;
   let responseCache: Record<string, ReturnType<typeof vi.fn>>;
@@ -39,6 +41,11 @@ describe('GatewayService', () => {
     promptAggregator = {
       aggregateAll: vi.fn().mockResolvedValue([]),
       getCachedPrompts: vi.fn().mockReturnValue([]),
+    };
+
+    resourceTemplateAggregator = {
+      aggregateAll: vi.fn().mockResolvedValue([]),
+      getCachedTemplates: vi.fn().mockReturnValue([]),
     };
 
     upstreamManager = {
@@ -70,6 +77,7 @@ describe('GatewayService', () => {
       toolAggregator as unknown as ToolAggregatorService,
       resourceAggregator as unknown as ResourceAggregatorService,
       promptAggregator as unknown as PromptAggregatorService,
+      resourceTemplateAggregator as unknown as ResourceTemplateAggregatorService,
       upstreamManager as unknown as UpstreamManagerService,
       policyEngine as unknown as PolicyEngineService,
       responseCache as unknown as ResponseCacheService,
@@ -186,7 +194,7 @@ describe('GatewayService', () => {
 
       const result = await service.callTool('gh_listRepos', { org: 'acme' });
 
-      expect(policyEngine.evaluate).toHaveBeenCalledWith('gh_listRepos');
+      expect(policyEngine.evaluate).toHaveBeenCalledWith('gh_listRepos', undefined);
       expect(router.resolve).toHaveBeenCalledWith('gh_listRepos');
       expect(responseCache.get).toHaveBeenCalledWith('cache-key');
       expect(requestTransform.apply).toHaveBeenCalled();
@@ -224,6 +232,15 @@ describe('GatewayService', () => {
 
       expect(result.isError).toBe(true);
       expect((result.content[0] as { text: string }).text).toContain('network error');
+    });
+
+    it('should pass PolicyContext through to policyEngine.evaluate', async () => {
+      policyEngine.evaluate.mockReturnValue({ effect: 'deny', reason: 'role denied' });
+      const context = { userId: 'bot-ci', roles: ['bot'], scopes: ['deploy'] };
+
+      await service.callTool('admin_deploy', {}, context);
+
+      expect(policyEngine.evaluate).toHaveBeenCalledWith('admin_deploy', context);
     });
   });
 
@@ -446,6 +463,150 @@ describe('GatewayService', () => {
           content: expect.objectContaining({ text: expect.stringContaining('prompt failed') }),
         }),
       );
+    });
+  });
+
+  describe('listResourceTemplates', () => {
+    it('should delegate to resourceTemplateAggregator.aggregateAll', async () => {
+      const expected = [
+        {
+          uriTemplate: 'fs://file:///{path}',
+          name: 'file',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///{path}',
+        },
+      ];
+      resourceTemplateAggregator.aggregateAll.mockResolvedValue(expected);
+
+      const result = await service.listResourceTemplates();
+
+      expect(result).toBe(expected);
+      expect(resourceTemplateAggregator.aggregateAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('getCachedResourceTemplates', () => {
+    it('should delegate to resourceTemplateAggregator.getCachedTemplates', () => {
+      const expected = [{ uriTemplate: 'file:///{path}' }];
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue(expected);
+
+      const result = service.getCachedResourceTemplates();
+
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('complete', () => {
+    it('should route prompt completion to correct upstream', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      const mockClient = {
+        complete: vi.fn().mockResolvedValue({
+          completion: { values: ['short', 'medium', 'long'], hasMore: false, total: 3 },
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+
+      const result = await service.complete(
+        { type: 'ref/prompt', name: 'ai_summarize' },
+        { name: 'style', value: 'sh' },
+      );
+
+      expect(mockClient.complete).toHaveBeenCalledWith({
+        ref: { type: 'ref/prompt', name: 'summarize' },
+        argument: { name: 'style', value: 'sh' },
+      });
+      expect(result).toEqual({ values: ['short', 'medium', 'long'], hasMore: false, total: 3 });
+    });
+
+    it('should route resource template completion to correct upstream', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///{path}',
+          name: 'file',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///{path}',
+        },
+      ]);
+      const mockClient = {
+        complete: vi.fn().mockResolvedValue({
+          completion: { values: ['readme.md', 'readme.txt'] },
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+
+      const result = await service.complete(
+        { type: 'ref/resource', uri: 'fs://file:///{path}' },
+        { name: 'path', value: 'read' },
+      );
+
+      expect(mockClient.complete).toHaveBeenCalledWith({
+        ref: { type: 'ref/resource', uri: 'file:///{path}' },
+        argument: { name: 'path', value: 'read' },
+      });
+      expect(result.values).toEqual(['readme.md', 'readme.txt']);
+    });
+
+    it('should return empty values when prompt not found', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([]);
+
+      const result = await service.complete(
+        { type: 'ref/prompt', name: 'missing' },
+        { name: 'arg', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
+    });
+
+    it('should return empty values when resource template not found', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([]);
+
+      const result = await service.complete(
+        { type: 'ref/resource', uri: 'missing:///{path}' },
+        { name: 'path', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
+    });
+
+    it('should return empty values when client not available', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue(undefined);
+
+      const result = await service.complete(
+        { type: 'ref/prompt', name: 'ai_summarize' },
+        { name: 'arg', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
+    });
+
+    it('should return empty values on upstream error', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        complete: vi.fn().mockRejectedValue(new Error('upstream error')),
+      });
+
+      const result = await service.complete(
+        { type: 'ref/prompt', name: 'ai_summarize' },
+        { name: 'arg', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
+    });
+
+    it('should return empty values for unknown ref type', async () => {
+      const result = await service.complete(
+        { type: 'ref/unknown' },
+        { name: 'arg', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
     });
   });
 });

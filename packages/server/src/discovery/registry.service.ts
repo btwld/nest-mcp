@@ -295,6 +295,27 @@ export class McpRegistryService {
     this.events.emit('prompt.registered', prompt);
   }
 
+  registerResourceTemplate(template: RegisteredResourceTemplate): void {
+    this.warnIfMissingDescription('ResourceTemplate', template.name, template.description);
+    this.resourceTemplates.set(template.uriTemplate, template);
+    this.logger.log(`Dynamically registered resource template: ${template.uriTemplate}`);
+    this.events.emit('resourceTemplate.registered', template);
+  }
+
+  unregisterResourceTemplate(uriTemplate: string): boolean {
+    const deleted = this.resourceTemplates.delete(uriTemplate);
+    if (deleted) {
+      this.events.emit('resourceTemplate.unregistered', uriTemplate);
+    }
+    return deleted;
+  }
+
+  registerCompletionHandler(handler: RegisteredCompletion): void {
+    const key = `${handler.refType === 'ref/prompt' ? 'prompt' : 'resource'}::${handler.refName}`;
+    this.completionHandlers.set(key, handler);
+    this.logger.log(`Dynamically registered completion handler: ${key}`);
+  }
+
   private warnIfMissingDescription(type: string, name: string, description?: string): void {
     if (!description) {
       this.logger.warn(

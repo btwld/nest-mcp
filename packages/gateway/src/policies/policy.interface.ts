@@ -4,6 +4,15 @@ export interface PolicyRule {
   pattern: string;
   effect: PolicyEffect;
   reason?: string;
+  roles?: string[];
+  scopes?: string[];
+  userMatch?: string;
+}
+
+export interface PolicyContext {
+  userId?: string;
+  roles?: string[];
+  scopes?: string[];
 }
 
 export interface PoliciesConfig {

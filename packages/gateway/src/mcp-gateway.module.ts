@@ -1,7 +1,14 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
-import { McpModule, McpPromptBuilder, McpResourceBuilder, McpToolBuilder } from '@btwld/mcp-server';
+import {
+  McpModule,
+  McpPromptBuilder,
+  McpRegistryService,
+  McpResourceBuilder,
+  McpToolBuilder,
+} from '@btwld/mcp-server';
+import type { RegisteredResourceTemplate } from '@btwld/mcp-server';
 import {
   type DynamicModule,
   Inject,
@@ -17,6 +24,7 @@ import type { UpstreamConfig } from './upstream/upstream.interface';
 
 import { PromptAggregatorService } from './routing/prompt-aggregator.service';
 import { ResourceAggregatorService } from './routing/resource-aggregator.service';
+import { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 import type { RoutingConfig } from './routing/route-config.interface';
 // Routing
 import { RouterService } from './routing/router.service';
@@ -73,6 +81,8 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     private readonly promptBuilder: McpPromptBuilder,
     private readonly resourceAggregator: ResourceAggregatorService,
     private readonly promptAggregator: PromptAggregatorService,
+    private readonly resourceTemplateAggregator: ResourceTemplateAggregatorService,
+    private readonly registry: McpRegistryService,
   ) {}
 
   static forRoot(options: McpGatewayOptions): DynamicModule {
@@ -97,6 +107,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         GatewayService,
         ResourceAggregatorService,
         PromptAggregatorService,
+        ResourceTemplateAggregatorService,
       ],
       exports: [
         GatewayService,
@@ -110,6 +121,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResponseTransformService,
         ResourceAggregatorService,
         PromptAggregatorService,
+        ResourceTemplateAggregatorService,
         MCP_GATEWAY_OPTIONS,
       ],
     };
@@ -150,6 +162,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         GatewayService,
         ResourceAggregatorService,
         PromptAggregatorService,
+        ResourceTemplateAggregatorService,
       ],
       exports: [
         GatewayService,
@@ -163,6 +176,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResponseTransformService,
         ResourceAggregatorService,
         PromptAggregatorService,
+        ResourceTemplateAggregatorService,
         MCP_GATEWAY_OPTIONS,
       ],
     };
@@ -195,6 +209,12 @@ export class McpGatewayModule implements OnApplicationBootstrap {
 
     // Aggregate prompts and register them on the MCP server
     await this.registerUpstreamPrompts();
+
+    // Aggregate resource templates and register them on the MCP server
+    await this.registerUpstreamResourceTemplates();
+
+    // Register completion handlers for prompts and resource templates
+    this.registerCompletionHandlers();
 
     McpGatewayModule.logger.log('MCP Gateway initialized');
   }
@@ -265,5 +285,76 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     }
 
     McpGatewayModule.logger.log(`Registered ${prompts.length} upstream prompts`);
+  }
+
+  private async registerUpstreamResourceTemplates(): Promise<void> {
+    const templates = await this.gatewayService.listResourceTemplates();
+
+    for (const template of templates) {
+      const handlerWrapper = {
+        [template.name]: async () => ({ contents: [] }),
+      };
+
+      const registered: RegisteredResourceTemplate = {
+        uriTemplate: template.uriTemplate,
+        name: template.name,
+        description:
+          template.description ?? `Proxied resource template from ${template.upstreamName}`,
+        mimeType: template.mimeType,
+        methodName: template.name,
+        target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,
+        instance: handlerWrapper,
+      };
+
+      this.registry.registerResourceTemplate(registered);
+    }
+
+    McpGatewayModule.logger.log(`Registered ${templates.length} upstream resource templates`);
+  }
+
+  private registerCompletionHandlers(): void {
+    const prompts = this.gatewayService.getCachedPrompts();
+    const templates = this.gatewayService.getCachedResourceTemplates();
+    let count = 0;
+
+    for (const prompt of prompts) {
+      const handlerObj = {
+        complete: async (argName: string, argValue: string) => {
+          return this.gatewayService.complete(
+            { type: 'ref/prompt', name: prompt.name },
+            { name: argName, value: argValue },
+          );
+        },
+      };
+
+      this.registry.registerCompletionHandler({
+        refType: 'ref/prompt',
+        refName: prompt.name,
+        methodName: 'complete',
+        instance: handlerObj,
+      });
+      count++;
+    }
+
+    for (const template of templates) {
+      const handlerObj = {
+        complete: async (argName: string, argValue: string) => {
+          return this.gatewayService.complete(
+            { type: 'ref/resource', uri: template.uriTemplate },
+            { name: argName, value: argValue },
+          );
+        },
+      };
+
+      this.registry.registerCompletionHandler({
+        refType: 'ref/resource',
+        refName: template.uriTemplate,
+        methodName: 'complete',
+        instance: handlerObj,
+      });
+      count++;
+    }
+
+    McpGatewayModule.logger.log(`Registered ${count} completion handlers`);
   }
 }
