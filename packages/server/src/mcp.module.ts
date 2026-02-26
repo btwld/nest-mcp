@@ -39,6 +39,9 @@ import { ToolAuthGuardService } from './auth/guards/tool-auth.guard';
 // Session
 import { SessionManager } from './session/session.manager';
 
+// Subscription
+import { ResourceSubscriptionManager } from './subscription/resource-subscription.manager';
+
 import { McpPromptBuilder } from './dynamic/prompt-builder.service';
 import { McpResourceBuilder } from './dynamic/resource-builder.service';
 // Dynamic
@@ -80,6 +83,7 @@ export class McpModule {
       McpResourceBuilder,
       McpPromptBuilder,
       MetricsService,
+      ResourceSubscriptionManager,
     ];
 
     // Streamable HTTP transport
@@ -117,6 +121,7 @@ export class McpModule {
         McpPromptBuilder,
         MetricsService,
         SessionManager,
+        ResourceSubscriptionManager,
         MCP_OPTIONS,
       ],
     };
@@ -145,6 +150,7 @@ export class McpModule {
       McpResourceBuilder,
       McpPromptBuilder,
       MetricsService,
+      ResourceSubscriptionManager,
     ];
 
     // Streamable HTTP transport
@@ -183,6 +189,7 @@ export class McpModule {
         McpPromptBuilder,
         MetricsService,
         SessionManager,
+        ResourceSubscriptionManager,
         MCP_OPTIONS,
       ],
     };

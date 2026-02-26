@@ -3,7 +3,7 @@ import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
 import {
   DEFAULT_PING_INTERVAL,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
@@ -22,6 +22,8 @@ import { McpExecutorService } from '../../execution/executor.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
 import type { HttpResponse } from '../http-response.interface';
 import {
   registerHandlers,
@@ -49,6 +51,7 @@ export class SseService implements OnModuleDestroy {
     private readonly executor: McpExecutorService,
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
+    @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
   ) {
     this.subscribeToRegistryEvents();
   }
@@ -68,7 +71,7 @@ export class SseService implements OnModuleDestroy {
       mcpServer: server,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx);
+    registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
@@ -200,6 +203,8 @@ export class SseService implements OnModuleDestroy {
   }
 
   private async cleanupSession(sessionId: string): Promise<void> {
+    this.subscriptionManager?.removeSession(sessionId);
+
     const pingInterval = this.pingIntervals.get(sessionId);
     if (pingInterval) {
       clearInterval(pingInterval);

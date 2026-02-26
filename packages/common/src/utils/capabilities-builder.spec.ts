@@ -39,7 +39,7 @@ describe('buildServerCapabilities', () => {
       hasResourceTemplates: false,
       hasPrompts: false,
     });
-    expect(result.resources).toEqual({ subscribe: false, listChanged: true });
+    expect(result.resources).toEqual({ subscribe: true, listChanged: true });
   });
 
   it('should include resources capability when hasResourceTemplates is true', () => {
@@ -49,7 +49,7 @@ describe('buildServerCapabilities', () => {
       hasResourceTemplates: true,
       hasPrompts: false,
     });
-    expect(result.resources).toEqual({ subscribe: false, listChanged: true });
+    expect(result.resources).toEqual({ subscribe: true, listChanged: true });
   });
 
   it('should include prompts capability when hasPrompts is true', () => {

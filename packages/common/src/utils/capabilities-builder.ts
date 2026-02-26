@@ -25,7 +25,7 @@ export function buildServerCapabilities(
 
   if (registry.hasResources || registry.hasResourceTemplates || options.capabilities?.resources) {
     capabilities.resources = {
-      subscribe: options.capabilities?.resources?.subscribe ?? false,
+      subscribe: options.capabilities?.resources?.subscribe ?? true,
       listChanged: options.capabilities?.resources?.listChanged ?? true,
     };
   }

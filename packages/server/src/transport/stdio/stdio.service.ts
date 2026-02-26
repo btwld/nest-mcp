@@ -2,7 +2,7 @@ import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
 import type {
   RegisteredPrompt,
   RegisteredResource,
@@ -17,6 +17,8 @@ import { McpExecutorService } from '../../execution/executor.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
 import {
   registerHandlers,
   registerPromptOnServer,
@@ -41,6 +43,7 @@ export class StdioService implements OnModuleDestroy {
     private readonly executor: McpExecutorService,
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
+    @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
   ) {
     this.subscribeToRegistryEvents();
   }
@@ -55,7 +58,7 @@ export class StdioService implements OnModuleDestroy {
       mcpServer: server,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx);
+    registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
 
     this.server = server;
     this.ctx = ctx;
@@ -125,6 +128,8 @@ export class StdioService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.subscriptionManager?.removeSession('stdio');
+
     for (const { event, listener } of this.registryListeners) {
       this.registry.events.removeListener(event, listener);
     }

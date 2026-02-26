@@ -7,6 +7,8 @@ import {
   ListResourceTemplatesRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  SubscribeRequestSchema,
+  UnsubscribeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type {
@@ -17,6 +19,7 @@ import type {
   RegisteredTool,
 } from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
+import type { ResourceSubscriptionManager } from '../subscription/resource-subscription.manager';
 
 /**
  * Permissive schema that accepts any arguments. Used for dynamically-registered
@@ -53,6 +56,7 @@ export function registerHandlers(
   registry: McpRegistryService,
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
+  subscriptionManager?: ResourceSubscriptionManager,
 ): void {
   for (const tool of registry.getAllTools()) {
     registerToolOnServer(server, tool, pipeline, ctx);
@@ -68,6 +72,9 @@ export function registerHandlers(
   }
   registerCancellationHandler(server);
   registerListHandlers(server, pipeline);
+  if (subscriptionManager) {
+    registerSubscriptionHandlers(server, subscriptionManager, ctx);
+  }
 }
 
 /**
@@ -255,5 +262,25 @@ function registerListHandlers(
     const cursor = request.params?.cursor;
     const result = await pipeline.listPrompts(cursor);
     return { prompts: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+  });
+}
+
+/**
+ * Registers `resources/subscribe` and `resources/unsubscribe` request handlers
+ * on the low-level SDK Server for per-session resource change tracking.
+ */
+function registerSubscriptionHandlers(
+  server: McpServer,
+  manager: ResourceSubscriptionManager,
+  ctx: McpExecutionContext,
+): void {
+  server.server.setRequestHandler(SubscribeRequestSchema, async (request) => {
+    manager.subscribe(ctx.sessionId, request.params.uri, server);
+    return {};
+  });
+
+  server.server.setRequestHandler(UnsubscribeRequestSchema, async (request) => {
+    manager.unsubscribe(ctx.sessionId, request.params.uri);
+    return {};
   });
 }

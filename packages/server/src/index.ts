@@ -70,6 +70,9 @@ export type {
 
 // Session
 export { SessionManager } from './session/session.manager';
+
+// Subscription
+export { ResourceSubscriptionManager } from './subscription/resource-subscription.manager';
 export type { McpSession } from './session/session.manager';
 
 // Dynamic builders
