@@ -103,4 +103,74 @@ describe('buildServerCapabilities', () => {
     expect(result.prompts).toBeDefined();
     expect(result.logging).toBeDefined();
   });
+
+  it('should include completions capability when hasPrompts is true', () => {
+    const result = buildServerCapabilities(makeOptions(), {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: true,
+    });
+    expect(result.completions).toEqual({});
+  });
+
+  it('should include completions capability when hasResourceTemplates is true', () => {
+    const result = buildServerCapabilities(makeOptions(), {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: true,
+      hasPrompts: false,
+    });
+    expect(result.completions).toEqual({});
+  });
+
+  it('should not include completions capability when only tools or resources exist', () => {
+    const result = buildServerCapabilities(makeOptions(), {
+      hasTools: true,
+      hasResources: true,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.completions).toBeUndefined();
+  });
+
+  it('should include tasks capability when tasks.enabled is true', () => {
+    const options = makeOptions({
+      capabilities: { tasks: { enabled: true } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.tasks).toEqual({
+      list: {},
+      cancel: {},
+      requests: { tools: { call: {} } },
+    });
+  });
+
+  it('should not include tasks capability when tasks is not configured', () => {
+    const result = buildServerCapabilities(makeOptions(), {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.tasks).toBeUndefined();
+  });
+
+  it('should not include tasks capability when tasks.enabled is false', () => {
+    const options = makeOptions({
+      capabilities: { tasks: { enabled: false } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.tasks).toBeUndefined();
+  });
 });

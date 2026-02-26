@@ -1,5 +1,7 @@
 import type {
   CircuitBreakerConfig,
+  CompletionRequest,
+  CompletionResult,
   McpExecutionContext,
   McpGuardContext,
   McpMiddleware,
@@ -187,6 +189,12 @@ export class ExecutionPipelineService {
 
   async listPrompts(cursor?: string) {
     return this.executor.listPrompts(cursor);
+  }
+
+  // ---- Completions ----
+
+  async complete(request: CompletionRequest): Promise<CompletionResult> {
+    return this.executor.complete(request);
   }
 
   // ---- Helpers ----

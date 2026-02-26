@@ -1,3 +1,4 @@
+import { drainAllPages } from '@btwld/mcp-common';
 import type { PromptArgument } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -47,10 +48,13 @@ export class PromptAggregatorService {
     }
 
     try {
-      const result = await client.listPrompts();
       const prefix = this.router.getPrefixForUpstream(upstreamName);
+      const allPrompts = await drainAllPages(async (cursor) => {
+        const result = await client.listPrompts(cursor ? { cursor } : undefined);
+        return { data: result.prompts ?? [], nextCursor: result.nextCursor };
+      });
 
-      return (result.prompts ?? []).map((prompt) => ({
+      return allPrompts.map((prompt) => ({
         name: prefix ? this.router.buildPrefixedName(prefix, prompt.name) : prompt.name,
         description: prompt.description,
         upstreamName,

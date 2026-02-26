@@ -5,6 +5,13 @@ export interface ServerCapabilities {
   prompts?: { listChanged?: boolean };
   resources?: { subscribe?: boolean; listChanged?: boolean };
   tools?: { listChanged?: boolean };
+  tasks?: {
+    list?: Record<string, never>;
+    cancel?: Record<string, never>;
+    requests?: {
+      tools?: { call?: Record<string, never> };
+    };
+  };
 }
 
 export interface ClientCapabilities {

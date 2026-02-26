@@ -48,6 +48,7 @@ describe('registerHandlers', () => {
       listResources: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
       listResourceTemplates: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
       listPrompts: vi.fn().mockResolvedValue({ items: [], nextCursor: undefined }),
+      complete: vi.fn().mockResolvedValue({ values: [] }),
     };
 
     ctx = {
@@ -306,8 +307,8 @@ describe('registerHandlers', () => {
   it('registers custom list request handlers on inner server', () => {
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
 
-    // 4 list handlers + 1 notification handler
-    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(4);
+    // 4 list handlers + 1 completion handler + 1 notification handler
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(5);
   });
 
   it('list tools handler passes cursor and returns paginated result', async () => {
@@ -384,6 +385,67 @@ describe('registerHandlers', () => {
     expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined);
     expect(result).toEqual({ prompts: [{ name: 'greet' }] });
   });
+
+  // --- Completion ---
+
+  it('completion handler delegates to pipeline.complete and returns formatted result', async () => {
+    mockPipeline.complete.mockResolvedValue({
+      values: ['alpha', 'alpine'],
+      hasMore: true,
+      total: 10,
+    });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'completion/complete',
+    );
+    expect(completeCall).toBeDefined();
+
+    const handler = completeCall![1];
+    const result = await handler({
+      method: 'completion/complete',
+      params: {
+        ref: { type: 'ref/prompt', name: 'greet' },
+        argument: { name: 'language', value: 'en' },
+      },
+    });
+
+    expect(mockPipeline.complete).toHaveBeenCalledWith({
+      ref: { type: 'ref/prompt', name: 'greet' },
+      argument: { name: 'language', value: 'en' },
+      context: undefined,
+    });
+    expect(result).toEqual({
+      completion: {
+        values: ['alpha', 'alpine'],
+        hasMore: true,
+        total: 10,
+      },
+    });
+  });
+
+  it('completion handler omits hasMore and total when not provided', async () => {
+    mockPipeline.complete.mockResolvedValue({ values: ['hello'] });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'completion/complete',
+    );
+    const handler = completeCall![1];
+    const result = await handler({
+      method: 'completion/complete',
+      params: {
+        ref: { type: 'ref/resource', uri: 'file:///a' },
+        argument: { name: 'path', value: '/tmp' },
+      },
+    });
+
+    expect(result).toEqual({ completion: { values: ['hello'] } });
+    expect(result.completion).not.toHaveProperty('hasMore');
+    expect(result.completion).not.toHaveProperty('total');
+  });
 });
 
 // --- Per-item helper tests ---
@@ -432,6 +494,77 @@ describe('registerToolOnServer', () => {
     expect(config.description).toBe('Calc');
     expect(config.inputSchema).toBe(schema);
     expect(config.annotations).toEqual({ readOnlyHint: true });
+  });
+
+  // --- Progress notifications ---
+
+  it('tool callback wires reportProgress from extra._meta.progressToken', async () => {
+    const tool = { name: 'upload', description: 'Upload', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const callback = registerTool.mock.calls[0][2];
+    const sendNotification = vi.fn().mockResolvedValue(undefined);
+    const mockExtra = {
+      signal: new AbortController().signal,
+      requestId: 'req-p1',
+      _meta: { progressToken: 'tok-1' },
+      sendNotification,
+    };
+
+    await callback({}, mockExtra);
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.reportProgress).not.toBe(ctx.reportProgress);
+
+    await passedCtx.reportProgress({ progress: 50, total: 100, message: 'halfway' });
+    expect(sendNotification).toHaveBeenCalledWith({
+      method: 'notifications/progress',
+      params: { progressToken: 'tok-1', progress: 50, total: 100, message: 'halfway' },
+    });
+  });
+
+  it('tool callback uses session reportProgress when no progressToken', async () => {
+    const tool = { name: 'ping', description: 'Ping', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const callback = registerTool.mock.calls[0][2];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-p2' };
+
+    await callback({}, mockExtra);
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.reportProgress).toBe(ctx.reportProgress);
+  });
+
+  it('reportProgress omits total and message when not provided', async () => {
+    const tool = { name: 'scan', description: 'Scan', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    const callback = registerTool.mock.calls[0][2];
+    const sendNotification = vi.fn().mockResolvedValue(undefined);
+    const mockExtra = {
+      signal: new AbortController().signal,
+      requestId: 'req-p3',
+      _meta: { progressToken: 42 },
+      sendNotification,
+    };
+
+    await callback({}, mockExtra);
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    await passedCtx.reportProgress({ progress: 10 });
+
+    expect(sendNotification).toHaveBeenCalledWith({
+      method: 'notifications/progress',
+      params: { progressToken: 42, progress: 10 },
+    });
+    // Verify total and message keys are not present
+    const sentParams = sendNotification.mock.calls[0][0].params;
+    expect(sentParams).not.toHaveProperty('total');
+    expect(sentParams).not.toHaveProperty('message');
   });
 });
 

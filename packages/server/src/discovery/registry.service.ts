@@ -11,6 +11,7 @@ import type {
 } from '@btwld/mcp-common';
 import {
   MCP_CIRCUIT_BREAKER_METADATA,
+  MCP_COMPLETION_METADATA,
   MCP_GUARDS_METADATA,
   MCP_MIDDLEWARE_METADATA,
   MCP_PROMPT_METADATA,
@@ -24,6 +25,7 @@ import {
   MCP_TIMEOUT_METADATA,
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
+import type { CompletionMetadata } from '../decorators/completion.decorator';
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface RegisteredTool extends ToolMetadata {
@@ -42,6 +44,13 @@ export interface RegisteredPrompt extends PromptMetadata {
   instance: Record<string, unknown>;
 }
 
+export interface RegisteredCompletion {
+  refType: 'ref/prompt' | 'ref/resource';
+  refName: string;
+  methodName: string;
+  instance: Record<string, unknown>;
+}
+
 @Injectable()
 export class McpRegistryService {
   private readonly logger = new Logger(McpRegistryService.name);
@@ -51,6 +60,7 @@ export class McpRegistryService {
   private readonly resources = new Map<string, RegisteredResource>();
   private readonly resourceTemplates = new Map<string, RegisteredResourceTemplate>();
   private readonly prompts = new Map<string, RegisteredPrompt>();
+  private readonly completionHandlers = new Map<string, RegisteredCompletion>();
 
   get hasTools(): boolean {
     return this.tools.size > 0;
@@ -84,6 +94,7 @@ export class McpRegistryService {
       this.scanResourceMetadata(instance as Record<string, unknown>, prototype, methodName);
       this.scanResourceTemplateMetadata(instance as Record<string, unknown>, prototype, methodName);
       this.scanPromptMetadata(instance as Record<string, unknown>, prototype, methodName);
+      this.scanCompletionMetadata(instance as Record<string, unknown>, prototype, methodName);
     }
   }
 
@@ -177,6 +188,30 @@ export class McpRegistryService {
     this.logger.log(`Registered prompt: ${registered.name}`);
   }
 
+  private scanCompletionMetadata(
+    instance: Record<string, unknown>,
+    prototype: object,
+    methodName: string,
+  ): void {
+    const metadata: CompletionMetadata | undefined = Reflect.getMetadata(
+      MCP_COMPLETION_METADATA,
+      prototype,
+      methodName,
+    );
+    if (!metadata) return;
+
+    const key = `${metadata.refType === 'ref/prompt' ? 'prompt' : 'resource'}::${metadata.refName}`;
+    const registered: RegisteredCompletion = {
+      refType: metadata.refType,
+      refName: metadata.refName,
+      methodName: metadata.methodName,
+      instance,
+    };
+
+    this.completionHandlers.set(key, registered);
+    this.logger.log(`Registered completion handler: ${key}`);
+  }
+
   // ---- Accessors ----
 
   getTool(name: string): RegisteredTool | undefined {
@@ -209,6 +244,15 @@ export class McpRegistryService {
 
   getAllPrompts(): RegisteredPrompt[] {
     return Array.from(this.prompts.values());
+  }
+
+  getCompletionHandler(refType: 'ref/prompt' | 'ref/resource', refName: string): RegisteredCompletion | undefined {
+    const key = `${refType === 'ref/prompt' ? 'prompt' : 'resource'}::${refName}`;
+    return this.completionHandlers.get(key);
+  }
+
+  getAllCompletionHandlers(): RegisteredCompletion[] {
+    return Array.from(this.completionHandlers.values());
   }
 
   // ---- Dynamic registration ----

@@ -19,6 +19,8 @@ import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { TaskManager } from '../../task/task.manager';
 import {
   registerHandlers,
   registerPromptOnServer,
@@ -44,13 +46,14 @@ export class StdioService implements OnModuleDestroy {
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
     @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
+    @Optional() private readonly taskManager?: TaskManager,
   ) {
     this.subscribeToRegistryEvents();
   }
 
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
-    const server = createMcpServer(this.registry, this.options);
+    const server = createMcpServer(this.registry, this.options, this.taskManager);
 
     const ctx = this.contextFactory.createContext({
       sessionId: 'stdio',
@@ -129,6 +132,7 @@ export class StdioService implements OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.subscriptionManager?.removeSession('stdio');
+    this.taskManager?.removeSession('stdio');
 
     for (const { event, listener } of this.registryListeners) {
       this.registry.events.removeListener(event, listener);

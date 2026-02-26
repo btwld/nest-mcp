@@ -1,8 +1,9 @@
-import type { McpExecutionContext } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpProgress } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   CancelledNotificationSchema,
+  CompleteRequestSchema,
   ListPromptsRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListResourcesRequestSchema,
@@ -72,6 +73,7 @@ export function registerHandlers(
   }
   registerCancellationHandler(server);
   registerListHandlers(server, pipeline);
+  registerCompletionHandler(server, pipeline);
   if (subscriptionManager) {
     registerSubscriptionHandlers(server, subscriptionManager, ctx);
   }
@@ -106,7 +108,18 @@ export function registerToolOnServer(
       outputSchema: tool.outputSchema,
       annotations: tool.annotations,
     },
-    async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
+    async (
+      args: Record<string, unknown>,
+      extra: {
+        signal: AbortSignal;
+        requestId: string | number;
+        _meta?: { progressToken?: string | number };
+        sendNotification?: (notification: {
+          method: string;
+          params: Record<string, unknown>;
+        }) => Promise<void>;
+      },
+    ) => {
       // Create a local AbortController that is linked to the SDK's signal
       // and tracked in the activeRequests map for explicit cancellation.
       const controller = new AbortController();
@@ -121,8 +134,30 @@ export function registerToolOnServer(
 
       activeRequests.set(requestId, controller);
 
-      // Shallow-clone the context with the cancellation signal
-      const ctxWithSignal: McpExecutionContext = { ...ctx, signal: controller.signal };
+      // Build per-request reportProgress that sends notifications/progress
+      // when the client provided a progressToken in _meta
+      const progressToken = extra._meta?.progressToken;
+      const reportProgress =
+        progressToken != null && extra.sendNotification
+          ? async (progress: McpProgress) => {
+              await extra.sendNotification?.({
+                method: 'notifications/progress' as const,
+                params: {
+                  progressToken,
+                  progress: progress.progress,
+                  ...(progress.total != null ? { total: progress.total } : {}),
+                  ...(progress.message != null ? { message: progress.message } : {}),
+                },
+              });
+            }
+          : ctx.reportProgress;
+
+      // Shallow-clone the context with the cancellation signal and per-request progress
+      const ctxWithSignal: McpExecutionContext = {
+        ...ctx,
+        signal: controller.signal,
+        reportProgress,
+      };
 
       try {
         return await pipeline.callTool(tool.name, args, ctxWithSignal);
@@ -213,19 +248,16 @@ export function registerPromptOnServer(
  * to abort in-flight tool executions when the client sends a cancellation.
  */
 function registerCancellationHandler(server: McpServer): void {
-  server.server.setNotificationHandler(
-    CancelledNotificationSchema,
-    async (notification) => {
-      const requestId = notification.params?.requestId;
-      if (requestId != null) {
-        const controller = activeRequests.get(requestId);
-        if (controller) {
-          controller.abort();
-          activeRequests.delete(requestId);
-        }
+  server.server.setNotificationHandler(CancelledNotificationSchema, async (notification) => {
+    const requestId = notification.params?.requestId;
+    if (requestId != null) {
+      const controller = activeRequests.get(requestId);
+      if (controller) {
+        controller.abort();
+        activeRequests.delete(requestId);
       }
-    },
-  );
+    }
+  });
 }
 
 /**
@@ -233,10 +265,7 @@ function registerCancellationHandler(server: McpServer): void {
  * support cursor-based pagination. These override the SDK's default
  * list handlers that were auto-registered by registerTool/resource/prompt.
  */
-function registerListHandlers(
-  server: McpServer,
-  pipeline: ExecutionPipelineService,
-): void {
+function registerListHandlers(server: McpServer, pipeline: ExecutionPipelineService): void {
   server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
     const cursor = request.params?.cursor;
     const result = await pipeline.listTools(cursor);
@@ -246,7 +275,10 @@ function registerListHandlers(
   server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
     const cursor = request.params?.cursor;
     const result = await pipeline.listResources(cursor);
-    return { resources: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+    return {
+      resources: result.items,
+      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+    };
   });
 
   server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
@@ -261,7 +293,35 @@ function registerListHandlers(
   server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
     const cursor = request.params?.cursor;
     const result = await pipeline.listPrompts(cursor);
-    return { prompts: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+    return {
+      prompts: result.items,
+      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+    };
+  });
+}
+
+/**
+ * Registers a `completion/complete` handler on the low-level SDK Server.
+ * Overrides the SDK's built-in completion handler to delegate to the pipeline,
+ * which supports both custom @Completion() handlers and default completion logic.
+ */
+function registerCompletionHandler(
+  server: McpServer,
+  pipeline: ExecutionPipelineService,
+): void {
+  server.server.setRequestHandler(CompleteRequestSchema, async (request) => {
+    const result = await pipeline.complete({
+      ref: request.params.ref,
+      argument: request.params.argument,
+      context: request.params.context,
+    });
+    return {
+      completion: {
+        values: result.values,
+        ...(result.hasMore != null ? { hasMore: result.hasMore } : {}),
+        ...(result.total != null ? { total: result.total } : {}),
+      },
+    };
   });
 }
 

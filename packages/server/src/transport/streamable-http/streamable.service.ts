@@ -22,6 +22,8 @@ import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { TaskManager } from '../../task/task.manager';
 import {
   registerHandlers,
   registerPromptOnServer,
@@ -60,6 +62,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
     @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
+    @Optional() private readonly taskManager?: TaskManager,
   ) {
     this.subscribeToRegistryEvents();
   }
@@ -191,7 +194,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     label: string,
     req?: unknown,
   ): McpServer {
-    const server = createMcpServer(this.registry, this.options);
+    const server = createMcpServer(this.registry, this.options, this.taskManager);
     const ctx = this.contextFactory.createContext({
       sessionId: label,
       transport: McpTransportType.STREAMABLE_HTTP,
@@ -288,6 +291,7 @@ export class StreamableHttpService implements OnModuleDestroy {
 
   private async cleanupSession(sessionId: string): Promise<void> {
     this.subscriptionManager?.removeSession(sessionId);
+    this.taskManager?.removeSession(sessionId);
 
     const transport = this.transports.get(sessionId);
     const server = this.servers.get(sessionId);

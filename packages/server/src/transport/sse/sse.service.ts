@@ -24,6 +24,8 @@ import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { TaskManager } from '../../task/task.manager';
 import type { HttpResponse } from '../http-response.interface';
 import {
   registerHandlers,
@@ -52,6 +54,7 @@ export class SseService implements OnModuleDestroy {
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
     @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
+    @Optional() private readonly taskManager?: TaskManager,
   ) {
     this.subscribeToRegistryEvents();
   }
@@ -63,7 +66,7 @@ export class SseService implements OnModuleDestroy {
     const transport = new SSEServerTransport(messagesEndpoint, res as unknown as ServerResponse);
     const sessionId = transport.sessionId;
 
-    const server = createMcpServer(this.registry, this.options);
+    const server = createMcpServer(this.registry, this.options, this.taskManager);
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.SSE,
@@ -204,6 +207,7 @@ export class SseService implements OnModuleDestroy {
 
   private async cleanupSession(sessionId: string): Promise<void> {
     this.subscriptionManager?.removeSession(sessionId);
+    this.taskManager?.removeSession(sessionId);
 
     const pingInterval = this.pingIntervals.get(sessionId);
     if (pingInterval) {

@@ -1,6 +1,8 @@
 import 'reflect-metadata';
+import { z } from 'zod';
 import {
   CircuitBreaker,
+  Completion,
   Guards,
   Prompt,
   Public,
@@ -93,6 +95,27 @@ class DuplicateTools {
   @Tool({ name: 'dup', description: 'second' })
   second() {
     return 'second';
+  }
+}
+
+class TestCompletionProvider {
+  @Prompt({
+    name: 'code_review',
+    description: 'Code review prompt',
+    parameters: z.object({ language: z.string() }),
+  })
+  codeReview() {
+    return { messages: [] };
+  }
+
+  @Completion({ refType: 'ref/prompt', refName: 'code_review' })
+  completeCodeReview() {
+    return { values: ['typescript', 'javascript'] };
+  }
+
+  @Completion({ refType: 'ref/resource', refName: 'file:///{path}' })
+  completeFilePath() {
+    return { values: ['/src', '/lib'] };
   }
 }
 
@@ -531,6 +554,43 @@ describe('McpRegistryService', () => {
       registry.unregisterPrompt('nonexistent');
 
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completion handlers', () => {
+    it('scans @Completion methods and registers them', () => {
+      const instance = new TestCompletionProvider();
+      registry.registerProvider(instance);
+
+      const promptHandler = registry.getCompletionHandler('ref/prompt', 'code_review');
+      expect(promptHandler).toBeDefined();
+      expect(promptHandler?.refType).toBe('ref/prompt');
+      expect(promptHandler?.refName).toBe('code_review');
+      expect(promptHandler?.methodName).toBe('completeCodeReview');
+      expect(promptHandler?.instance).toBe(instance);
+    });
+
+    it('scans @Completion methods for resources', () => {
+      const instance = new TestCompletionProvider();
+      registry.registerProvider(instance);
+
+      const resourceHandler = registry.getCompletionHandler('ref/resource', 'file:///{path}');
+      expect(resourceHandler).toBeDefined();
+      expect(resourceHandler?.refType).toBe('ref/resource');
+      expect(resourceHandler?.refName).toBe('file:///{path}');
+      expect(resourceHandler?.methodName).toBe('completeFilePath');
+    });
+
+    it('returns undefined for unregistered completion handler', () => {
+      expect(registry.getCompletionHandler('ref/prompt', 'nonexistent')).toBeUndefined();
+    });
+
+    it('returns all completion handlers', () => {
+      const instance = new TestCompletionProvider();
+      registry.registerProvider(instance);
+
+      const handlers = registry.getAllCompletionHandlers();
+      expect(handlers).toHaveLength(2);
     });
   });
 

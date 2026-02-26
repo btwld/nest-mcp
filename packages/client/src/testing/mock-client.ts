@@ -12,9 +12,13 @@ import type {
   ListResourcesResult,
   ListToolsRequest,
   ListToolsResult,
+  Prompt,
   ReadResourceRequest,
   ReadResourceResult,
+  Resource,
+  ResourceTemplate,
   ServerCapabilities,
+  Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 
 type PingResult = Awaited<ReturnType<Client['ping']>>;
@@ -87,6 +91,22 @@ export class MockMcpClient {
     _options?: RequestOptions,
   ): Promise<ListPromptsResult> {
     return this._listPromptsResult;
+  }
+
+  async listAllTools(_options?: RequestOptions): Promise<Tool[]> {
+    return (this._listToolsResult.tools ?? []) as Tool[];
+  }
+
+  async listAllResources(_options?: RequestOptions): Promise<Resource[]> {
+    return (this._listResourcesResult.resources ?? []) as Resource[];
+  }
+
+  async listAllResourceTemplates(_options?: RequestOptions): Promise<ResourceTemplate[]> {
+    return [];
+  }
+
+  async listAllPrompts(_options?: RequestOptions): Promise<Prompt[]> {
+    return (this._listPromptsResult.prompts ?? []) as Prompt[];
   }
 
   async ping(_options?: RequestOptions): Promise<PingResult> {

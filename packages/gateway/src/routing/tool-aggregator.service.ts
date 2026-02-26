@@ -1,3 +1,4 @@
+import { drainAllPages } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
@@ -53,10 +54,13 @@ export class ToolAggregatorService {
     }
 
     try {
-      const result = await client.listTools();
       const prefix = this.router.getPrefixForUpstream(upstreamName);
+      const allTools = await drainAllPages(async (cursor) => {
+        const result = await client.listTools(cursor ? { cursor } : undefined);
+        return { data: result.tools ?? [], nextCursor: result.nextCursor };
+      });
 
-      return (result.tools ?? []).map((tool) => ({
+      return allTools.map((tool) => ({
         name: prefix ? this.router.buildPrefixedName(prefix, tool.name) : tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema as ToolInputSchema,

@@ -47,11 +47,17 @@ export interface McpModuleOptions {
     cleanupInterval?: number;
   };
 
+  // Pagination
+  pagination?: {
+    defaultPageSize?: number;
+  };
+
   // Capabilities
   capabilities?: {
     tools?: { listChanged?: boolean };
     resources?: { subscribe?: boolean; listChanged?: boolean };
     prompts?: { listChanged?: boolean };
+    tasks?: { enabled?: boolean };
   };
 }
 

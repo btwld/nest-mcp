@@ -1,5 +1,6 @@
 import 'reflect-metadata';
-import { ToolExecutionError, ValidationError } from '@btwld/mcp-common';
+import { McpTransportType, ToolExecutionError, ValidationError } from '@btwld/mcp-common';
+import type { McpModuleOptions } from '@btwld/mcp-common';
 import { z } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type {
@@ -11,6 +12,12 @@ import type {
 import { mockMcpContext } from '../testing/mock-context';
 import { McpExecutorService } from './executor.service';
 
+const defaultOptions: McpModuleOptions = {
+  name: 'test',
+  version: '1.0.0',
+  transport: McpTransportType.STDIO,
+};
+
 describe('McpExecutorService', () => {
   let registry: McpRegistryService;
   let executor: McpExecutorService;
@@ -18,7 +25,7 @@ describe('McpExecutorService', () => {
 
   beforeEach(() => {
     registry = new McpRegistryService();
-    executor = new McpExecutorService(registry);
+    executor = new McpExecutorService(registry, defaultOptions);
     ctx = mockMcpContext();
   });
 
@@ -451,6 +458,167 @@ describe('McpExecutorService', () => {
       await expect(executor.getPrompt('bad', {}, ctx)).rejects.toThrow(
         'Prompt handler must return { messages: [...] }',
       );
+    });
+  });
+
+  // --- complete ---
+
+  describe('complete', () => {
+    it('calls custom handler when one is registered', async () => {
+      const handler = vi.fn().mockResolvedValue({ values: ['ts', 'js'] });
+      // Manually set up a completion handler via private map
+      (registry as unknown as { completionHandlers: Map<string, unknown> }).completionHandlers.set(
+        'prompt::code_review',
+        {
+          refType: 'ref/prompt',
+          refName: 'code_review',
+          methodName: 'complete',
+          instance: { complete: handler },
+        },
+      );
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'code_review' },
+        argument: { name: 'language', value: 'ty' },
+      });
+
+      expect(handler).toHaveBeenCalledWith('language', 'ty', undefined);
+      expect(result.values).toEqual(['ts', 'js']);
+    });
+
+    it('falls back to default prompt completion with enum values', async () => {
+      const schema = z.object({
+        language: z.enum(['typescript', 'javascript', 'python', 'ruby']),
+      });
+      registry.registerPrompt({
+        name: 'review',
+        description: 'Review',
+        methodName: 'review',
+        target: Object,
+        instance: { review: vi.fn() },
+        parameters: schema,
+      } as RegisteredPrompt);
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'review' },
+        argument: { name: 'language', value: 'type' },
+      });
+
+      expect(result.values).toEqual(['typescript']);
+    });
+
+    it('returns empty for non-enum prompt fields', async () => {
+      const schema = z.object({ name: z.string() });
+      registry.registerPrompt({
+        name: 'greet',
+        description: 'Greet',
+        methodName: 'greet',
+        target: Object,
+        instance: { greet: vi.fn() },
+        parameters: schema,
+      } as RegisteredPrompt);
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'greet' },
+        argument: { name: 'name', value: 'Jo' },
+      });
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('returns empty for unknown prompt', async () => {
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'nonexistent' },
+        argument: { name: 'arg', value: 'val' },
+      });
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('returns empty for resource completion without custom handler', async () => {
+      const result = await executor.complete({
+        ref: { type: 'ref/resource', uri: 'file:///{path}' },
+        argument: { name: 'path', value: '/sr' },
+      });
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('caps values at 100 and sets hasMore', async () => {
+      const manyValues = Array.from({ length: 150 }, (_, i) => `val${i}`);
+      const handler = vi.fn().mockResolvedValue({ values: manyValues });
+      (registry as unknown as { completionHandlers: Map<string, unknown> }).completionHandlers.set(
+        'prompt::big',
+        {
+          refType: 'ref/prompt',
+          refName: 'big',
+          methodName: 'complete',
+          instance: { complete: handler },
+        },
+      );
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'big' },
+        argument: { name: 'arg', value: '' },
+      });
+
+      expect(result.values).toHaveLength(100);
+      expect(result.hasMore).toBe(true);
+      expect(result.total).toBe(150);
+    });
+
+    it('normalizes non-object result to empty', async () => {
+      const handler = vi.fn().mockResolvedValue('bad');
+      (registry as unknown as { completionHandlers: Map<string, unknown> }).completionHandlers.set(
+        'prompt::bad',
+        {
+          refType: 'ref/prompt',
+          refName: 'bad',
+          methodName: 'complete',
+          instance: { complete: handler },
+        },
+      );
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'bad' },
+        argument: { name: 'arg', value: '' },
+      });
+
+      expect(result.values).toEqual([]);
+    });
+  });
+
+  // --- configurable page size ---
+
+  describe('pagination configuration', () => {
+    it('uses custom page size from options', async () => {
+      const customRegistry = new McpRegistryService();
+      const customExecutor = new McpExecutorService(customRegistry, {
+        ...defaultOptions,
+        pagination: { defaultPageSize: 2 },
+      });
+
+      for (let i = 0; i < 5; i++) {
+        customRegistry.registerTool({
+          name: `tool${i}`,
+          description: `Tool ${i}`,
+          methodName: `tool${i}`,
+          target: Object,
+          instance: { [`tool${i}`]: vi.fn() },
+        } as RegisteredTool);
+      }
+
+      const first = await customExecutor.listTools();
+      expect(first.items).toHaveLength(2);
+      expect(first.nextCursor).toBeDefined();
+
+      const second = await customExecutor.listTools(first.nextCursor);
+      expect(second.items).toHaveLength(2);
+      expect(second.nextCursor).toBeDefined();
+
+      const third = await customExecutor.listTools(second.nextCursor);
+      expect(third.items).toHaveLength(1);
+      expect(third.nextCursor).toBeUndefined();
     });
   });
 });

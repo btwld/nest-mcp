@@ -42,6 +42,9 @@ import { SessionManager } from './session/session.manager';
 // Subscription
 import { ResourceSubscriptionManager } from './subscription/resource-subscription.manager';
 
+// Tasks
+import { TaskManager } from './task/task.manager';
+
 import { McpPromptBuilder } from './dynamic/prompt-builder.service';
 import { McpResourceBuilder } from './dynamic/resource-builder.service';
 // Dynamic
@@ -84,6 +87,7 @@ export class McpModule {
       McpPromptBuilder,
       MetricsService,
       ResourceSubscriptionManager,
+      TaskManager,
     ];
 
     // Streamable HTTP transport
@@ -122,6 +126,7 @@ export class McpModule {
         MetricsService,
         SessionManager,
         ResourceSubscriptionManager,
+        TaskManager,
         MCP_OPTIONS,
       ],
     };
@@ -151,6 +156,7 @@ export class McpModule {
       McpPromptBuilder,
       MetricsService,
       ResourceSubscriptionManager,
+      TaskManager,
     ];
 
     // Streamable HTTP transport
@@ -190,6 +196,7 @@ export class McpModule {
         MetricsService,
         SessionManager,
         ResourceSubscriptionManager,
+        TaskManager,
         MCP_OPTIONS,
       ],
     };

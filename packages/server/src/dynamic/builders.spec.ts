@@ -1,10 +1,18 @@
 import 'reflect-metadata';
+import { McpTransportType } from '@btwld/mcp-common';
+import type { McpModuleOptions } from '@btwld/mcp-common';
 import { McpRegistryService } from '../discovery/registry.service';
 import { McpExecutorService } from '../execution/executor.service';
 import { mockMcpContext } from '../testing/mock-context';
 import { McpPromptBuilder } from './prompt-builder.service';
 import { McpResourceBuilder } from './resource-builder.service';
 import { McpToolBuilder } from './tool-builder.service';
+
+const defaultOptions: McpModuleOptions = {
+  name: 'test',
+  version: '1.0.0',
+  transport: McpTransportType.STDIO,
+};
 
 describe('Dynamic Builders', () => {
   let registry: McpRegistryService;
@@ -186,7 +194,7 @@ describe('Dynamic Builders', () => {
   describe('Integration: builder -> executor', () => {
     it('callTool works with dynamically registered tool', async () => {
       const toolBuilder = new McpToolBuilder(registry);
-      const executor = new McpExecutorService(registry);
+      const executor = new McpExecutorService(registry, defaultOptions);
       const ctx = mockMcpContext();
 
       toolBuilder.register({
@@ -201,7 +209,7 @@ describe('Dynamic Builders', () => {
 
     it('readResource works with dynamically registered resource', async () => {
       const resourceBuilder = new McpResourceBuilder(registry);
-      const executor = new McpExecutorService(registry);
+      const executor = new McpExecutorService(registry, defaultOptions);
       const ctx = mockMcpContext();
 
       resourceBuilder.register({
@@ -216,7 +224,7 @@ describe('Dynamic Builders', () => {
 
     it('getPrompt works with dynamically registered prompt', async () => {
       const promptBuilder = new McpPromptBuilder(registry);
-      const executor = new McpExecutorService(registry);
+      const executor = new McpExecutorService(registry, defaultOptions);
       const ctx = mockMcpContext();
 
       promptBuilder.register({

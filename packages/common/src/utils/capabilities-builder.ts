@@ -36,8 +36,22 @@ export function buildServerCapabilities(
     };
   }
 
+  // Enable completions when there are prompts or resource templates to complete
+  if (registry.hasPrompts || registry.hasResourceTemplates || options.capabilities?.prompts || options.capabilities?.resources) {
+    capabilities.completions = {};
+  }
+
   // Always enable logging
   capabilities.logging = {};
+
+  // Tasks (opt-in)
+  if (options.capabilities?.tasks?.enabled) {
+    capabilities.tasks = {
+      list: {},
+      cancel: {},
+      requests: { tools: { call: {} } },
+    };
+  }
 
   return capabilities;
 }

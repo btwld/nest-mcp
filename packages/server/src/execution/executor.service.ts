@@ -1,5 +1,9 @@
 import {
+  MCP_OPTIONS,
+  type CompletionRequest,
+  type CompletionResult,
   type McpExecutionContext,
+  type McpModuleOptions,
   type PaginatedResult,
   type PromptGetResult,
   type ResourceReadResult,
@@ -11,7 +15,7 @@ import {
   paginate,
   zodToJsonSchema,
 } from '@btwld/mcp-common';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
@@ -20,8 +24,14 @@ import type { RegisteredTool } from '../discovery/registry.service';
 @Injectable()
 export class McpExecutorService {
   private readonly logger = new Logger(McpExecutorService.name);
+  private readonly pageSize: number | undefined;
 
-  constructor(private readonly registry: McpRegistryService) {}
+  constructor(
+    private readonly registry: McpRegistryService,
+    @Inject(MCP_OPTIONS) options: McpModuleOptions,
+  ) {
+    this.pageSize = options.pagination?.defaultPageSize;
+  }
 
   // ---- Tools ----
 
@@ -33,7 +43,7 @@ export class McpExecutorService {
       ...(tool.outputSchema ? { outputSchema: zodToJsonSchema(tool.outputSchema) } : {}),
       ...(tool.annotations ? { annotations: tool.annotations } : {}),
     }));
-    return paginate(all, cursor);
+    return paginate(all, cursor, this.pageSize);
   }
 
   async callTool(
@@ -117,7 +127,7 @@ export class McpExecutorService {
       ...(r.description ? { description: r.description } : {}),
       ...(r.mimeType ? { mimeType: r.mimeType } : {}),
     }));
-    return paginate(all, cursor);
+    return paginate(all, cursor, this.pageSize);
   }
 
   async listResourceTemplates(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
@@ -127,7 +137,7 @@ export class McpExecutorService {
       ...(t.description ? { description: t.description } : {}),
       ...(t.mimeType ? { mimeType: t.mimeType } : {}),
     }));
-    return paginate(all, cursor);
+    return paginate(all, cursor, this.pageSize);
   }
 
   async readResource(uri: string, ctx: McpExecutionContext): Promise<ResourceReadResult> {
@@ -186,7 +196,7 @@ export class McpExecutorService {
           }
         : {}),
     }));
-    return paginate(all, cursor);
+    return paginate(all, cursor, this.pageSize);
   }
 
   async getPrompt(
@@ -213,5 +223,91 @@ export class McpExecutorService {
     }
 
     throw new ToolExecutionError('prompts/get', 'Prompt handler must return { messages: [...] }');
+  }
+
+  // ---- Completions ----
+
+  async complete(
+    request: CompletionRequest,
+  ): Promise<CompletionResult> {
+    const refName = request.ref.type === 'ref/prompt' ? request.ref.name : request.ref.uri;
+    const handler = this.registry.getCompletionHandler(request.ref.type, refName);
+
+    if (handler) {
+      const fn = handler.instance[handler.methodName] as
+        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+        Function;
+      const result = await fn(request.argument.name, request.argument.value, request.context);
+      return this.normalizeCompletionResult(result);
+    }
+
+    return this.defaultComplete(request);
+  }
+
+  private defaultComplete(request: CompletionRequest): CompletionResult {
+    const empty: CompletionResult = { values: [] };
+
+    if (request.ref.type === 'ref/prompt') {
+      return this.defaultPromptComplete(request.ref.name, request.argument);
+    }
+
+    if (request.ref.type === 'ref/resource') {
+      return this.defaultResourceComplete(request.ref.uri, request.argument);
+    }
+
+    return empty;
+  }
+
+  private defaultPromptComplete(
+    promptName: string,
+    argument: { name: string; value: string },
+  ): CompletionResult {
+    const prompt = this.registry.getPrompt(promptName);
+    if (!prompt?.parameters) return { values: [] };
+
+    const def = (prompt.parameters as unknown as { _def?: { shape?: () => Record<string, { _def?: { typeName?: string; values?: string[] } }> } })?._def;
+    const shape = def?.shape?.();
+    if (!shape) return { values: [] };
+
+    const field = shape[argument.name];
+    if (!field?._def) return { values: [] };
+
+    // Support ZodEnum fields: filter values by prefix
+    if (field._def.typeName === 'ZodEnum' && Array.isArray(field._def.values)) {
+      const prefix = argument.value.toLowerCase();
+      const filtered = (field._def.values as string[]).filter(
+        (v) => v.toLowerCase().startsWith(prefix),
+      );
+      return this.normalizeCompletionResult({ values: filtered });
+    }
+
+    return { values: [] };
+  }
+
+  private defaultResourceComplete(
+    _uri: string,
+    _argument: { name: string; value: string },
+  ): CompletionResult {
+    // Resource template completion requires domain-specific knowledge.
+    // Without a custom handler, return empty results.
+    return { values: [] };
+  }
+
+  private normalizeCompletionResult(result: unknown): CompletionResult {
+    if (!result || typeof result !== 'object') return { values: [] };
+
+    const r = result as { values?: unknown[]; hasMore?: boolean; total?: number };
+    if (!Array.isArray(r.values)) return { values: [] };
+
+    const MAX_COMPLETION_VALUES = 100;
+    const allValues = r.values.map(String);
+    const truncated = allValues.length > MAX_COMPLETION_VALUES;
+    const values = truncated ? allValues.slice(0, MAX_COMPLETION_VALUES) : allValues;
+
+    return {
+      values,
+      ...(truncated || r.hasMore ? { hasMore: true } : {}),
+      ...(r.total != null ? { total: r.total } : truncated ? { total: allValues.length } : {}),
+    };
   }
 }

@@ -17,6 +17,7 @@ export * from './interfaces/mcp-auth.interface';
 export * from './interfaces/mcp-resilience.interface';
 export * from './interfaces/mcp-middleware.interface';
 export * from './interfaces/http-adapter.interface';
+export * from './interfaces/mcp-completion.interface';
 
 // Types
 export * from './types/json-rpc.types';
@@ -38,6 +39,7 @@ export * from './utils/uri-template';
 export * from './utils/capabilities-builder';
 export * from './utils/duration';
 export { paginate, type PaginatedResult } from './utils/paginator';
+export { drainAllPages } from './utils/drain-pages';
 
 // Decorators
 export * from './decorators/metadata.utils';

@@ -4,10 +4,12 @@ import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '@nestjs/common';
 import type { McpRegistryService } from '../discovery/registry.service';
+import type { TaskManager } from '../task/task.manager';
 
 export function createMcpServer(
   registry: McpRegistryService,
   options: McpModuleOptions,
+  taskManager?: TaskManager,
 ): McpServer {
   const logger = new Logger('McpServerFactory');
 
@@ -25,7 +27,13 @@ export function createMcpServer(
     {
       capabilities: capabilities as ServerOptions['capabilities'],
       ...(options.description ? { instructions: options.description } : {}),
-    },
+      ...(taskManager
+        ? {
+            taskStore: taskManager.store,
+            taskMessageQueue: taskManager.queue,
+          }
+        : {}),
+    } as ServerOptions,
   );
 
   return mcpServer;

@@ -11,5 +11,6 @@ export const MCP_RATE_LIMIT_METADATA = Symbol('mcp:rate-limit');
 export const MCP_RETRY_METADATA = Symbol('mcp:retry');
 export const MCP_CIRCUIT_BREAKER_METADATA = Symbol('mcp:circuit-breaker');
 export const MCP_TIMEOUT_METADATA = Symbol('mcp:timeout');
+export const MCP_COMPLETION_METADATA = Symbol('mcp:completion');
 export const MCP_MODULE_OPTIONS = Symbol('mcp:module-options');
 export const MCP_MODULE_ID = Symbol('mcp:module-id');

@@ -9,6 +9,7 @@ export {
   Resource,
   ResourceTemplate,
   Prompt,
+  Completion,
   Public,
   Scopes,
   Roles,
@@ -27,7 +28,9 @@ export type {
   RegisteredResource,
   RegisteredResourceTemplate,
   RegisteredPrompt,
+  RegisteredCompletion,
 } from './discovery/registry.service';
+export type { CompletionOptions, CompletionMetadata } from './decorators/completion.decorator';
 
 // Execution
 export { McpExecutorService } from './execution/executor.service';
@@ -75,6 +78,9 @@ export { SessionManager } from './session/session.manager';
 export { ResourceSubscriptionManager } from './subscription/resource-subscription.manager';
 export type { McpSession } from './session/session.manager';
 
+// Tasks
+export { TaskManager } from './task/task.manager';
+
 // Dynamic builders
 export { McpToolBuilder } from './dynamic/tool-builder.service';
 export type { DynamicToolConfig } from './dynamic/tool-builder.service';
@@ -112,6 +118,9 @@ export type {
   McpGuard,
   McpGuardContext,
   AuthenticatedUser,
+  CompletionRequest,
+  CompletionResult,
+  CompletionHandler,
 } from '@btwld/mcp-common';
 
 export { McpTransportType } from '@btwld/mcp-common';

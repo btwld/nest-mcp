@@ -1,3 +1,4 @@
+import { drainAllPages } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
@@ -47,10 +48,13 @@ export class ResourceAggregatorService {
     }
 
     try {
-      const result = await client.listResources();
       const prefix = this.router.getPrefixForUpstream(upstreamName);
+      const allResources = await drainAllPages(async (cursor) => {
+        const result = await client.listResources(cursor ? { cursor } : undefined);
+        return { data: result.resources ?? [], nextCursor: result.nextCursor };
+      });
 
-      return (result.resources ?? []).map((resource) => ({
+      return allResources.map((resource) => ({
         uri: prefix ? `${prefix}://${resource.uri}` : resource.uri,
         name: resource.name ?? resource.uri,
         description: resource.description,

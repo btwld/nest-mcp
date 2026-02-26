@@ -1,3 +1,4 @@
+import { drainAllPages } from '@btwld/mcp-common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -10,8 +11,12 @@ import type {
   ListResourceTemplatesRequest,
   ListToolsRequest,
   LoggingLevel,
+  Prompt,
   ReadResourceRequest,
+  Resource,
+  ResourceTemplate,
   SubscribeRequest,
+  Tool,
   UnsubscribeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
@@ -116,6 +121,44 @@ export class McpClient {
   async listPrompts(params?: ListPromptsRequest['params'], options?: RequestOptions) {
     this.assertConnected();
     return this.client.listPrompts(params, options);
+  }
+
+  async listAllTools(options?: RequestOptions): Promise<Tool[]> {
+    this.assertConnected();
+    return drainAllPages(async (cursor) => {
+      const result = await this.client.listTools(cursor ? { cursor } : undefined, options);
+      return { data: (result.tools ?? []) as Tool[], nextCursor: result.nextCursor };
+    });
+  }
+
+  async listAllResources(options?: RequestOptions): Promise<Resource[]> {
+    this.assertConnected();
+    return drainAllPages(async (cursor) => {
+      const result = await this.client.listResources(cursor ? { cursor } : undefined, options);
+      return { data: (result.resources ?? []) as Resource[], nextCursor: result.nextCursor };
+    });
+  }
+
+  async listAllResourceTemplates(options?: RequestOptions): Promise<ResourceTemplate[]> {
+    this.assertConnected();
+    return drainAllPages(async (cursor) => {
+      const result = await this.client.listResourceTemplates(
+        cursor ? { cursor } : undefined,
+        options,
+      );
+      return {
+        data: (result.resourceTemplates ?? []) as ResourceTemplate[],
+        nextCursor: result.nextCursor,
+      };
+    });
+  }
+
+  async listAllPrompts(options?: RequestOptions): Promise<Prompt[]> {
+    this.assertConnected();
+    return drainAllPages(async (cursor) => {
+      const result = await this.client.listPrompts(cursor ? { cursor } : undefined, options);
+      return { data: (result.prompts ?? []) as Prompt[], nextCursor: result.nextCursor };
+    });
   }
 
   async ping(options?: RequestOptions) {

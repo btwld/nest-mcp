@@ -507,4 +507,23 @@ describe('ExecutionPipelineService', () => {
       expect(result).toBe(expected);
     });
   });
+
+  // --- complete ---
+
+  describe('complete', () => {
+    it('delegates to executor.complete', async () => {
+      const expected = { values: ['a', 'b'] };
+      executor.complete = vi.fn().mockResolvedValue(expected);
+
+      const request = {
+        ref: { type: 'ref/prompt' as const, name: 'test' },
+        argument: { name: 'arg', value: 'a' },
+      };
+
+      const result = await pipeline.complete(request);
+
+      expect(result).toBe(expected);
+      expect(executor.complete).toHaveBeenCalledWith(request);
+    });
+  });
 });
