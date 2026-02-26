@@ -11,6 +11,8 @@ export interface DynamicToolConfig {
   parameters?: ZodType;
   inputSchema?: Record<string, unknown>;
   outputSchema?: ZodType;
+  /** Raw JSON schema for output — used when no Zod outputSchema is available (e.g. gateway-proxied tools). */
+  rawOutputSchema?: Record<string, unknown>;
   annotations?: ToolAnnotations;
   handler: (
     args: Record<string, unknown>,
@@ -38,6 +40,7 @@ export class McpToolBuilder {
       parameters: config.parameters,
       inputSchema: config.inputSchema,
       outputSchema: config.outputSchema,
+      rawOutputSchema: config.rawOutputSchema,
       annotations: config.annotations,
       methodName: config.name,
       target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,

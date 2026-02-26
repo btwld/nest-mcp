@@ -39,8 +39,14 @@ export class McpExecutorService {
     const all = this.registry.getAllTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.parameters ? zodToJsonSchema(tool.parameters) : { type: 'object' },
-      ...(tool.outputSchema ? { outputSchema: zodToJsonSchema(tool.outputSchema) } : {}),
+      inputSchema: tool.parameters
+        ? zodToJsonSchema(tool.parameters)
+        : (tool.inputSchema ?? { type: 'object' }),
+      ...(tool.outputSchema
+        ? { outputSchema: zodToJsonSchema(tool.outputSchema) }
+        : tool.rawOutputSchema
+          ? { outputSchema: tool.rawOutputSchema }
+          : {}),
       ...(tool.annotations ? { annotations: tool.annotations } : {}),
     }));
     return paginate(all, cursor, this.pageSize);

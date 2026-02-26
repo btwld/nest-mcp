@@ -1,3 +1,4 @@
+import type { ToolAnnotations } from '@btwld/mcp-common';
 import { drainAllPages } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -18,6 +19,8 @@ export interface AggregatedTool {
   name: string;
   description?: string;
   inputSchema: ToolInputSchema;
+  outputSchema?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
   upstreamName: string;
   originalName: string;
 }
@@ -64,6 +67,8 @@ export class ToolAggregatorService {
         name: prefix ? this.router.buildPrefixedName(prefix, tool.name) : tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema as ToolInputSchema,
+        ...(tool.outputSchema ? { outputSchema: tool.outputSchema as Record<string, unknown> } : {}),
+        ...(tool.annotations ? { annotations: tool.annotations as ToolAnnotations } : {}),
         upstreamName,
         originalName: tool.name,
       }));

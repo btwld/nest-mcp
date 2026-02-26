@@ -227,6 +227,8 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         name: tool.name,
         description: tool.description ?? `Proxied tool from ${tool.upstreamName}`,
         inputSchema: tool.inputSchema,
+        rawOutputSchema: tool.outputSchema,
+        annotations: tool.annotations,
         handler: async (args: Record<string, unknown>) => {
           const result = await this.gatewayService.callTool(tool.name, args);
           return {

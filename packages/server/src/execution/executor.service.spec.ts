@@ -52,7 +52,7 @@ describe('McpExecutorService', () => {
       );
     });
 
-    it('defaults to { type: "object" } when no parameters', async () => {
+    it('defaults to { type: "object" } when no parameters or inputSchema', async () => {
       registry.registerTool({
         name: 'noop',
         description: 'No params',
@@ -63,6 +63,21 @@ describe('McpExecutorService', () => {
 
       const result = await executor.listTools();
       expect(result.items[0].inputSchema).toEqual({ type: 'object' });
+    });
+
+    it('uses raw inputSchema when no Zod parameters are present', async () => {
+      const rawInput = { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] };
+      registry.registerTool({
+        name: 'proxied',
+        description: 'Gateway proxied tool',
+        methodName: 'proxied',
+        target: Object,
+        instance: { proxied: vi.fn() },
+        inputSchema: rawInput,
+      } as unknown as RegisteredTool);
+
+      const result = await executor.listTools();
+      expect(result.items[0].inputSchema).toEqual(rawInput);
     });
 
     it('includes outputSchema when present', async () => {
@@ -78,6 +93,25 @@ describe('McpExecutorService', () => {
 
       const result = await executor.listTools();
       expect(result.items[0].outputSchema).toBeDefined();
+    });
+
+    it('includes rawOutputSchema when no Zod outputSchema is present', async () => {
+      const rawOutput = {
+        type: 'object',
+        properties: { count: { type: 'number' } },
+        required: ['count'],
+      };
+      registry.registerTool({
+        name: 'proxied-output',
+        description: 'Gateway proxied with output schema',
+        methodName: 'proxied-output',
+        target: Object,
+        instance: { 'proxied-output': vi.fn() },
+        rawOutputSchema: rawOutput,
+      } as unknown as RegisteredTool);
+
+      const result = await executor.listTools();
+      expect(result.items[0].outputSchema).toEqual(rawOutput);
     });
 
     it('includes annotations when present', async () => {

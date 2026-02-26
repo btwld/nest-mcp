@@ -62,6 +62,53 @@ describe('ToolAggregatorService', () => {
       });
     });
 
+    it('should preserve outputSchema and annotations from upstream tools', async () => {
+      const outputSchema = {
+        type: 'object',
+        properties: { count: { type: 'number' } },
+        required: ['count'],
+      };
+      const annotations = { readOnlyHint: true, idempotentHint: true };
+
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'getCount',
+              description: 'Get count',
+              inputSchema: { type: 'object' },
+              outputSchema,
+              annotations,
+            },
+          ],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const tools = await service.aggregateAll();
+
+      expect(tools[0].outputSchema).toEqual(outputSchema);
+      expect(tools[0].annotations).toEqual(annotations);
+    });
+
+    it('should omit outputSchema and annotations when not present in upstream tool', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({
+        listTools: vi.fn().mockResolvedValue({
+          tools: [{ name: 'simple', inputSchema: { type: 'object' } }],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const tools = await service.aggregateAll();
+
+      expect(tools[0]).not.toHaveProperty('outputSchema');
+      expect(tools[0]).not.toHaveProperty('annotations');
+    });
+
     it('should use raw tool name when no prefix exists', async () => {
       upstreamManager.getAllNames.mockReturnValue(['github']);
       upstreamManager.getClient.mockReturnValue({

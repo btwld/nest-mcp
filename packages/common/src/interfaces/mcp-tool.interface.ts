@@ -29,6 +29,8 @@ export interface ToolMetadata {
   parameters?: ZodType;
   inputSchema?: Record<string, unknown>;
   outputSchema?: ZodType;
+  /** Raw JSON schema for output — used when no Zod outputSchema is available (e.g. gateway-proxied tools). */
+  rawOutputSchema?: Record<string, unknown>;
   annotations?: ToolAnnotations;
   // Auth
   isPublic?: boolean;
