@@ -118,11 +118,7 @@ describe('Resilience decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_TIMEOUT_METADATA,
-        TestService.prototype,
-        'slowMethod',
-      );
+      const value = Reflect.getMetadata(MCP_TIMEOUT_METADATA, TestService.prototype, 'slowMethod');
 
       expect(value).toBe(5000);
     });

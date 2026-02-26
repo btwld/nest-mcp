@@ -23,17 +23,14 @@ export class ResponseTransformService {
   }
 
   async apply(initial: ToolCallResponse): Promise<ToolCallResponse> {
-    return this.transforms.reduce<Promise<ToolCallResponse>>(
-      async (acc, transform) => {
-        const current = await acc;
-        try {
-          return await transform(current);
-        } catch (error) {
-          this.logger.error(`Response transform failed: ${extractErrorMessage(error)}`);
-          throw error;
-        }
-      },
-      Promise.resolve(initial),
-    );
+    return this.transforms.reduce<Promise<ToolCallResponse>>(async (acc, transform) => {
+      const current = await acc;
+      try {
+        return await transform(current);
+      } catch (error) {
+        this.logger.error(`Response transform failed: ${extractErrorMessage(error)}`);
+        throw error;
+      }
+    }, Promise.resolve(initial));
   }
 }

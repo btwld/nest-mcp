@@ -35,7 +35,10 @@ export class RetryService {
     throw lastError;
   }
 
-  private static readonly DELAY_STRATEGIES: Record<string, (attempt: number, initialDelay: number, maxDelay: number) => number> = {
+  private static readonly DELAY_STRATEGIES: Record<
+    string,
+    (attempt: number, initialDelay: number, maxDelay: number) => number
+  > = {
     exponential: (a, i, m) => Math.random() * Math.min(m, i * 2 ** (a - 1)),
     linear: (a, i) => i * a,
   };

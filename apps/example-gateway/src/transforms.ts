@@ -36,16 +36,10 @@ export class TransformService implements OnModuleInit {
       );
 
       // Enrich JSON text content with _gateway metadata
-      const enrichedContent = response.content.map((item: unknown) => {
-        if (
-          typeof item === 'object' &&
-          item !== null &&
-          'type' in item &&
-          (item as Record<string, unknown>).type === 'text'
-        ) {
-          const textItem = item as { type: string; text: string };
+      const enrichedContent = response.content.map((item) => {
+        if (item.type === 'text') {
           try {
-            const parsed = JSON.parse(textItem.text);
+            const parsed = JSON.parse(item.text);
             const enriched = {
               ...parsed,
               _gateway: {
@@ -55,7 +49,7 @@ export class TransformService implements OnModuleInit {
                 cached: false,
               },
             };
-            return { ...textItem, text: JSON.stringify(enriched) };
+            return { ...item, text: JSON.stringify(enriched) };
           } catch {
             // Not JSON, return as-is
             return item;

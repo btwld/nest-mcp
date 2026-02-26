@@ -34,7 +34,10 @@ export function createOAuthController(basePath: string): Type<unknown> {
   @Controller(basePath)
   @UseGuards(AuthRateLimitGuard)
   class OAuthController {
-    private readonly grantHandlers = new Map<string, (body: Record<string, unknown>) => Promise<TokenResponse>>([
+    private readonly grantHandlers = new Map<
+      string,
+      (body: Record<string, unknown>) => Promise<TokenResponse>
+    >([
       ['authorization_code', (body) => this.handleAuthorizationCode(body)],
       ['refresh_token', (body) => this.handleRefreshToken(body)],
     ]);

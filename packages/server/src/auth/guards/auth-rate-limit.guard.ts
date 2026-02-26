@@ -1,3 +1,4 @@
+import { parseDurationMs } from '@btwld/mcp-common';
 import {
   type CanActivate,
   type ExecutionContext,
@@ -8,7 +9,6 @@ import {
   type OnModuleDestroy,
   Optional,
 } from '@nestjs/common';
-import { parseDurationMs } from '@btwld/mcp-common';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { AuthAuditService } from '../services/auth-audit.service';
 import { MCP_AUTH_OPTIONS } from '../services/jwt-token.service';

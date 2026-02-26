@@ -8,9 +8,9 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResponseCacheService } from './cache/response-cache.service';
-import type { PolicyEffect } from './policies/policy.interface';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService } from './policies/policy-engine.service';
+import type { PolicyEffect } from './policies/policy.interface';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PromptAggregatorService } from './routing/prompt-aggregator.service';
 import type { AggregatedPrompt } from './routing/prompt-aggregator.service';

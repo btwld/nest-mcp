@@ -1,6 +1,6 @@
 import type { PromptGetResult, ResourceReadResult, ToolCallResult } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
-import { type DynamicModule, type ForwardReference, type Provider, type Type } from '@nestjs/common';
+import type { DynamicModule, ForwardReference, Provider, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { McpRegistryService } from '../discovery/registry.service';
@@ -38,7 +38,8 @@ export async function createMcpTestApp(options: CreateTestAppOptions): Promise<M
   // Scan all providers
   for (const provider of options.providers) {
     try {
-      const token = typeof provider === 'function' ? provider : (provider as { provide: unknown }).provide;
+      const token =
+        typeof provider === 'function' ? provider : (provider as { provide: unknown }).provide;
       const instance = moduleRef.get(token as Type<unknown>);
       if (instance) registry.registerProvider(instance);
     } catch {

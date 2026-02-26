@@ -56,9 +56,25 @@ export class MetricsService {
   toPrometheus(): string {
     const metrics = Array.from(this.metrics.values());
     const sections = [
-      { help: 'mcp_tool_calls_total', type: 'counter', helpText: 'Total number of tool calls', fn: (m: ToolMetrics) => `mcp_tool_calls_total{tool="${m.name}"} ${m.totalCalls}` },
-      { help: 'mcp_tool_errors_total', type: 'counter', helpText: 'Total number of tool errors', fn: (m: ToolMetrics) => `mcp_tool_errors_total{tool="${m.name}"} ${m.errorCount}` },
-      { help: 'mcp_tool_duration_ms_avg', type: 'gauge', helpText: 'Average tool call duration in milliseconds', fn: (m: ToolMetrics) => `mcp_tool_duration_ms_avg{tool="${m.name}"} ${m.avgDurationMs.toFixed(2)}` },
+      {
+        help: 'mcp_tool_calls_total',
+        type: 'counter',
+        helpText: 'Total number of tool calls',
+        fn: (m: ToolMetrics) => `mcp_tool_calls_total{tool="${m.name}"} ${m.totalCalls}`,
+      },
+      {
+        help: 'mcp_tool_errors_total',
+        type: 'counter',
+        helpText: 'Total number of tool errors',
+        fn: (m: ToolMetrics) => `mcp_tool_errors_total{tool="${m.name}"} ${m.errorCount}`,
+      },
+      {
+        help: 'mcp_tool_duration_ms_avg',
+        type: 'gauge',
+        helpText: 'Average tool call duration in milliseconds',
+        fn: (m: ToolMetrics) =>
+          `mcp_tool_duration_ms_avg{tool="${m.name}"} ${m.avgDurationMs.toFixed(2)}`,
+      },
     ];
     const lines = sections.flatMap(({ help, type, helpText, fn }) => [
       `# HELP ${help} ${helpText}`,

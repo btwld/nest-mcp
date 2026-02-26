@@ -24,7 +24,10 @@ export class JwtTokenService {
     const aud = this.options.audience ?? 'mcp-client';
 
     const accessExpiresIn = parseDurationSeconds(this.options.accessTokenExpiresIn ?? '1d', 86400);
-    const refreshExpiresIn = parseDurationSeconds(this.options.refreshTokenExpiresIn ?? '30d', 86400);
+    const refreshExpiresIn = parseDurationSeconds(
+      this.options.refreshTokenExpiresIn ?? '30d',
+      86400,
+    );
 
     const accessToken = jwt.sign(
       {
@@ -76,5 +79,4 @@ export class JwtTokenService {
       throw new AuthorizationError(`Invalid token: ${(error as Error).message}`);
     }
   }
-
 }

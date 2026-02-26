@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { extractErrorMessage } from '../utils/error-utils';
-import { collectFulfilled } from '../utils/settled-results';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
+import { extractErrorMessage } from '../utils/error-utils';
+import { collectFulfilled } from '../utils/settled-results';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RouterService } from './router.service';
 

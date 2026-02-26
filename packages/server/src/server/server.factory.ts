@@ -1,7 +1,7 @@
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { buildServerCapabilities } from '@btwld/mcp-common';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '@nestjs/common';
 import type { McpRegistryService } from '../discovery/registry.service';
 

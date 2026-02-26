@@ -91,7 +91,10 @@ export class ExecutionPipelineService {
 
         // Build execution chain with resilience wrappers
         const baseFn = () => this.executor.callTool(name, args, ctx);
-        const executionFn = this.buildExecutionChain(baseFn, name, { retry: retryConfig, circuitBreaker: cbConfig });
+        const executionFn = this.buildExecutionChain(baseFn, name, {
+          retry: retryConfig,
+          circuitBreaker: cbConfig,
+        });
 
         const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
         return timeoutMs ? this.withTimeout(executionFn(), name, timeoutMs) : executionFn();
@@ -149,10 +152,7 @@ export class ExecutionPipelineService {
 
     if (prompt) {
       const guardContext = this.buildGuardContext(ctx, { promptName: name });
-      await this.authGuard.checkAuthorization(
-        { ...prompt, isPublic: false },
-        guardContext,
-      );
+      await this.authGuard.checkAuthorization({ ...prompt, isPublic: false }, guardContext);
     }
 
     // Collect middleware: global only (prompts don't have per-item middleware)
@@ -223,20 +223,25 @@ export class ExecutionPipelineService {
     name: string,
     config: { retry?: RetryConfig; circuitBreaker?: CircuitBreakerConfig },
   ): () => Promise<ToolCallResult> {
-    const withRetry = config.retry
-      ? () => this.retry.execute(name, config.retry!, baseFn)
-      : baseFn;
-
-    const withCircuitBreaker = config.circuitBreaker
-      ? () => this.circuitBreaker.execute(name, config.circuitBreaker!, withRetry)
+    const { retry, circuitBreaker } = config;
+    const withRetry = retry ? () => this.retry.execute(name, retry, baseFn) : baseFn;
+    const withCircuitBreaker = circuitBreaker
+      ? () => this.circuitBreaker.execute(name, circuitBreaker, withRetry)
       : withRetry;
 
     return withCircuitBreaker;
   }
 
-  private withTimeout<T>(promise: Promise<T>, operationName: string, timeoutMs: number): Promise<T> {
+  private withTimeout<T>(
+    promise: Promise<T>,
+    operationName: string,
+    timeoutMs: number,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new McpTimeoutError(operationName, timeoutMs)), timeoutMs);
+      const timer = setTimeout(
+        () => reject(new McpTimeoutError(operationName, timeoutMs)),
+        timeoutMs,
+      );
       promise.then(resolve, reject).finally(() => clearTimeout(timer));
     });
   }

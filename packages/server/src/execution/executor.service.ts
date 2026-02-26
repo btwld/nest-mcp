@@ -65,7 +65,11 @@ export class McpExecutorService {
     }
   }
 
-  private validateInput(schema: ZodType, args: Record<string, unknown>, label: string): Record<string, unknown> {
+  private validateInput(
+    schema: ZodType,
+    args: Record<string, unknown>,
+    label: string,
+  ): Record<string, unknown> {
     const parsed = schema.safeParse(args);
     if (!parsed.success) {
       throw new ValidationError(

@@ -21,17 +21,14 @@ export class RequestTransformService {
   }
 
   async apply(initial: ToolCallRequest): Promise<ToolCallRequest> {
-    return this.transforms.reduce<Promise<ToolCallRequest>>(
-      async (acc, transform) => {
-        const current = await acc;
-        try {
-          return await transform(current);
-        } catch (error) {
-          this.logger.error(`Request transform failed: ${extractErrorMessage(error)}`);
-          throw error;
-        }
-      },
-      Promise.resolve(initial),
-    );
+    return this.transforms.reduce<Promise<ToolCallRequest>>(async (acc, transform) => {
+      const current = await acc;
+      try {
+        return await transform(current);
+      } catch (error) {
+        this.logger.error(`Request transform failed: ${extractErrorMessage(error)}`);
+        throw error;
+      }
+    }, Promise.resolve(initial));
   }
 }
