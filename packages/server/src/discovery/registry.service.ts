@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import type {
   CircuitBreakerConfig,
   McpMiddleware,
@@ -44,6 +45,7 @@ export interface RegisteredPrompt extends PromptMetadata {
 @Injectable()
 export class McpRegistryService {
   private readonly logger = new Logger(McpRegistryService.name);
+  readonly events = new EventEmitter();
 
   private readonly tools = new Map<string, RegisteredTool>();
   private readonly resources = new Map<string, RegisteredResource>();
@@ -210,29 +212,43 @@ export class McpRegistryService {
   registerTool(tool: RegisteredTool): void {
     this.tools.set(tool.name, tool);
     this.logger.log(`Dynamically registered tool: ${tool.name}`);
+    this.events.emit('tool.registered', tool);
   }
 
   unregisterTool(name: string): boolean {
     const deleted = this.tools.delete(name);
-    if (deleted) this.logger.log(`Unregistered tool: ${name}`);
+    if (deleted) {
+      this.logger.log(`Unregistered tool: ${name}`);
+      this.events.emit('tool.unregistered', name);
+    }
     return deleted;
   }
 
   registerResource(resource: RegisteredResource): void {
     this.resources.set(resource.uri, resource);
     this.logger.log(`Dynamically registered resource: ${resource.uri}`);
+    this.events.emit('resource.registered', resource);
   }
 
   unregisterResource(uri: string): boolean {
-    return this.resources.delete(uri);
+    const deleted = this.resources.delete(uri);
+    if (deleted) {
+      this.events.emit('resource.unregistered', uri);
+    }
+    return deleted;
   }
 
   registerPrompt(prompt: RegisteredPrompt): void {
     this.prompts.set(prompt.name, prompt);
     this.logger.log(`Dynamically registered prompt: ${prompt.name}`);
+    this.events.emit('prompt.registered', prompt);
   }
 
   unregisterPrompt(name: string): boolean {
-    return this.prompts.delete(name);
+    const deleted = this.prompts.delete(name);
+    if (deleted) {
+      this.events.emit('prompt.unregistered', name);
+    }
+    return deleted;
   }
 }

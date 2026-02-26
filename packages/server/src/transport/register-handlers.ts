@@ -9,7 +9,13 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import type { McpRegistryService } from '../discovery/registry.service';
+import type {
+  McpRegistryService,
+  RegisteredPrompt,
+  RegisteredResource,
+  RegisteredResourceTemplate,
+  RegisteredTool,
+} from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
 
 /**
@@ -25,6 +31,11 @@ const PASSTHROUGH_SCHEMA = z.object({}).passthrough();
  * notification is received from the client.
  */
 const activeRequests = new Map<string | number, AbortController>();
+
+/** Handle returned by SDK registration methods — used to remove items dynamically. */
+export interface SdkHandle {
+  remove(): void;
+}
 
 /**
  * Registers all tools, resources, resource templates, and prompts from the
@@ -43,126 +54,151 @@ export function registerHandlers(
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
 ): void {
-  registerTools(server, registry, pipeline, ctx);
-  registerResources(server, registry, pipeline, ctx);
-  registerResourceTemplates(server, registry, pipeline, ctx);
-  registerPrompts(server, registry, pipeline, ctx);
+  for (const tool of registry.getAllTools()) {
+    registerToolOnServer(server, tool, pipeline, ctx);
+  }
+  for (const resource of registry.getAllResources()) {
+    registerResourceOnServer(server, resource, pipeline, ctx);
+  }
+  for (const template of registry.getAllResourceTemplates()) {
+    registerResourceTemplateOnServer(server, template, pipeline, ctx);
+  }
+  for (const prompt of registry.getAllPrompts()) {
+    registerPromptOnServer(server, prompt, pipeline, ctx);
+  }
   registerCancellationHandler(server);
   registerListHandlers(server, pipeline);
 }
 
-function registerTools(
+/**
+ * Register a single tool on an McpServer instance.
+ * Returns an SDK handle whose `remove()` unregisters the tool and auto-sends
+ * `notifications/tools/list_changed` to connected clients.
+ */
+export function registerToolOnServer(
   server: McpServer,
-  registry: McpRegistryService,
+  tool: RegisteredTool,
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
-): void {
-  for (const tool of registry.getAllTools()) {
-    // Use registerTool() with named config to avoid overload ambiguity
-    // The SDK's tool() method uses isZodRawShapeCompat() to distinguish params
-    // from annotations, which fails for pre-converted JSON schema objects.
-    (server as unknown as { registerTool: (...args: unknown[]) => void }).registerTool(
-      tool.name,
-      {
-        description: tool.description,
-        // Use Zod schema for validation, or a permissive passthrough schema
-        // for dynamically-registered tools that only have JSON schemas.
-        // A schema is always required so the SDK passes args to the callback.
-        inputSchema: tool.parameters ?? PASSTHROUGH_SCHEMA,
-        outputSchema: tool.outputSchema,
-        annotations: tool.annotations,
-      },
-      async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
-        // Create a local AbortController that is linked to the SDK's signal
-        // and tracked in the activeRequests map for explicit cancellation.
-        const controller = new AbortController();
-        const requestId = extra.requestId;
+): SdkHandle {
+  // Use registerTool() with named config to avoid overload ambiguity.
+  // The SDK's tool() method uses isZodRawShapeCompat() to distinguish params
+  // from annotations, which fails for pre-converted JSON schema objects.
+  return (
+    server as unknown as {
+      registerTool: (...args: unknown[]) => SdkHandle;
+    }
+  ).registerTool(
+    tool.name,
+    {
+      description: tool.description,
+      // Use Zod schema for validation, or a permissive passthrough schema
+      // for dynamically-registered tools that only have JSON schemas.
+      // A schema is always required so the SDK passes args to the callback.
+      inputSchema: tool.parameters ?? PASSTHROUGH_SCHEMA,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
+    },
+    async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
+      // Create a local AbortController that is linked to the SDK's signal
+      // and tracked in the activeRequests map for explicit cancellation.
+      const controller = new AbortController();
+      const requestId = extra.requestId;
 
-        // Link the SDK's built-in signal to our controller
-        if (extra.signal.aborted) {
-          controller.abort();
-        } else {
-          extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
-        }
-
-        activeRequests.set(requestId, controller);
-
-        // Shallow-clone the context with the cancellation signal
-        const ctxWithSignal: McpExecutionContext = { ...ctx, signal: controller.signal };
-
-        try {
-          return await pipeline.callTool(tool.name, args, ctxWithSignal);
-        } finally {
-          activeRequests.delete(requestId);
-        }
-      },
-    );
-  }
-}
-
-function registerResources(
-  server: McpServer,
-  registry: McpRegistryService,
-  pipeline: ExecutionPipelineService,
-  ctx: McpExecutionContext,
-): void {
-  for (const resource of registry.getAllResources()) {
-    (server as unknown as { resource: (...args: unknown[]) => void }).resource(
-      resource.name,
-      resource.uri,
-      resource.mimeType ? { mimeType: resource.mimeType } : {},
-      async (uri: URL) => {
-        return pipeline.readResource(uri.href, ctx);
-      },
-    );
-  }
-}
-
-function registerResourceTemplates(
-  server: McpServer,
-  registry: McpRegistryService,
-  pipeline: ExecutionPipelineService,
-  ctx: McpExecutionContext,
-): void {
-  for (const template of registry.getAllResourceTemplates()) {
-    const resourceTemplate = new ResourceTemplate(template.uriTemplate, { list: undefined });
-    (
-      server as unknown as {
-        registerResource: (...args: unknown[]) => void;
+      // Link the SDK's built-in signal to our controller
+      if (extra.signal.aborted) {
+        controller.abort();
+      } else {
+        extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
       }
-    ).registerResource(
-      template.name,
-      resourceTemplate,
-      template.mimeType ? { mimeType: template.mimeType } : {},
-      async (uri: URL) => {
-        return pipeline.readResource(uri.href, ctx);
-      },
-    );
-  }
+
+      activeRequests.set(requestId, controller);
+
+      // Shallow-clone the context with the cancellation signal
+      const ctxWithSignal: McpExecutionContext = { ...ctx, signal: controller.signal };
+
+      try {
+        return await pipeline.callTool(tool.name, args, ctxWithSignal);
+      } finally {
+        activeRequests.delete(requestId);
+      }
+    },
+  );
 }
 
-function registerPrompts(
+/**
+ * Register a single resource on an McpServer instance.
+ * Returns an SDK handle whose `remove()` unregisters the resource.
+ */
+export function registerResourceOnServer(
   server: McpServer,
-  registry: McpRegistryService,
+  resource: RegisteredResource,
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
-): void {
-  for (const prompt of registry.getAllPrompts()) {
-    (
-      server as unknown as {
-        registerPrompt: (...args: unknown[]) => void;
-      }
-    ).registerPrompt(
-      prompt.name,
-      {
-        description: prompt.description,
-        argsSchema: prompt.parameters?.shape,
-      },
-      async (args: Record<string, unknown>) => {
-        return pipeline.getPrompt(prompt.name, args, ctx);
-      },
-    );
-  }
+): SdkHandle {
+  return (
+    server as unknown as {
+      resource: (...args: unknown[]) => SdkHandle;
+    }
+  ).resource(
+    resource.name,
+    resource.uri,
+    resource.mimeType ? { mimeType: resource.mimeType } : {},
+    async (uri: URL) => {
+      return pipeline.readResource(uri.href, ctx);
+    },
+  );
+}
+
+/**
+ * Register a single resource template on an McpServer instance.
+ * Returns an SDK handle whose `remove()` unregisters the template.
+ */
+export function registerResourceTemplateOnServer(
+  server: McpServer,
+  template: RegisteredResourceTemplate,
+  pipeline: ExecutionPipelineService,
+  ctx: McpExecutionContext,
+): SdkHandle {
+  const resourceTemplate = new ResourceTemplate(template.uriTemplate, { list: undefined });
+  return (
+    server as unknown as {
+      registerResource: (...args: unknown[]) => SdkHandle;
+    }
+  ).registerResource(
+    template.name,
+    resourceTemplate,
+    template.mimeType ? { mimeType: template.mimeType } : {},
+    async (uri: URL) => {
+      return pipeline.readResource(uri.href, ctx);
+    },
+  );
+}
+
+/**
+ * Register a single prompt on an McpServer instance.
+ * Returns an SDK handle whose `remove()` unregisters the prompt.
+ */
+export function registerPromptOnServer(
+  server: McpServer,
+  prompt: RegisteredPrompt,
+  pipeline: ExecutionPipelineService,
+  ctx: McpExecutionContext,
+): SdkHandle {
+  return (
+    server as unknown as {
+      registerPrompt: (...args: unknown[]) => SdkHandle;
+    }
+  ).registerPrompt(
+    prompt.name,
+    {
+      description: prompt.description,
+      argsSchema: prompt.parameters?.shape,
+    },
+    async (args: Record<string, unknown>) => {
+      return pipeline.getPrompt(prompt.name, args, ctx);
+    },
+  );
 }
 
 /**

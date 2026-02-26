@@ -89,4 +89,130 @@ describe('McpContextFactory', () => {
     expect(ctx.request).toBeUndefined();
     expect(ctx.signal).toBeUndefined();
   });
+
+  // --- MCP Log Bridge ---
+
+  describe('log bridge with mcpServer', () => {
+    it('calls sendLoggingMessage on debug', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      ctx.log.debug('test message');
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
+        level: 'debug',
+        logger: 'MCP:sess-abc',
+        data: 'test message',
+      });
+    });
+
+    it('calls sendLoggingMessage on info', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      ctx.log.info('info message');
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
+        level: 'info',
+        logger: 'MCP:sess-abc',
+        data: 'info message',
+      });
+    });
+
+    it('maps warn to MCP warning level', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      ctx.log.warn('warn message');
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
+        level: 'warning',
+        logger: 'MCP:sess-abc',
+        data: 'warn message',
+      });
+    });
+
+    it('calls sendLoggingMessage on error', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      ctx.log.error('error message');
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
+        level: 'error',
+        logger: 'MCP:sess-abc',
+        data: 'error message',
+      });
+    });
+
+    it('includes data in sendLoggingMessage when provided', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      ctx.log.info('with data', { key: 'value' });
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
+        level: 'info',
+        logger: 'MCP:sess-abc',
+        data: { message: 'with data', key: 'value' },
+      });
+    });
+
+    it('swallows rejected sendLoggingMessage promise', () => {
+      const mockServer = {
+        sendLoggingMessage: vi.fn().mockRejectedValue(new Error('disconnected')),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.SSE,
+        mcpServer: mockServer as never,
+      });
+
+      // Should not throw
+      expect(() => ctx.log.info('test')).not.toThrow();
+    });
+
+    it('does not call sendLoggingMessage when mcpServer is not provided', () => {
+      const ctx = factory.createContext({
+        sessionId: 'sess-1',
+        transport: McpTransportType.STDIO,
+      });
+
+      // Should not throw, just writes to NestJS logger
+      expect(() => ctx.log.debug('test')).not.toThrow();
+      expect(() => ctx.log.info('test')).not.toThrow();
+      expect(() => ctx.log.warn('test')).not.toThrow();
+      expect(() => ctx.log.error('test')).not.toThrow();
+    });
+  });
 });

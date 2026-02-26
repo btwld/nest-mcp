@@ -2,7 +2,13 @@ import type { McpExecutionContext } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { registerHandlers } from './register-handlers';
+import {
+  registerHandlers,
+  registerPromptOnServer,
+  registerResourceOnServer,
+  registerResourceTemplateOnServer,
+  registerToolOnServer,
+} from './register-handlers';
 
 describe('registerHandlers', () => {
   let mockInnerServer: Record<string, ReturnType<typeof vi.fn>>;
@@ -19,11 +25,11 @@ describe('registerHandlers', () => {
 
     mockServer = {
       tool: vi.fn(),
-      registerTool: vi.fn(),
-      resource: vi.fn(),
-      registerResource: vi.fn(),
+      registerTool: vi.fn().mockReturnValue({ remove: vi.fn() }),
+      resource: vi.fn().mockReturnValue({ remove: vi.fn() }),
+      registerResource: vi.fn().mockReturnValue({ remove: vi.fn() }),
       prompt: vi.fn(),
-      registerPrompt: vi.fn(),
+      registerPrompt: vi.fn().mockReturnValue({ remove: vi.fn() }),
       server: mockInnerServer,
     };
 
@@ -377,5 +383,168 @@ describe('registerHandlers', () => {
 
     expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined);
     expect(result).toEqual({ prompts: [{ name: 'greet' }] });
+  });
+});
+
+// --- Per-item helper tests ---
+
+describe('registerToolOnServer', () => {
+  let mockServer: Record<string, unknown>;
+  let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
+  let ctx: McpExecutionContext;
+  const removeFn = vi.fn();
+
+  beforeEach(() => {
+    mockServer = {
+      registerTool: vi.fn().mockReturnValue({ remove: removeFn }),
+      server: { setNotificationHandler: vi.fn(), setRequestHandler: vi.fn() },
+    };
+    mockPipeline = {
+      callTool: vi.fn().mockResolvedValue({ content: [] }),
+    };
+    ctx = {
+      sessionId: 'test',
+      transport: McpTransportType.SSE,
+      reportProgress: vi.fn(),
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      metadata: {},
+    };
+  });
+
+  it('returns an SDK handle with remove()', () => {
+    const tool = { name: 'dyn', description: 'Dynamic', parameters: null };
+    const handle = registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    expect(handle).toBeDefined();
+    expect(typeof handle.remove).toBe('function');
+  });
+
+  it('calls server.registerTool with the correct name and config', () => {
+    const schema = z.object({ x: z.number() });
+    const tool = { name: 'calc', description: 'Calc', parameters: schema, annotations: { readOnlyHint: true } };
+
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
+    expect(registerTool).toHaveBeenCalledTimes(1);
+    const [name, config] = registerTool.mock.calls[0];
+    expect(name).toBe('calc');
+    expect(config.description).toBe('Calc');
+    expect(config.inputSchema).toBe(schema);
+    expect(config.annotations).toEqual({ readOnlyHint: true });
+  });
+});
+
+describe('registerResourceOnServer', () => {
+  let mockServer: Record<string, unknown>;
+  let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
+  let ctx: McpExecutionContext;
+
+  beforeEach(() => {
+    mockServer = {
+      resource: vi.fn().mockReturnValue({ remove: vi.fn() }),
+      server: { setNotificationHandler: vi.fn(), setRequestHandler: vi.fn() },
+    };
+    mockPipeline = {
+      readResource: vi.fn().mockResolvedValue({ contents: [] }),
+    };
+    ctx = {
+      sessionId: 'test',
+      transport: McpTransportType.SSE,
+      reportProgress: vi.fn(),
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      metadata: {},
+    };
+  });
+
+  it('returns an SDK handle with remove()', () => {
+    const resource = { name: 'data', uri: 'data://data', mimeType: 'text/plain' };
+    const handle = registerResourceOnServer(mockServer as never, resource as never, mockPipeline as never, ctx);
+
+    expect(handle).toBeDefined();
+    expect(typeof handle.remove).toBe('function');
+  });
+
+  it('passes mimeType metadata when present', () => {
+    const resource = { name: 'config', uri: 'data://config', mimeType: 'application/json' };
+    registerResourceOnServer(mockServer as never, resource as never, mockPipeline as never, ctx);
+
+    const resourceFn = mockServer.resource as ReturnType<typeof vi.fn>;
+    const [, , metadata] = resourceFn.mock.calls[0];
+    expect(metadata).toEqual({ mimeType: 'application/json' });
+  });
+});
+
+describe('registerResourceTemplateOnServer', () => {
+  let mockServer: Record<string, unknown>;
+  let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
+  let ctx: McpExecutionContext;
+
+  beforeEach(() => {
+    mockServer = {
+      registerResource: vi.fn().mockReturnValue({ remove: vi.fn() }),
+      server: { setNotificationHandler: vi.fn(), setRequestHandler: vi.fn() },
+    };
+    mockPipeline = {
+      readResource: vi.fn().mockResolvedValue({ contents: [] }),
+    };
+    ctx = {
+      sessionId: 'test',
+      transport: McpTransportType.SSE,
+      reportProgress: vi.fn(),
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      metadata: {},
+    };
+  });
+
+  it('returns an SDK handle with remove()', () => {
+    const template = { name: 'user', uriTemplate: 'data://users/{id}', mimeType: 'application/json' };
+    const handle = registerResourceTemplateOnServer(mockServer as never, template as never, mockPipeline as never, ctx);
+
+    expect(handle).toBeDefined();
+    expect(typeof handle.remove).toBe('function');
+  });
+});
+
+describe('registerPromptOnServer', () => {
+  let mockServer: Record<string, unknown>;
+  let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
+  let ctx: McpExecutionContext;
+
+  beforeEach(() => {
+    mockServer = {
+      registerPrompt: vi.fn().mockReturnValue({ remove: vi.fn() }),
+      server: { setNotificationHandler: vi.fn(), setRequestHandler: vi.fn() },
+    };
+    mockPipeline = {
+      getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
+    };
+    ctx = {
+      sessionId: 'test',
+      transport: McpTransportType.SSE,
+      reportProgress: vi.fn(),
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      metadata: {},
+    };
+  });
+
+  it('returns an SDK handle with remove()', () => {
+    const prompt = { name: 'greet', description: 'Greet', parameters: null };
+    const handle = registerPromptOnServer(mockServer as never, prompt as never, mockPipeline as never, ctx);
+
+    expect(handle).toBeDefined();
+    expect(typeof handle.remove).toBe('function');
+  });
+
+  it('passes description and argsSchema', () => {
+    const schema = z.object({ name: z.string() });
+    const prompt = { name: 'greet', description: 'Greet', parameters: schema };
+    registerPromptOnServer(mockServer as never, prompt as never, mockPipeline as never, ctx);
+
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    const [name, config] = registerPrompt.mock.calls[0];
+    expect(name).toBe('greet');
+    expect(config.description).toBe('Greet');
+    expect(config.argsSchema).toBe(schema.shape);
   });
 });

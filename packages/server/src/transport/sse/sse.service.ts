@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { McpModuleOptions } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -8,6 +8,11 @@ import {
   DEFAULT_PING_INTERVAL,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from '../../constants/module.constants';
+import type {
+  RegisteredPrompt,
+  RegisteredResource,
+  RegisteredTool,
+} from '../../discovery/registry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../../discovery/registry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -18,14 +23,25 @@ import { McpExecutorService } from '../../execution/executor.service';
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
 import type { HttpResponse } from '../http-response.interface';
-import { registerHandlers } from '../register-handlers';
+import {
+  registerHandlers,
+  registerPromptOnServer,
+  registerResourceOnServer,
+  registerToolOnServer,
+} from '../register-handlers';
+import type { SdkHandle } from '../register-handlers';
 
 @Injectable()
 export class SseService implements OnModuleDestroy {
   private readonly logger = new Logger(SseService.name);
   private readonly transports = new Map<string, SSEServerTransport>();
   private readonly servers = new Map<string, McpServer>();
+  private readonly contexts = new Map<string, McpExecutionContext>();
   private readonly pingIntervals = new Map<string, NodeJS.Timeout>();
+  /** SDK handles per session, keyed by item name/uri for removal. */
+  private readonly sdkHandles = new Map<string, Map<string, SdkHandle>>();
+
+  private readonly registryListeners: Array<{ event: string; listener: (...args: unknown[]) => void }> = [];
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
@@ -33,7 +49,9 @@ export class SseService implements OnModuleDestroy {
     private readonly executor: McpExecutorService,
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
-  ) {}
+  ) {
+    this.subscribeToRegistryEvents();
+  }
 
   async createConnection(req: unknown, res: unknown): Promise<void> {
     const messagesEndpoint =
@@ -43,10 +61,19 @@ export class SseService implements OnModuleDestroy {
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options);
-    this.registerServerHandlers(server, sessionId, req);
+    const ctx = this.contextFactory.createContext({
+      sessionId,
+      transport: McpTransportType.SSE,
+      request: req,
+      mcpServer: server,
+    });
+
+    registerHandlers(server, this.registry, this.pipeline, ctx);
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
+    this.contexts.set(sessionId, ctx);
+    this.sdkHandles.set(sessionId, new Map());
 
     // Setup ping
     const resObj = res as Record<string, unknown>;
@@ -97,14 +124,79 @@ export class SseService implements OnModuleDestroy {
     }
   }
 
-  private registerServerHandlers(server: McpServer, sessionId: string, req?: unknown): void {
-    const ctx = this.contextFactory.createContext({
-      sessionId,
-      transport: McpTransportType.SSE,
-      request: req,
-    });
+  private subscribeToRegistryEvents(): void {
+    const onToolRegistered = (tool: RegisteredTool) => {
+      for (const [sessionId, server] of this.servers) {
+        const ctx = this.contexts.get(sessionId);
+        if (!ctx) continue;
+        const handle = registerToolOnServer(server, tool, this.pipeline, ctx);
+        this.sdkHandles.get(sessionId)?.set(`tool:${tool.name}`, handle);
+      }
+    };
 
-    registerHandlers(server, this.registry, this.pipeline, ctx);
+    const onToolUnregistered = (name: string) => {
+      for (const [sessionId] of this.servers) {
+        const handle = this.sdkHandles.get(sessionId)?.get(`tool:${name}`);
+        if (handle) {
+          handle.remove();
+          this.sdkHandles.get(sessionId)?.delete(`tool:${name}`);
+        }
+      }
+    };
+
+    const onResourceRegistered = (resource: RegisteredResource) => {
+      for (const [sessionId, server] of this.servers) {
+        const ctx = this.contexts.get(sessionId);
+        if (!ctx) continue;
+        const handle = registerResourceOnServer(server, resource, this.pipeline, ctx);
+        this.sdkHandles.get(sessionId)?.set(`resource:${resource.uri}`, handle);
+      }
+    };
+
+    const onResourceUnregistered = (uri: string) => {
+      for (const [sessionId] of this.servers) {
+        const handle = this.sdkHandles.get(sessionId)?.get(`resource:${uri}`);
+        if (handle) {
+          handle.remove();
+          this.sdkHandles.get(sessionId)?.delete(`resource:${uri}`);
+        }
+      }
+    };
+
+    const onPromptRegistered = (prompt: RegisteredPrompt) => {
+      for (const [sessionId, server] of this.servers) {
+        const ctx = this.contexts.get(sessionId);
+        if (!ctx) continue;
+        const handle = registerPromptOnServer(server, prompt, this.pipeline, ctx);
+        this.sdkHandles.get(sessionId)?.set(`prompt:${prompt.name}`, handle);
+      }
+    };
+
+    const onPromptUnregistered = (name: string) => {
+      for (const [sessionId] of this.servers) {
+        const handle = this.sdkHandles.get(sessionId)?.get(`prompt:${name}`);
+        if (handle) {
+          handle.remove();
+          this.sdkHandles.get(sessionId)?.delete(`prompt:${name}`);
+        }
+      }
+    };
+
+    this.registry.events.on('tool.registered', onToolRegistered);
+    this.registry.events.on('tool.unregistered', onToolUnregistered);
+    this.registry.events.on('resource.registered', onResourceRegistered);
+    this.registry.events.on('resource.unregistered', onResourceUnregistered);
+    this.registry.events.on('prompt.registered', onPromptRegistered);
+    this.registry.events.on('prompt.unregistered', onPromptUnregistered);
+
+    this.registryListeners.push(
+      { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
+      { event: 'tool.unregistered', listener: onToolUnregistered as (...args: unknown[]) => void },
+      { event: 'resource.registered', listener: onResourceRegistered as (...args: unknown[]) => void },
+      { event: 'resource.unregistered', listener: onResourceUnregistered as (...args: unknown[]) => void },
+      { event: 'prompt.registered', listener: onPromptRegistered as (...args: unknown[]) => void },
+      { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
+    );
   }
 
   private async cleanupSession(sessionId: string): Promise<void> {
@@ -126,10 +218,18 @@ export class SseService implements OnModuleDestroy {
       this.servers.delete(sessionId);
     }
 
+    this.contexts.delete(sessionId);
+    this.sdkHandles.delete(sessionId);
+
     this.logger.log(`SSE session cleaned up: ${sessionId}`);
   }
 
   async onModuleDestroy(): Promise<void> {
+    for (const { event, listener } of this.registryListeners) {
+      this.registry.events.removeListener(event, listener);
+    }
+    this.registryListeners.length = 0;
+
     for (const sessionId of this.transports.keys()) {
       await this.cleanupSession(sessionId);
     }

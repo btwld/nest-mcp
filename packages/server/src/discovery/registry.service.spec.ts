@@ -209,6 +209,19 @@ describe('McpRegistryService', () => {
       expect(() => registry.registerProvider(noConstructor)).not.toThrow();
       expect(registry.hasTools).toBe(false);
     });
+
+    it('does NOT emit events on registerProvider', () => {
+      const spy = vi.fn();
+      registry.events.on('tool.registered', spy);
+      registry.events.on('resource.registered', spy);
+      registry.events.on('prompt.registered', spy);
+
+      registry.registerProvider(new TestTools());
+      registry.registerProvider(new TestResources());
+      registry.registerProvider(new TestPrompts());
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('accessors', () => {
@@ -295,6 +308,50 @@ describe('McpRegistryService', () => {
       const result = registry.unregisterTool('nonexistent');
       expect(result).toBe(false);
     });
+
+    it('emits tool.registered event on registerTool', () => {
+      const spy = vi.fn();
+      registry.events.on('tool.registered', spy);
+
+      const tool: RegisteredTool = {
+        name: 'dyn-tool',
+        description: 'Dynamic',
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerTool(tool);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(tool);
+    });
+
+    it('emits tool.unregistered event on unregisterTool', () => {
+      const spy = vi.fn();
+      registry.events.on('tool.unregistered', spy);
+
+      const tool: RegisteredTool = {
+        name: 'dyn-tool',
+        description: 'Dynamic',
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerTool(tool);
+      registry.unregisterTool('dyn-tool');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('dyn-tool');
+    });
+
+    it('does not emit tool.unregistered when tool does not exist', () => {
+      const spy = vi.fn();
+      registry.events.on('tool.unregistered', spy);
+
+      registry.unregisterTool('nonexistent');
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('dynamic registerResource/unregisterResource', () => {
@@ -336,6 +393,50 @@ describe('McpRegistryService', () => {
       const result = registry.unregisterResource('nonexistent');
       expect(result).toBe(false);
     });
+
+    it('emits resource.registered event on registerResource', () => {
+      const spy = vi.fn();
+      registry.events.on('resource.registered', spy);
+
+      const resource: RegisteredResource = {
+        uri: 'file:///dyn.txt',
+        name: 'dyn',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResource(resource);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(resource);
+    });
+
+    it('emits resource.unregistered event on unregisterResource', () => {
+      const spy = vi.fn();
+      registry.events.on('resource.unregistered', spy);
+
+      const resource: RegisteredResource = {
+        uri: 'file:///dyn.txt',
+        name: 'dyn',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResource(resource);
+      registry.unregisterResource('file:///dyn.txt');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('file:///dyn.txt');
+    });
+
+    it('does not emit resource.unregistered when resource does not exist', () => {
+      const spy = vi.fn();
+      registry.events.on('resource.unregistered', spy);
+
+      registry.unregisterResource('nonexistent');
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('dynamic registerPrompt/unregisterPrompt', () => {
@@ -375,6 +476,50 @@ describe('McpRegistryService', () => {
     it('returns false when unregistering nonexistent prompt', () => {
       const result = registry.unregisterPrompt('nonexistent');
       expect(result).toBe(false);
+    });
+
+    it('emits prompt.registered event on registerPrompt', () => {
+      const spy = vi.fn();
+      registry.events.on('prompt.registered', spy);
+
+      const prompt: RegisteredPrompt = {
+        name: 'dyn-prompt',
+        description: 'Dynamic',
+        methodName: 'generate',
+        target: Object,
+        instance: {},
+      };
+      registry.registerPrompt(prompt);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(prompt);
+    });
+
+    it('emits prompt.unregistered event on unregisterPrompt', () => {
+      const spy = vi.fn();
+      registry.events.on('prompt.unregistered', spy);
+
+      const prompt: RegisteredPrompt = {
+        name: 'dyn-prompt',
+        description: 'Dynamic',
+        methodName: 'generate',
+        target: Object,
+        instance: {},
+      };
+      registry.registerPrompt(prompt);
+      registry.unregisterPrompt('dyn-prompt');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('dyn-prompt');
+    });
+
+    it('does not emit prompt.unregistered when prompt does not exist', () => {
+      const spy = vi.fn();
+      registry.events.on('prompt.unregistered', spy);
+
+      registry.unregisterPrompt('nonexistent');
+
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 });

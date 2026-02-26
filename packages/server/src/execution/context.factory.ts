@@ -4,6 +4,7 @@ import type {
   McpProgress,
   McpTransportType,
 } from '@btwld/mcp-common';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
@@ -15,8 +16,11 @@ export class McpContextFactory {
     user?: McpAuthenticatedUser;
     progressCallback?: (progress: McpProgress) => Promise<void>;
     signal?: AbortSignal;
+    mcpServer?: McpServer;
   }): McpExecutionContext {
     const logger = new Logger(`MCP:${options.sessionId.slice(0, 8)}`);
+    const loggerName = `MCP:${options.sessionId.slice(0, 8)}`;
+    const server = options.mcpServer;
 
     return {
       sessionId: options.sessionId,
@@ -27,10 +31,46 @@ export class McpContextFactory {
       signal: options.signal,
       reportProgress: options.progressCallback ?? (async () => {}),
       log: {
-        debug: (message, data) => logger.debug(message, data),
-        info: (message, data) => logger.log(message, data),
-        warn: (message, data) => logger.warn(message, data),
-        error: (message, data) => logger.error(message, data),
+        debug: (message, data) => {
+          logger.debug(message, data);
+          server
+            ?.sendLoggingMessage({
+              level: 'debug',
+              logger: loggerName,
+              data: data ? { message, ...data } : message,
+            })
+            .catch(() => {});
+        },
+        info: (message, data) => {
+          logger.log(message, data);
+          server
+            ?.sendLoggingMessage({
+              level: 'info',
+              logger: loggerName,
+              data: data ? { message, ...data } : message,
+            })
+            .catch(() => {});
+        },
+        warn: (message, data) => {
+          logger.warn(message, data);
+          server
+            ?.sendLoggingMessage({
+              level: 'warning',
+              logger: loggerName,
+              data: data ? { message, ...data } : message,
+            })
+            .catch(() => {});
+        },
+        error: (message, data) => {
+          logger.error(message, data);
+          server
+            ?.sendLoggingMessage({
+              level: 'error',
+              logger: loggerName,
+              data: data ? { message, ...data } : message,
+            })
+            .catch(() => {});
+        },
       },
     };
   }
