@@ -220,6 +220,10 @@ export class McpClient {
     return this.client.getServerVersion();
   }
 
+  getInstructions(): string | undefined {
+    return this.client.getInstructions();
+  }
+
   private assertConnected(): void {
     if (!this.connected) {
       throw new Error(`McpClient "${this.name}" is not connected`);
