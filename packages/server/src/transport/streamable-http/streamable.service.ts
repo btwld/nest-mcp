@@ -318,23 +318,29 @@ export class StreamableHttpService implements OnModuleDestroy {
   }
 
   private async cleanupSession(sessionId: string): Promise<void> {
+    // Guard: remove from maps first to prevent re-entrant cleanup when
+    // transport.close() fires onclose, which would call cleanupSession again.
+    if (!this.transports.has(sessionId) && !this.servers.has(sessionId)) {
+      return;
+    }
+
     this.subscriptionManager?.removeSession(sessionId);
     this.taskManager?.removeSession(sessionId);
 
     const transport = this.transports.get(sessionId);
     const server = this.servers.get(sessionId);
 
+    this.transports.delete(sessionId);
+    this.servers.delete(sessionId);
+    this.contexts.delete(sessionId);
+    this.sdkHandles.delete(sessionId);
+
     if (transport) {
       await transport.close();
-      this.transports.delete(sessionId);
     }
     if (server) {
       await server.close();
-      this.servers.delete(sessionId);
     }
-
-    this.contexts.delete(sessionId);
-    this.sdkHandles.delete(sessionId);
 
     this.logger.log(`Session cleaned up: ${sessionId}`);
   }
