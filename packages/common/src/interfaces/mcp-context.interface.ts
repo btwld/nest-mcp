@@ -21,6 +21,12 @@ export interface McpExecutionContext {
   streamContent?: (content: ToolContent | ToolContent[]) => Promise<void>;
   /** Ask the user for input during tool execution via the elicitation protocol. */
   elicit?: (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>;
+  /**
+   * Notify all clients that have subscribed to the given resource URI that
+   * the resource has been updated. Sends `notifications/resources/updated`.
+   * No-op when no clients are subscribed or when subscriptions are not enabled.
+   */
+  notifyResourceUpdated?: (uri: string) => Promise<void>;
 }
 
 export interface McpContextLogger {

@@ -90,6 +90,30 @@ describe('McpContextFactory', () => {
     expect(ctx.signal).toBeUndefined();
   });
 
+  // --- notifyResourceUpdated ---
+
+  it('wires notifyResourceUpdated when provided', async () => {
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const ctx = factory.createContext({
+      sessionId: 'sess-1',
+      transport: McpTransportType.STDIO,
+      notifyResourceUpdated: notify,
+    });
+
+    expect(ctx.notifyResourceUpdated).toBeDefined();
+    await ctx.notifyResourceUpdated!('file:///a.txt');
+    expect(notify).toHaveBeenCalledWith('file:///a.txt');
+  });
+
+  it('leaves notifyResourceUpdated undefined when not provided', () => {
+    const ctx = factory.createContext({
+      sessionId: 'sess-1',
+      transport: McpTransportType.STDIO,
+    });
+
+    expect(ctx.notifyResourceUpdated).toBeUndefined();
+  });
+
   // --- MCP Log Bridge ---
 
   describe('log bridge with mcpServer', () => {

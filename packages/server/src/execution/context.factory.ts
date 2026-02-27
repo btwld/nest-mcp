@@ -17,6 +17,7 @@ export class McpContextFactory {
     progressCallback?: (progress: McpProgress) => Promise<void>;
     signal?: AbortSignal;
     mcpServer?: McpServer;
+    notifyResourceUpdated?: (uri: string) => Promise<void>;
   }): McpExecutionContext {
     const logger = new Logger(`MCP:${options.sessionId.slice(0, 8)}`);
     const loggerName = `MCP:${options.sessionId.slice(0, 8)}`;
@@ -30,6 +31,9 @@ export class McpContextFactory {
       metadata: {},
       signal: options.signal,
       reportProgress: options.progressCallback ?? (async () => {}),
+      ...(options.notifyResourceUpdated
+        ? { notifyResourceUpdated: options.notifyResourceUpdated }
+        : {}),
       log: {
         debug: (message, data) => {
           logger.debug(message, data);

@@ -61,6 +61,9 @@ export class StdioService implements OnModuleDestroy {
       sessionId: 'stdio',
       transport: McpTransportType.STDIO,
       mcpServer: server,
+      notifyResourceUpdated: this.subscriptionManager
+        ? (uri) => this.subscriptionManager!.notifyResourceUpdated(uri)
+        : undefined,
     });
 
     registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);

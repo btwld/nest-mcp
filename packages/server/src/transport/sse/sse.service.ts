@@ -74,6 +74,9 @@ export class SseService implements OnModuleDestroy {
       transport: McpTransportType.SSE,
       request: req,
       mcpServer: server,
+      notifyResourceUpdated: this.subscriptionManager
+        ? (uri) => this.subscriptionManager!.notifyResourceUpdated(uri)
+        : undefined,
     });
 
     registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);

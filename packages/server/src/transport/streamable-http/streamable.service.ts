@@ -202,6 +202,9 @@ export class StreamableHttpService implements OnModuleDestroy {
       transport: McpTransportType.STREAMABLE_HTTP,
       request: req,
       mcpServer: server,
+      notifyResourceUpdated: this.subscriptionManager
+        ? (uri) => this.subscriptionManager!.notifyResourceUpdated(uri)
+        : undefined,
     });
 
     registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
