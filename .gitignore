@@ -9,3 +9,4 @@ coverage/
 .npm-cache/
 internal-docs/
 references/
+.claude/
