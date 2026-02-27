@@ -1,0 +1,36 @@
+{
+  "name": "@btwld/mcp-example-browser-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example MCP server using Playwright headless browser for web content fetching (stdio transport)",
+  "bin": {
+    "mcp-browser": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "start:debug": "node dist/main.js --debug",
+    "install-browser": "npx playwright install chromium",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@btwld/mcp-common": "workspace:*",
+    "@btwld/mcp-server": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "@mozilla/readability": "^0.5.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "jsdom": "^24.0.0",
+    "playwright": "^1.42.1",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0",
+    "turndown": "^7.1.2",
+    "turndown-plugin-gfm": "^1.0.2",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.6",
+    "@types/turndown": "^5.0.4",
+    "typescript": "^5.7.0"
+  }
+}
