@@ -26,6 +26,9 @@ export type {
   McpClientReconnectOptions,
   McpClientAuthOptions,
   McpClientTransportType,
+  McpSamplingHandler,
+  McpElicitationHandler,
+  McpRootsHandler,
 } from './interfaces/client-options.interface';
 
 // Transport

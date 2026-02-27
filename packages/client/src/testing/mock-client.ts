@@ -27,6 +27,11 @@ import type {
   Tool,
   UnsubscribeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  McpElicitationHandler,
+  McpRootsHandler,
+  McpSamplingHandler,
+} from '../interfaces/client-options.interface';
 
 type PingResult = Awaited<ReturnType<Client['ping']>>;
 
@@ -166,6 +171,18 @@ export class MockMcpClient {
 
   async sendRootsListChanged(): Promise<void> {
     // no-op
+  }
+
+  setSamplingHandler(_handler: McpSamplingHandler): void {
+    // no-op in mock — handler not invoked
+  }
+
+  setElicitationHandler(_handler: McpElicitationHandler): void {
+    // no-op in mock — handler not invoked
+  }
+
+  setRootsHandler(_handler: McpRootsHandler): void {
+    // no-op in mock — handler not invoked
   }
 
   onNotification(

@@ -1,7 +1,26 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type {
+  ClientCapabilities,
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+  ListRootsResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { InjectionToken, ModuleMetadata } from '@nestjs/common';
 
 export type McpClientTransportType = 'streamable-http' | 'sse' | 'stdio';
+
+export type McpSamplingHandler = (
+  request: CreateMessageRequest,
+) => CreateMessageResult | Promise<CreateMessageResult>;
+
+export type McpElicitationHandler = (
+  params: ElicitRequestFormParams | ElicitRequestURLParams,
+) => ElicitResult | Promise<ElicitResult>;
+
+export type McpRootsHandler = () => ListRootsResult | Promise<ListRootsResult>;
 
 export interface McpClientReconnectOptions {
   maxAttempts?: number;
@@ -17,6 +36,27 @@ interface McpClientConnectionBase {
   name: string;
   connectTimeout?: number;
   reconnect?: McpClientReconnectOptions;
+  /**
+   * Client capabilities to advertise during the MCP initialization handshake.
+   * Merged with any capabilities implicitly declared by setSamplingHandler / setElicitationHandler / setRootsHandler.
+   */
+  capabilities?: ClientCapabilities;
+  /**
+   * Register a handler for server-to-client `sampling/createMessage` requests.
+   * Setting this automatically declares the `sampling` client capability.
+   * Must be a stable reference (module-level function or class method) when used in forRoot options.
+   */
+  samplingHandler?: McpSamplingHandler;
+  /**
+   * Register a handler for server-to-client `elicitation/create` requests.
+   * Setting this automatically declares the `elicitation` client capability.
+   */
+  elicitationHandler?: McpElicitationHandler;
+  /**
+   * Register a handler for server-to-client `roots/list` requests.
+   * Setting this automatically declares the `roots` client capability.
+   */
+  rootsHandler?: McpRootsHandler;
 }
 
 export interface McpClientHttpConnectionBase extends McpClientConnectionBase {

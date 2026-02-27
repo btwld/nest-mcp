@@ -4,11 +4,18 @@ import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.j
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   CallToolRequest,
+  ClientCapabilities,
   CompleteRequest,
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
   GetPromptRequest,
   ListPromptsRequest,
   ListResourcesRequest,
   ListResourceTemplatesRequest,
+  ListRootsResult,
   ListToolsRequest,
   LoggingLevel,
   Prompt,
@@ -19,10 +26,18 @@ import type {
   Tool,
   UnsubscribeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
+  ListRootsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import type {
   McpClientConnection,
   McpClientReconnectOptions,
+  McpElicitationHandler,
+  McpRootsHandler,
+  McpSamplingHandler,
 } from './interfaces/client-options.interface';
 import { createClientTransport } from './transport/client-transport.factory';
 
@@ -37,15 +52,29 @@ export class McpClient {
     string,
     (notification: unknown) => Promise<void>
   >();
+  /** Accumulated capabilities for new Client instances (constructor + handler registrations). */
+  private _declaredCapabilities: ClientCapabilities;
+  private _samplingHandler?: McpSamplingHandler;
+  private _elicitationHandler?: McpElicitationHandler;
+  private _rootsHandler?: McpRootsHandler;
 
   constructor(
     readonly name: string,
     private readonly connection: McpClientConnection,
   ) {
     this.logger = new Logger(`McpClient[${name}]`);
-    this.client = new Client(
-      { name: `nestjs-mcp-client-${name}`, version: '1.0.0' },
-      { capabilities: {} },
+    this._declaredCapabilities = connection.capabilities ?? {};
+    this.client = this._createClient();
+
+    if (connection.samplingHandler) this.setSamplingHandler(connection.samplingHandler);
+    if (connection.elicitationHandler) this.setElicitationHandler(connection.elicitationHandler);
+    if (connection.rootsHandler) this.setRootsHandler(connection.rootsHandler);
+  }
+
+  private _createClient(): Client {
+    return new Client(
+      { name: `nestjs-mcp-client-${this.name}`, version: '1.0.0' },
+      { capabilities: this._declaredCapabilities },
     );
   }
 
@@ -196,6 +225,53 @@ export class McpClient {
     return this.client.sendRootsListChanged();
   }
 
+  /**
+   * Register a handler for server→client `sampling/createMessage` requests.
+   * Automatically declares the `sampling` capability. Should be called before `connect()`
+   * so the capability is advertised during initialization.
+   */
+  setSamplingHandler(handler: McpSamplingHandler): void {
+    this._samplingHandler = handler;
+    this._declaredCapabilities = { ...this._declaredCapabilities, sampling: {} };
+    if (!this.connected) {
+      this.client.registerCapabilities({ sampling: {} });
+    }
+    this.client.setRequestHandler(CreateMessageRequestSchema, (req) => handler(req));
+  }
+
+  /**
+   * Register a handler for server→client `elicitation/create` requests.
+   * Automatically declares the `elicitation` capability.
+   */
+  setElicitationHandler(handler: McpElicitationHandler): void {
+    this._elicitationHandler = handler;
+    this._declaredCapabilities = { ...this._declaredCapabilities, elicitation: {} };
+    if (!this.connected) {
+      this.client.registerCapabilities({ elicitation: {} });
+    }
+    this.client.setRequestHandler(ElicitRequestSchema, (req) =>
+      handler(
+        req.params as ElicitRequestFormParams | ElicitRequestURLParams,
+      ),
+    );
+  }
+
+  /**
+   * Register a handler for server→client `roots/list` requests.
+   * Automatically declares the `roots` capability with `listChanged: true`.
+   */
+  setRootsHandler(handler: McpRootsHandler): void {
+    this._rootsHandler = handler;
+    this._declaredCapabilities = {
+      ...this._declaredCapabilities,
+      roots: { listChanged: true },
+    };
+    if (!this.connected) {
+      this.client.registerCapabilities({ roots: { listChanged: true } });
+    }
+    this.client.setRequestHandler(ListRootsRequestSchema, () => handler());
+  }
+
   onNotification(
     method: string,
     handler: (notification: { method: string; params?: Record<string, unknown> }) => void | Promise<void>,
@@ -226,6 +302,23 @@ export class McpClient {
   private _reapplyNotificationHandlers(): void {
     for (const [method, wrapped] of this._notificationHandlerStore) {
       this._applyNotificationHandler(method, wrapped);
+    }
+  }
+
+  private _reapplyRequestHandlers(): void {
+    if (this._samplingHandler) {
+      const h = this._samplingHandler;
+      this.client.setRequestHandler(CreateMessageRequestSchema, (req) => h(req));
+    }
+    if (this._elicitationHandler) {
+      const h = this._elicitationHandler;
+      this.client.setRequestHandler(ElicitRequestSchema, (req) =>
+        h(req.params as ElicitRequestFormParams | ElicitRequestURLParams),
+      );
+    }
+    if (this._rootsHandler) {
+      const h = this._rootsHandler;
+      this.client.setRequestHandler(ListRootsRequestSchema, () => h());
     }
   }
 
@@ -274,10 +367,8 @@ export class McpClient {
       await this.sleep(delay * this.reconnectAttempts);
 
       try {
-        this.client = new Client(
-          { name: `nestjs-mcp-client-${this.name}`, version: '1.0.0' },
-          { capabilities: {} },
-        );
+        this.client = this._createClient();
+        this._reapplyRequestHandlers();
         this.transport = createClientTransport(this.connection);
         this.transport.onclose = () => this.handleDisconnect();
         this.transport.onerror = (err) => this.logger.error(`Transport error: ${err.message}`);
