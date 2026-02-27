@@ -237,8 +237,12 @@ describe('registerHandlers', () => {
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const callback = resource.mock.calls[0][3];
-    await callback(new URL('data://config'));
-    expect(mockPipeline.readResource).toHaveBeenCalledWith('data://config', ctx);
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-r1' };
+    await callback(new URL('data://config'), mockExtra);
+    expect(mockPipeline.readResource).toHaveBeenCalledWith(
+      'data://config',
+      expect.objectContaining({ sessionId: 'test-session', signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('prompt callback delegates to pipeline.getPrompt', async () => {
@@ -250,8 +254,13 @@ describe('registerHandlers', () => {
 
     const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
     const callback = registerPrompt.mock.calls[0][2];
-    await callback({ name: 'Alice' });
-    expect(mockPipeline.getPrompt).toHaveBeenCalledWith('greet', { name: 'Alice' }, ctx);
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-p1' };
+    await callback({ name: 'Alice' }, mockExtra);
+    expect(mockPipeline.getPrompt).toHaveBeenCalledWith(
+      'greet',
+      { name: 'Alice' },
+      expect.objectContaining({ sessionId: 'test-session', signal: expect.any(AbortSignal) }),
+    );
   });
 
   // --- Cancellation ---
@@ -300,6 +309,70 @@ describe('registerHandlers', () => {
     // Resolve the blocked call to clean up
     resolveCall({ content: [] });
     await callPromise;
+  });
+
+  it('resource callback passes signal through context', async () => {
+    mockRegistry.getAllResources.mockReturnValue([
+      { name: 'config', uri: 'data://config', mimeType: undefined },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    const callback = resource.mock.calls[0][3];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-r2' };
+    await callback(new URL('data://config'), mockExtra);
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.signal).toBeDefined();
+    expect(passedCtx.signal!.aborted).toBe(false);
+  });
+
+  it('resource cancellation aborts in-flight call', async () => {
+    mockRegistry.getAllResources.mockReturnValue([
+      { name: 'slow', uri: 'data://slow', mimeType: undefined },
+    ]);
+
+    let resolveCall!: (value: unknown) => void;
+    mockPipeline.readResource.mockImplementation(
+      () => new Promise((resolve) => { resolveCall = resolve; }),
+    );
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const resource = mockServer.resource as ReturnType<typeof vi.fn>;
+    const callback = resource.mock.calls[0][3];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-r3' };
+
+    const callPromise = callback(new URL('data://slow'), mockExtra);
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.signal!.aborted).toBe(false);
+
+    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
+    await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-r3' } });
+
+    expect(passedCtx.signal!.aborted).toBe(true);
+
+    resolveCall({ contents: [] });
+    await callPromise;
+  });
+
+  it('prompt callback passes signal through context', async () => {
+    mockRegistry.getAllPrompts.mockReturnValue([
+      { name: 'greet', description: 'Greet', parameters: null },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    const callback = registerPrompt.mock.calls[0][2];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-q1' };
+    await callback({ name: 'Alice' }, mockExtra);
+
+    const passedCtx = mockPipeline.getPrompt.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.signal).toBeDefined();
+    expect(passedCtx.signal!.aborted).toBe(false);
   });
 
   // --- Pagination ---
@@ -636,6 +709,20 @@ describe('registerResourceTemplateOnServer', () => {
 
     expect(handle).toBeDefined();
     expect(typeof handle.remove).toBe('function');
+  });
+
+  it('resource template callback passes signal through context', async () => {
+    const template = { name: 'user', uriTemplate: 'data://users/{id}', mimeType: 'application/json' };
+    registerResourceTemplateOnServer(mockServer as never, template as never, mockPipeline as never, ctx);
+
+    const registerResource = mockServer.registerResource as ReturnType<typeof vi.fn>;
+    const callback = registerResource.mock.calls[0][3];
+    const mockExtra = { signal: new AbortController().signal, requestId: 'req-t1' };
+    await callback(new URL('data://users/1'), {}, mockExtra);
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.signal).toBeDefined();
+    expect(passedCtx.signal!.aborted).toBe(false);
   });
 });
 

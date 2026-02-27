@@ -36,6 +36,23 @@ const PASSTHROUGH_SCHEMA = z.object({}).passthrough();
  */
 const activeRequests = new Map<string | number, AbortController>();
 
+function createSignalContext(
+  ctx: McpExecutionContext,
+  extra: { signal: AbortSignal; requestId: string | number },
+): { ctxWithSignal: McpExecutionContext; cleanup: () => void } {
+  const controller = new AbortController();
+  if (extra.signal.aborted) {
+    controller.abort();
+  } else {
+    extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  activeRequests.set(extra.requestId, controller);
+  return {
+    ctxWithSignal: { ...ctx, signal: controller.signal },
+    cleanup: () => activeRequests.delete(extra.requestId),
+  };
+}
+
 /** Handle returned by SDK registration methods — used to remove items dynamically. */
 export interface SdkHandle {
   remove(): void;
@@ -120,19 +137,7 @@ export function registerToolOnServer(
         }) => Promise<void>;
       },
     ) => {
-      // Create a local AbortController that is linked to the SDK's signal
-      // and tracked in the activeRequests map for explicit cancellation.
-      const controller = new AbortController();
-      const requestId = extra.requestId;
-
-      // Link the SDK's built-in signal to our controller
-      if (extra.signal.aborted) {
-        controller.abort();
-      } else {
-        extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-
-      activeRequests.set(requestId, controller);
+      const { ctxWithSignal: baseCtxWithSignal, cleanup } = createSignalContext(ctx, extra);
 
       // Build per-request reportProgress that sends notifications/progress
       // when the client provided a progressToken in _meta
@@ -152,17 +157,15 @@ export function registerToolOnServer(
             }
           : ctx.reportProgress;
 
-      // Shallow-clone the context with the cancellation signal and per-request progress
       const ctxWithSignal: McpExecutionContext = {
-        ...ctx,
-        signal: controller.signal,
+        ...baseCtxWithSignal,
         reportProgress,
       };
 
       try {
         return await pipeline.callTool(tool.name, args, ctxWithSignal);
       } finally {
-        activeRequests.delete(requestId);
+        cleanup();
       }
     },
   );
@@ -186,8 +189,13 @@ export function registerResourceOnServer(
     resource.name,
     resource.uri,
     resource.mimeType ? { mimeType: resource.mimeType } : {},
-    async (uri: URL) => {
-      return pipeline.readResource(uri.href, ctx);
+    async (uri: URL, extra: { signal: AbortSignal; requestId: string | number }) => {
+      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      try {
+        return await pipeline.readResource(uri.href, ctxWithSignal);
+      } finally {
+        cleanup();
+      }
     },
   );
 }
@@ -211,8 +219,13 @@ export function registerResourceTemplateOnServer(
     template.name,
     resourceTemplate,
     template.mimeType ? { mimeType: template.mimeType } : {},
-    async (uri: URL) => {
-      return pipeline.readResource(uri.href, ctx);
+    async (uri: URL, _variables: Record<string, string>, extra: { signal: AbortSignal; requestId: string | number }) => {
+      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      try {
+        return await pipeline.readResource(uri.href, ctxWithSignal);
+      } finally {
+        cleanup();
+      }
     },
   );
 }
@@ -237,8 +250,13 @@ export function registerPromptOnServer(
       description: prompt.description,
       argsSchema: prompt.parameters?.shape,
     },
-    async (args: Record<string, unknown>) => {
-      return pipeline.getPrompt(prompt.name, args, ctx);
+    async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
+      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      try {
+        return await pipeline.getPrompt(prompt.name, args, ctxWithSignal);
+      } finally {
+        cleanup();
+      }
     },
   );
 }

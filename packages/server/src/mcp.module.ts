@@ -17,6 +17,7 @@ import { McpContextFactory } from './execution/context.factory';
 // Execution
 import { McpExecutorService } from './execution/executor.service';
 import { ExecutionPipelineService } from './execution/pipeline.service';
+import { McpRequestContextService } from './execution/request-context.service';
 
 import { createSseController } from './transport/sse/sse.controller.factory';
 import { SseService } from './transport/sse/sse.service';
@@ -75,6 +76,7 @@ export class McpModule {
       McpScannerService,
       McpExecutorService,
       ExecutionPipelineService,
+      McpRequestContextService,
       McpContextFactory,
       RateLimiterService,
       CircuitBreakerService,
@@ -120,6 +122,7 @@ export class McpModule {
         McpRegistryService,
         McpExecutorService,
         ExecutionPipelineService,
+        McpRequestContextService,
         McpToolBuilder,
         McpResourceBuilder,
         McpPromptBuilder,
@@ -144,6 +147,7 @@ export class McpModule {
       McpScannerService,
       McpExecutorService,
       ExecutionPipelineService,
+      McpRequestContextService,
       McpContextFactory,
       RateLimiterService,
       CircuitBreakerService,
@@ -190,6 +194,7 @@ export class McpModule {
         McpRegistryService,
         McpExecutorService,
         ExecutionPipelineService,
+        McpRequestContextService,
         McpToolBuilder,
         McpResourceBuilder,
         McpPromptBuilder,

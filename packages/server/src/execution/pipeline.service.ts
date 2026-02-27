@@ -32,6 +32,8 @@ import { RateLimiterService } from '../resilience/rate-limiter.service';
 import { RetryService } from '../resilience/retry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpExecutorService } from './executor.service';
+// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
+import { McpRequestContextService } from './request-context.service';
 
 @Injectable()
 export class ExecutionPipelineService {
@@ -48,6 +50,7 @@ export class ExecutionPipelineService {
     private readonly metrics: MetricsService,
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
     private readonly moduleRef: ModuleRef,
+    private readonly requestContext: McpRequestContextService,
   ) {}
 
   // ---- Tools ----
@@ -57,90 +60,94 @@ export class ExecutionPipelineService {
     args: Record<string, unknown>,
     ctx: McpExecutionContext,
   ): Promise<ToolCallResult> {
-    const tool = this.registry.getTool(name);
-    if (!tool) {
-      throw new ToolExecutionError(name, `Tool '${name}' not found`);
-    }
+    return this.requestContext.run(ctx, async () => {
+      const tool = this.registry.getTool(name);
+      if (!tool) {
+        throw new ToolExecutionError(name, `Tool '${name}' not found`);
+      }
 
-    // Global guards (populate user from token)
-    await this.applyGlobalGuards(ctx, { toolName: name });
+      // Global guards (populate user from token)
+      await this.applyGlobalGuards(ctx, { toolName: name });
 
-    // Auth check
-    if (!tool.isPublic) {
-      const guardContext = this.buildGuardContext(ctx, { toolName: name });
-      await this.authGuard.checkAuthorization(tool, guardContext);
-    }
+      // Auth check
+      if (!tool.isPublic) {
+        const guardContext = this.buildGuardContext(ctx, { toolName: name });
+        await this.authGuard.checkAuthorization(tool, guardContext);
+      }
 
-    // Collect middleware: global + tool-level
-    const middleware: McpMiddleware[] = [
-      ...(this.options.middleware ?? []),
-      ...(tool.middleware ?? []),
-    ];
+      // Collect middleware: global + tool-level
+      const middleware: McpMiddleware[] = [
+        ...(this.options.middleware ?? []),
+        ...(tool.middleware ?? []),
+      ];
 
-    const startTime = Date.now();
+      const startTime = Date.now();
 
-    try {
-      const result = await this.middlewareService.executeChain(middleware, ctx, args, async () => {
-        // Rate limiting
-        const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
-        if (rateLimitConfig) {
-          await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
-        }
+      try {
+        const result = await this.middlewareService.executeChain(middleware, ctx, args, async () => {
+          // Rate limiting
+          const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
+          if (rateLimitConfig) {
+            await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
+          }
 
-        // Resolve resilience configs
-        const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
-        const retryConfig = tool.retry ?? this.options.resilience?.retry;
+          // Resolve resilience configs
+          const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
+          const retryConfig = tool.retry ?? this.options.resilience?.retry;
 
-        // Build execution chain with resilience wrappers
-        const baseFn = () => this.executor.callTool(name, args, ctx);
-        const executionFn = this.buildExecutionChain(baseFn, name, {
-          retry: retryConfig,
-          circuitBreaker: cbConfig,
+          // Build execution chain with resilience wrappers
+          const baseFn = () => this.executor.callTool(name, args, ctx);
+          const executionFn = this.buildExecutionChain(baseFn, name, {
+            retry: retryConfig,
+            circuitBreaker: cbConfig,
+          });
+
+          const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
+          return timeoutMs
+            ? this.withTimeout(executionFn(), name, timeoutMs, ctx.signal)
+            : executionFn();
         });
 
-        const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
-        return timeoutMs
-          ? this.withTimeout(executionFn(), name, timeoutMs, ctx.signal)
-          : executionFn();
-      });
-
-      const duration = Date.now() - startTime;
-      this.metrics.recordCall(name, duration, true);
-      return result as ToolCallResult;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      this.metrics.recordCall(name, duration, false);
-      throw error;
-    }
+        const duration = Date.now() - startTime;
+        this.metrics.recordCall(name, duration, true);
+        return result as ToolCallResult;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        this.metrics.recordCall(name, duration, false);
+        throw error;
+      }
+    });
   }
 
   // ---- Resources ----
 
   async readResource(uri: string, ctx: McpExecutionContext): Promise<ResourceReadResult> {
-    // Try to find resource for auth check
-    const resource = this.registry.getResource(uri);
+    return this.requestContext.run(ctx, async () => {
+      // Try to find resource for auth check
+      const resource = this.registry.getResource(uri);
 
-    // Global guards (populate user from token)
-    await this.applyGlobalGuards(ctx, { resourceUri: uri });
+      // Global guards (populate user from token)
+      await this.applyGlobalGuards(ctx, { resourceUri: uri });
 
-    if (resource) {
-      const guardContext = this.buildGuardContext(ctx, { resourceUri: uri });
-      await this.authGuard.checkAuthorization(
-        { ...resource, name: resource.uri, isPublic: false },
-        guardContext,
-      );
-    }
+      if (resource) {
+        const guardContext = this.buildGuardContext(ctx, { resourceUri: uri });
+        await this.authGuard.checkAuthorization(
+          { ...resource, name: resource.uri, isPublic: false },
+          guardContext,
+        );
+      }
 
-    // Collect middleware: global only (resources don't have per-item middleware)
-    const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
+      // Collect middleware: global only (resources don't have per-item middleware)
+      const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    const timeoutMs = this.options.resilience?.timeout;
-    return this.middlewareService.executeChain(middleware, ctx, { uri }, () => {
-      const promise = this.executor.readResource(uri, ctx);
-      return timeoutMs
-        ? this.withTimeout(promise, `resource:${uri}`, timeoutMs, ctx.signal)
-        : promise;
-    }) as Promise<ResourceReadResult>;
+      const timeoutMs = this.options.resilience?.timeout;
+      return this.middlewareService.executeChain(middleware, ctx, { uri }, () => {
+        const promise = this.executor.readResource(uri, ctx);
+        return timeoutMs
+          ? this.withTimeout(promise, `resource:${uri}`, timeoutMs, ctx.signal)
+          : promise;
+      }) as Promise<ResourceReadResult>;
+    });
   }
 
   // ---- Prompts ----
@@ -150,27 +157,29 @@ export class ExecutionPipelineService {
     args: Record<string, unknown>,
     ctx: McpExecutionContext,
   ): Promise<PromptGetResult> {
-    // Try to find prompt for auth check
-    const prompt = this.registry.getPrompt(name);
+    return this.requestContext.run(ctx, async () => {
+      // Try to find prompt for auth check
+      const prompt = this.registry.getPrompt(name);
 
-    // Global guards (populate user from token)
-    await this.applyGlobalGuards(ctx, { promptName: name });
+      // Global guards (populate user from token)
+      await this.applyGlobalGuards(ctx, { promptName: name });
 
-    if (prompt) {
-      const guardContext = this.buildGuardContext(ctx, { promptName: name });
-      await this.authGuard.checkAuthorization({ ...prompt, isPublic: false }, guardContext);
-    }
+      if (prompt) {
+        const guardContext = this.buildGuardContext(ctx, { promptName: name });
+        await this.authGuard.checkAuthorization({ ...prompt, isPublic: false }, guardContext);
+      }
 
-    // Collect middleware: global only (prompts don't have per-item middleware)
-    const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
+      // Collect middleware: global only (prompts don't have per-item middleware)
+      const middleware: McpMiddleware[] = [...(this.options.middleware ?? [])];
 
-    const promptTimeoutMs = this.options.resilience?.timeout;
-    return this.middlewareService.executeChain(middleware, ctx, args, () => {
-      const promise = this.executor.getPrompt(name, args, ctx);
-      return promptTimeoutMs
-        ? this.withTimeout(promise, `prompt:${name}`, promptTimeoutMs, ctx.signal)
-        : promise;
-    }) as Promise<PromptGetResult>;
+      const promptTimeoutMs = this.options.resilience?.timeout;
+      return this.middlewareService.executeChain(middleware, ctx, args, () => {
+        const promise = this.executor.getPrompt(name, args, ctx);
+        return promptTimeoutMs
+          ? this.withTimeout(promise, `prompt:${name}`, promptTimeoutMs, ctx.signal)
+          : promise;
+      }) as Promise<PromptGetResult>;
+    });
   }
 
   // ---- List methods (delegate directly) ----

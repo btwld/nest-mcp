@@ -36,6 +36,7 @@ export type { CompletionOptions, CompletionMetadata } from './decorators/complet
 export { McpExecutorService } from './execution/executor.service';
 export { ExecutionPipelineService } from './execution/pipeline.service';
 export { McpContextFactory } from './execution/context.factory';
+export { McpRequestContextService } from './execution/request-context.service';
 
 // Transport
 export { StreamableHttpService } from './transport/streamable-http/streamable.service';

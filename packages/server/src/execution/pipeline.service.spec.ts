@@ -3,6 +3,7 @@ import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-com
 import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { mockMcpContext } from '../testing/mock-context';
 import { ExecutionPipelineService } from './pipeline.service';
+import { McpRequestContextService } from './request-context.service';
 
 describe('ExecutionPipelineService', () => {
   let pipeline: ExecutionPipelineService;
@@ -19,6 +20,7 @@ describe('ExecutionPipelineService', () => {
   let metrics: Record<string, ReturnType<typeof vi.fn>>;
   let moduleRef: Record<string, ReturnType<typeof vi.fn>>;
   let options: McpModuleOptions;
+  let requestContext: McpRequestContextService;
 
   beforeEach(() => {
     ctx = mockMcpContext();
@@ -67,6 +69,7 @@ describe('ExecutionPipelineService', () => {
     moduleRef = { get: vi.fn() };
 
     options = {} as McpModuleOptions;
+    requestContext = new McpRequestContextService();
 
     pipeline = new ExecutionPipelineService(
       executor as unknown as ConstructorParameters<typeof ExecutionPipelineService>[0],
@@ -79,6 +82,7 @@ describe('ExecutionPipelineService', () => {
       metrics as unknown as ConstructorParameters<typeof ExecutionPipelineService>[7],
       options,
       moduleRef as unknown as ConstructorParameters<typeof ExecutionPipelineService>[9],
+      requestContext,
     );
   });
 
@@ -524,6 +528,49 @@ describe('ExecutionPipelineService', () => {
 
       expect(result).toBe(expected);
       expect(executor.complete).toHaveBeenCalledWith(request);
+    });
+  });
+
+  // --- AsyncLocalStorage context propagation ---
+
+  describe('AsyncLocalStorage context propagation', () => {
+    it('callTool provides context via getContext()', async () => {
+      let capturedContext: McpExecutionContext | undefined;
+      executor.callTool.mockImplementation(() => {
+        capturedContext = requestContext.getContext();
+        return Promise.resolve({ content: [] });
+      });
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(capturedContext).toBe(ctx);
+    });
+
+    it('readResource provides context via getContext()', async () => {
+      let capturedContext: McpExecutionContext | undefined;
+      executor.readResource.mockImplementation(() => {
+        capturedContext = requestContext.getContext();
+        return Promise.resolve({ contents: [] });
+      });
+      registry.getResource.mockReturnValue(undefined);
+
+      await pipeline.readResource('file:///data', ctx);
+
+      expect(capturedContext).toBe(ctx);
+    });
+
+    it('getPrompt provides context via getContext()', async () => {
+      let capturedContext: McpExecutionContext | undefined;
+      executor.getPrompt.mockImplementation(() => {
+        capturedContext = requestContext.getContext();
+        return Promise.resolve({ messages: [] });
+      });
+      registry.getPrompt.mockReturnValue(undefined);
+
+      await pipeline.getPrompt('greet', {}, ctx);
+
+      expect(capturedContext).toBe(ctx);
     });
   });
 });
