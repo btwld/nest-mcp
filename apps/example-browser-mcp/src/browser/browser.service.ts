@@ -1,6 +1,6 @@
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { chromium } from 'playwright';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { FetchOptions } from '../interfaces/fetch-options.interface';
 
 const USER_AGENTS = [
@@ -22,8 +22,10 @@ const VIEWPORTS = [
 ];
 
 @Injectable()
-export class BrowserService {
+export class BrowserService implements OnModuleDestroy {
   private readonly logger = new Logger(BrowserService.name);
+  private sharedBrowser: Browser | null = null;
+  private launchPromise: Promise<Browser> | null = null;
 
   isDebugMode(options: Pick<FetchOptions, 'debug'>): boolean {
     if (options.debug !== undefined) return options.debug;
@@ -73,13 +75,32 @@ export class BrowserService {
     }
   }
 
-  async createBrowser(options: FetchOptions): Promise<Browser> {
-    const viewport = this.randomFrom(VIEWPORTS);
-    const debug = this.isDebugMode(options);
+  /** Returns the shared browser, launching it if not yet started. */
+  async getBrowser(): Promise<Browser> {
+    if (this.sharedBrowser?.isConnected()) {
+      return this.sharedBrowser;
+    }
 
+    if (!this.launchPromise) {
+      this.launchPromise = this.launchBrowser().then((browser) => {
+        this.sharedBrowser = browser;
+        this.launchPromise = null;
+        browser.on('disconnected', () => {
+          this.sharedBrowser = null;
+          this.logger.warn('Browser disconnected — will relaunch on next request');
+        });
+        return browser;
+      });
+    }
+
+    return this.launchPromise;
+  }
+
+  private async launchBrowser(): Promise<Browser> {
+    this.logger.log('Launching shared Chromium browser…');
     try {
       return await chromium.launch({
-        headless: !debug,
+        headless: true,
         args: [
           '--disable-blink-features=AutomationControlled',
           '--disable-features=IsolateOrigins,site-per-process',
@@ -88,7 +109,6 @@ export class BrowserService {
           '--disable-dev-shm-usage',
           '--disable-webgl',
           '--disable-infobars',
-          `--window-size=${viewport.width},${viewport.height}`,
           '--disable-extensions',
         ],
       });
@@ -115,9 +135,9 @@ export class BrowserService {
   }
 
   async createContext(
-    browser: Browser,
     options: FetchOptions,
   ): Promise<{ context: BrowserContext; viewport: { width: number; height: number } }> {
+    const browser = await this.getBrowser();
     const viewport = this.randomFrom(VIEWPORTS);
 
     const context = await browser.newContext({
@@ -157,9 +177,9 @@ export class BrowserService {
     return context.newPage();
   }
 
-  async cleanup(browser: Browser | null, page: Page | null, options: FetchOptions): Promise<void> {
+  async cleanup(context: BrowserContext, page: Page | null, options: FetchOptions): Promise<void> {
     if (this.isDebugMode(options)) {
-      this.logger.debug('Debug mode: browser/page kept open');
+      this.logger.debug('Debug mode: context/page kept open');
       return;
     }
     if (page) {
@@ -167,10 +187,16 @@ export class BrowserService {
         this.logger.error(`Failed to close page: ${e instanceof Error ? e.message : String(e)}`);
       });
     }
-    if (browser) {
-      await browser.close().catch((e: unknown) => {
-        this.logger.error(`Failed to close browser: ${e instanceof Error ? e.message : String(e)}`);
-      });
+    await context.close().catch((e: unknown) => {
+      this.logger.error(`Failed to close context: ${e instanceof Error ? e.message : String(e)}`);
+    });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.sharedBrowser) {
+      this.logger.log('Closing shared browser…');
+      await this.sharedBrowser.close().catch(() => {});
+      this.sharedBrowser = null;
     }
   }
 }

@@ -2,7 +2,7 @@
   "name": "@btwld/mcp-example-browser-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Example MCP server using Playwright headless browser for web content fetching (stdio transport)",
+  "description": "Example MCP server using Playwright headless browser for web content fetching (streamable HTTP transport)",
   "bin": {
     "mcp-browser": "dist/main.js"
   },
@@ -20,6 +20,7 @@
     "@mozilla/readability": "^0.5.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
     "jsdom": "^24.0.0",
     "playwright": "^1.42.1",
     "reflect-metadata": "^0.2.0",

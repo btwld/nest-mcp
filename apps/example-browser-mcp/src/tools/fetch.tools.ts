@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { Tool } from '@btwld/mcp-server';
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
@@ -97,15 +99,14 @@ export class FetchTools {
 
     if (debug) this.logger.debug(`Debug mode enabled for URL: ${args.url}`);
 
-    const browser = await this.browserService.createBrowser(options);
+    const { context } = await this.browserService.createContext(options);
     let page = null;
     try {
-      const { context, viewport } = await this.browserService.createContext(browser, options);
       page = await this.browserService.createPage(context);
       const result = await this.webContentService.processPageContent(page, args.url, options);
       return { content: [{ type: 'text' as const, text: result.content }] };
     } finally {
-      await this.browserService.cleanup(browser, page, options);
+      await this.browserService.cleanup(context, page, options);
     }
   }
 
@@ -138,10 +139,8 @@ export class FetchTools {
 
     if (debug) this.logger.debug(`Debug mode enabled for URLs: ${args.urls.join(', ')}`);
 
-    const browser = await this.browserService.createBrowser(options);
+    const { context } = await this.browserService.createContext(options);
     try {
-      const { context, viewport } = await this.browserService.createContext(browser, options);
-
       const results: FetchResult[] = await Promise.all(
         args.urls.map(async (url, index) => {
           const page = await this.browserService.createPage(context);
@@ -169,12 +168,98 @@ export class FetchTools {
       return { content: [{ type: 'text' as const, text: combined }] };
     } finally {
       if (!debug) {
-        await browser
+        await context
           .close()
           .catch((e: unknown) =>
-            this.logger.error(`Failed to close browser: ${e instanceof Error ? e.message : String(e)}`),
+            this.logger.error(`Failed to close context: ${e instanceof Error ? e.message : String(e)}`),
           );
       }
+    }
+  }
+
+  @Tool({
+    name: 'generate_pdf',
+    description: 'Generate a PDF from a web page URL using a headless Chromium browser.',
+    parameters: z.object({
+      url: z.string().describe('URL of the page to render as PDF'),
+      format: z
+        .enum(['A4', 'A3', 'A2', 'A1', 'A0', 'Letter', 'Legal', 'Tabloid', 'Ledger'])
+        .optional()
+        .default('A4')
+        .describe('Paper format (default: A4)'),
+      landscape: z.boolean().optional().default(false).describe('Landscape orientation (default: false)'),
+      printBackground: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Print background graphics and colours (default: true)'),
+      outputPath: z
+        .string()
+        .optional()
+        .describe('Absolute path where the PDF will be saved. Defaults to a temp file.'),
+      timeout: z.number().optional().default(30000).describe('Page load timeout in ms (default: 30000)'),
+      waitUntil: z
+        .enum(['load', 'domcontentloaded', 'networkidle', 'commit'])
+        .optional()
+        .default('load')
+        .describe("When navigation is considered complete (default: 'load')"),
+    }),
+    annotations: { readOnlyHint: true },
+  })
+  async generatePdf(args: {
+    url: string;
+    format?: 'A4' | 'A3' | 'A2' | 'A1' | 'A0' | 'Letter' | 'Legal' | 'Tabloid' | 'Ledger';
+    landscape?: boolean;
+    printBackground?: boolean;
+    outputPath?: string;
+    timeout?: number;
+    waitUntil?: FetchOptions['waitUntil'];
+  }) {
+    validateUrlProtocol(args.url);
+
+    const { context } = await this.browserService.createContext({
+      timeout: args.timeout ?? 30000,
+      waitUntil: args.waitUntil ?? 'load',
+      disableMedia: false,
+      extractContent: false,
+      maxLength: 0,
+      returnHtml: false,
+      waitForNavigation: false,
+      navigationTimeout: 10000,
+    });
+
+    let page = null;
+    try {
+      page = await this.browserService.createPage(context);
+      await page.goto(args.url, {
+        timeout: args.timeout ?? 30000,
+        waitUntil: args.waitUntil ?? 'load',
+      });
+
+      const pdfBuffer = await page.pdf({
+        format: args.format ?? 'A4',
+        landscape: args.landscape ?? false,
+        printBackground: args.printBackground ?? true,
+      });
+
+      let outputPath = args.outputPath;
+      if (!outputPath) {
+        const dir = join(tmpdir(), 'browser-mcp-pdfs');
+        mkdirSync(dir, { recursive: true });
+        const hostname = new URL(args.url).hostname.replace(/[^a-z0-9.-]/gi, '_');
+        outputPath = join(dir, `${hostname}-${Date.now()}.pdf`);
+      }
+
+      writeFileSync(outputPath, pdfBuffer);
+      this.logger.log(`PDF saved: ${outputPath}`);
+
+      return {
+        path: outputPath,
+        sizeKb: parseFloat((pdfBuffer.length / 1024).toFixed(1)),
+        url: args.url,
+      };
+    } finally {
+      await this.browserService.cleanup(context, page, { disableMedia: false, extractContent: false, maxLength: 0, returnHtml: false, waitForNavigation: false, navigationTimeout: 10000, timeout: 30000, waitUntil: 'load' });
     }
   }
 

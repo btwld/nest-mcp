@@ -10,7 +10,7 @@ import { FetchTools } from './tools/fetch.tools';
       name: 'browser-mcp',
       version: '0.1.0',
       description: 'MCP server for fetching web content using a headless Playwright browser',
-      transport: McpTransportType.STDIO,
+      transport: McpTransportType.STREAMABLE_HTTP,
       capabilities: {
         tools: { listChanged: false },
       },
