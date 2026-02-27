@@ -327,7 +327,7 @@ describe('GatewayService', () => {
 
       const result = await service.readResource('fs://file:///a');
 
-      expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'file:///a' });
+      expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'file:///a' }, undefined);
       expect(result.contents).toEqual([{ uri: 'file:///a', text: 'hello' }]);
     });
 
@@ -437,10 +437,10 @@ describe('GatewayService', () => {
 
       const result = await service.getPrompt('ai_summarize', { text: 'hello' });
 
-      expect(mockClient.getPrompt).toHaveBeenCalledWith({
-        name: 'summarize',
-        arguments: { text: 'hello' },
-      });
+      expect(mockClient.getPrompt).toHaveBeenCalledWith(
+        { name: 'summarize', arguments: { text: 'hello' } },
+        undefined,
+      );
       expect(result.description).toBe('Summarize text');
       expect(result.messages).toEqual([
         { role: 'user', content: { type: 'text', text: 'summarized' } },

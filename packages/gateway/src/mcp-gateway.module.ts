@@ -1,5 +1,5 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import type { McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import {
   McpModule,
@@ -229,8 +229,8 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         inputSchema: tool.inputSchema,
         rawOutputSchema: tool.outputSchema,
         annotations: tool.annotations,
-        handler: async (args: Record<string, unknown>) => {
-          const result = await this.gatewayService.callTool(tool.name, args);
+        handler: async (args: Record<string, unknown>, ctx: McpExecutionContext) => {
+          const result = await this.gatewayService.callTool(tool.name, args, undefined, ctx.signal);
           return {
             content: result.content as ToolContent[],
             isError: result.isError,
@@ -251,8 +251,8 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         name: resource.name,
         description: resource.description ?? `Proxied resource from ${resource.upstreamName}`,
         mimeType: resource.mimeType,
-        handler: async () => {
-          const result = await this.gatewayService.readResource(resource.uri);
+        handler: async (_uri: URL, ctx: McpExecutionContext) => {
+          const result = await this.gatewayService.readResource(resource.uri, ctx.signal);
           return { contents: result.contents } as {
             contents: Array<{ uri: string; mimeType?: string; text?: string; blob?: string }>;
           };
@@ -270,11 +270,11 @@ export class McpGatewayModule implements OnApplicationBootstrap {
       this.promptBuilder.register({
         name: prompt.name,
         description: prompt.description ?? `Proxied prompt from ${prompt.upstreamName}`,
-        handler: async (args: Record<string, unknown>) => {
+        handler: async (args: Record<string, unknown>, ctx: McpExecutionContext) => {
           const stringArgs = Object.fromEntries(
             Object.entries(args).map(([key, value]) => [key, String(value)]),
           );
-          const result = await this.gatewayService.getPrompt(prompt.name, stringArgs);
+          const result = await this.gatewayService.getPrompt(prompt.name, stringArgs, ctx.signal);
           return result as {
             description?: string;
             messages: Array<{

@@ -113,6 +113,7 @@ export class GatewayService {
     toolName: string,
     args: Record<string, unknown>,
     context?: PolicyContext,
+    signal?: AbortSignal,
   ): Promise<GatewayCallToolResult> {
     // Evaluate policy
     const policy = this.policyEngine.evaluate(toolName, context);
@@ -175,10 +176,10 @@ export class GatewayService {
     try {
       // Forward the call to the upstream
       const timeoutMs = this.upstreamManager.getConfig(route.upstreamName)?.timeout;
-      const callPromise = client.callTool({
-        name: request.toolName,
-        arguments: request.arguments,
-      });
+      const callPromise = client.callTool(
+        { name: request.toolName, arguments: request.arguments },
+        signal ? { signal } : undefined,
+      );
       const result = await (timeoutMs
         ? this.withTimeout(callPromise, `callTool:${toolName}`, timeoutMs)
         : callPromise);
@@ -226,7 +227,7 @@ export class GatewayService {
     return this.resourceAggregator.getCachedResources();
   }
 
-  async readResource(uri: string): Promise<GatewayReadResourceResult> {
+  async readResource(uri: string, signal?: AbortSignal): Promise<GatewayReadResourceResult> {
     // Find the aggregated resource to determine the upstream
     const cached = this.resourceAggregator.getCachedResources();
     const resource = cached.find((r) => r.uri === uri);
@@ -246,7 +247,10 @@ export class GatewayService {
 
     try {
       const readTimeoutMs = this.upstreamManager.getConfig(resource.upstreamName)?.timeout;
-      const readPromise = client.readResource({ uri: resource.originalUri });
+      const readPromise = client.readResource(
+        { uri: resource.originalUri },
+        signal ? { signal } : undefined,
+      );
       const result = await (readTimeoutMs
         ? this.withTimeout(readPromise, `readResource:${uri}`, readTimeoutMs)
         : readPromise);
@@ -271,7 +275,7 @@ export class GatewayService {
     return this.promptAggregator.getCachedPrompts();
   }
 
-  async getPrompt(name: string, args: Record<string, string>): Promise<GatewayGetPromptResult> {
+  async getPrompt(name: string, args: Record<string, string>, signal?: AbortSignal): Promise<GatewayGetPromptResult> {
     // Find the aggregated prompt to determine the upstream
     const cached = this.promptAggregator.getCachedPrompts();
     const prompt = cached.find((p) => p.name === name);
@@ -309,7 +313,10 @@ export class GatewayService {
 
     try {
       const promptTimeoutMs = this.upstreamManager.getConfig(prompt.upstreamName)?.timeout;
-      const promptPromise = client.getPrompt({ name: prompt.originalName, arguments: args });
+      const promptPromise = client.getPrompt(
+        { name: prompt.originalName, arguments: args },
+        signal ? { signal } : undefined,
+      );
       const result = await (promptTimeoutMs
         ? this.withTimeout(promptPromise, `getPrompt:${name}`, promptTimeoutMs)
         : promptPromise);
