@@ -293,13 +293,12 @@ describe('McpClientBootstrap notification wiring', () => {
     expect(onNotificationFn).not.toHaveBeenCalled();
   });
 
-  it('skips handlers when client is not connected', async () => {
+  it('registers @OnMcpNotification handlers even when client is not connected', async () => {
     const onNotificationFn = vi.fn();
     const clientA = {
       name: 'server-a',
       connect: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn().mockResolvedValue(undefined),
-      isConnected: vi.fn().mockReturnValue(false),
       onNotification: onNotificationFn,
     } as unknown as McpClient;
 
@@ -320,7 +319,10 @@ describe('McpClientBootstrap notification wiring', () => {
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
 
-    expect(onNotificationFn).not.toHaveBeenCalled();
+    expect(onNotificationFn).toHaveBeenCalledWith(
+      'notifications/tools/list_changed',
+      expect.any(Function),
+    );
   });
 
   it('binds the handler to the correct instance', async () => {

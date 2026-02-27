@@ -264,10 +264,52 @@ describe('McpClient', () => {
       expect(handler).toHaveBeenCalledWith(notification);
     });
 
-    it('should throw if not connected', () => {
+    it('onNotification registers handler without requiring connection', async () => {
+      // Not connected yet
+      expect(mcpClient.isConnected()).toBe(false);
+
+      const handler = vi.fn();
+      // Should not throw
       expect(() =>
-        mcpClient.onNotification('notifications/tools/list_changed', vi.fn()),
-      ).toThrow('is not connected');
+        mcpClient.onNotification('notifications/tools/list_changed', handler),
+      ).not.toThrow();
+
+      // After connecting, the stored handler is applied to the client
+      await mcpClient.connect();
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(
+        clientInstance._notificationHandlers.has('notifications/tools/list_changed'),
+      ).toBe(true);
+    });
+
+    it('onNotification handler survives reconnect (new Client instance)', async () => {
+      const connWithReconnect = createConnection({ reconnect: { maxAttempts: 2, delay: 1 } });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      const handler = vi.fn();
+      // Register BEFORE connecting
+      mcpClient.onNotification('notifications/tools/list_changed', handler);
+
+      await mcpClient.connect();
+
+      // Capture the current client instance (created in the constructor above)
+      // before reconnect swaps it out
+      const initialClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(
+        initialClient._notificationHandlers.has('notifications/tools/list_changed'),
+      ).toBe(true);
+
+      // Trigger disconnect — reconnect creates a brand-new Client instance
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      expect(mcpClient.isConnected()).toBe(true);
+
+      // The newly created Client instance should also have the handler
+      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(
+        reconnectedClient._notificationHandlers.has('notifications/tools/list_changed'),
+      ).toBe(true);
     });
   });
 

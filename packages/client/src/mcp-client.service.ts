@@ -33,6 +33,10 @@ export class McpClient {
   private connected = false;
   private reconnectAttempts = 0;
   private reconnecting = false;
+  private readonly _notificationHandlerStore = new Map<
+    string,
+    (notification: unknown) => Promise<void>
+  >();
 
   constructor(
     readonly name: string,
@@ -55,6 +59,7 @@ export class McpClient {
     try {
       await this.client.connect(this.transport);
       this.connected = true;
+      this._reapplyNotificationHandlers();
       this.reconnectAttempts = 0;
       this.logger.log(`Connected to MCP server "${this.name}"`);
     } catch (err: unknown) {
@@ -195,21 +200,33 @@ export class McpClient {
     method: string,
     handler: (notification: { method: string; params?: Record<string, unknown> }) => void | Promise<void>,
   ): void {
-    this.assertConnected();
+    // Store the wrapped handler persistently so it survives reconnects.
     // Access the internal notification handlers map directly because the SDK's
     // setNotificationHandler() requires a Zod schema with a literal method field,
     // which is not practical for arbitrary notification method strings.
-    const protocol = this.client as unknown as {
-      _notificationHandlers: Map<
-        string,
-        (notification: unknown) => Promise<void>
-      >;
-    };
-    protocol._notificationHandlers.set(method, (notification) =>
-      Promise.resolve(
-        handler(notification as { method: string; params?: Record<string, unknown> }),
-      ),
-    );
+    const wrapped = (n: unknown) =>
+      Promise.resolve(handler(n as { method: string; params?: Record<string, unknown> }));
+    this._notificationHandlerStore.set(method, wrapped);
+    if (this.connected) {
+      this._applyNotificationHandler(method, wrapped);
+    }
+  }
+
+  private _applyNotificationHandler(
+    method: string,
+    wrapped: (n: unknown) => Promise<void>,
+  ): void {
+    (
+      this.client as unknown as {
+        _notificationHandlers: Map<string, (n: unknown) => Promise<void>>;
+      }
+    )._notificationHandlers.set(method, wrapped);
+  }
+
+  private _reapplyNotificationHandlers(): void {
+    for (const [method, wrapped] of this._notificationHandlerStore) {
+      this._applyNotificationHandler(method, wrapped);
+    }
   }
 
   getServerCapabilities() {
@@ -267,6 +284,7 @@ export class McpClient {
 
         await this.client.connect(this.transport);
         this.connected = true;
+        this._reapplyNotificationHandlers();
         this.reconnectAttempts = 0;
         this.reconnecting = false;
         this.logger.log(`Reconnected to "${this.name}"`);

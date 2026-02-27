@@ -188,14 +188,6 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
             continue;
           }
 
-          if (!client.isConnected()) {
-            this.logger.warn(
-              `@OnMcpNotification on ${instance.constructor.name}.${methodName}: ` +
-                `client "${metadata.connectionName}" is not connected, skipping`,
-            );
-            continue;
-          }
-
           const boundHandler = (instance as Record<string, Function>)[methodName].bind(instance);
           client.onNotification(metadata.method, boundHandler);
           wiredCount++;

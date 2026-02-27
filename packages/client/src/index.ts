@@ -47,3 +47,21 @@ export type {
 
 // Testing
 export { MockMcpClient } from './testing/mock-client';
+
+// OAuth
+export {
+  auth,
+  extractWWWAuthenticateParams,
+  discoverAuthorizationServerMetadata,
+  discoverOAuthProtectedResourceMetadata,
+} from '@modelcontextprotocol/sdk/client/auth.js';
+export type {
+  OAuthClientProvider,
+  AuthResult,
+} from '@modelcontextprotocol/sdk/client/auth.js';
+export type {
+  OAuthClientMetadata,
+  OAuthTokens,
+  AuthorizationServerMetadata,
+  OAuthProtectedResourceMetadata,
+} from '@modelcontextprotocol/sdk/shared/auth.js';
