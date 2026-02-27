@@ -7,3 +7,5 @@ coverage/
 .env
 .env.local
 .npm-cache/
+internal-docs/
+references/
