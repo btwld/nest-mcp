@@ -74,7 +74,7 @@ export class McpExecutorService {
       const handler = tool.instance[tool.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      const result = await handler(validatedArgs, ctx);
+      const result = await handler.call(tool.instance, validatedArgs, ctx);
       return this.normalizeToolResult(result);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
@@ -163,7 +163,7 @@ export class McpExecutorService {
       const handler = resource.instance[resource.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      const result = await handler(new URL(uri), ctx);
+      const result = await handler.call(resource.instance, new URL(uri), ctx);
       return this.normalizeResourceResult(result, uri);
     }
 
@@ -174,7 +174,7 @@ export class McpExecutorService {
         const handler = template.instance[template.methodName] as
           // biome-ignore lint/complexity/noBannedTypes: dynamic method call
           Function;
-        const result = await handler(new URL(uri), match.params, ctx);
+        const result = await handler.call(template.instance, new URL(uri), match.params, ctx);
         return this.normalizeResourceResult(result, uri);
       }
     }
@@ -235,7 +235,7 @@ export class McpExecutorService {
     const handler = prompt.instance[prompt.methodName] as
       // biome-ignore lint/complexity/noBannedTypes: dynamic method call
       Function;
-    const result = await handler(validatedArgs, ctx);
+    const result = await handler.call(prompt.instance, validatedArgs, ctx);
 
     if (result && typeof result === 'object' && 'messages' in result) {
       return result as PromptGetResult;
@@ -256,7 +256,7 @@ export class McpExecutorService {
       const fn = handler.instance[handler.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      const result = await fn(request.argument.name, request.argument.value, request.context);
+      const result = await fn.call(handler.instance, request.argument.name, request.argument.value, request.context);
       return this.normalizeCompletionResult(result);
     }
 
