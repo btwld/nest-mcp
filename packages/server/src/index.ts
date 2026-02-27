@@ -42,6 +42,9 @@ export { McpRequestContextService } from './execution/request-context.service';
 export { StreamableHttpService } from './transport/streamable-http/streamable.service';
 export { SseService } from './transport/sse/sse.service';
 export { StdioService } from './transport/stdio/stdio.service';
+export { StderrLogger } from './transport/stdio/stderr-logger';
+export { bootstrapStdioApp } from './transport/stdio/bootstrap-stdio';
+export type { StdioBootstrapOptions } from './transport/stdio/bootstrap-stdio';
 
 // Resilience
 export { RateLimiterService } from './resilience/rate-limiter.service';
