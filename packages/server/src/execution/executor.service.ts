@@ -38,6 +38,7 @@ export class McpExecutorService {
   async listTools(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
     const all = this.registry.getAllTools().map((tool) => ({
       name: tool.name,
+      ...(tool.title != null ? { title: tool.title } : {}),
       description: tool.description,
       inputSchema: tool.parameters
         ? zodToJsonSchema(tool.parameters)
@@ -48,6 +49,9 @@ export class McpExecutorService {
           ? { outputSchema: tool.rawOutputSchema }
           : {}),
       ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      ...(tool.icons ? { icons: tool.icons } : {}),
+      ...(tool.execution ? { execution: tool.execution } : {}),
+      ...(tool._meta ? { _meta: tool._meta } : {}),
     }));
     return paginate(all, cursor, this.pageSize);
   }
@@ -130,8 +134,11 @@ export class McpExecutorService {
     const all = this.registry.getAllResources().map((r) => ({
       uri: r.uri,
       name: r.name,
+      ...(r.title != null ? { title: r.title } : {}),
       ...(r.description ? { description: r.description } : {}),
       ...(r.mimeType ? { mimeType: r.mimeType } : {}),
+      ...(r.icons ? { icons: r.icons } : {}),
+      ...(r._meta ? { _meta: r._meta } : {}),
     }));
     return paginate(all, cursor, this.pageSize);
   }
@@ -140,8 +147,11 @@ export class McpExecutorService {
     const all = this.registry.getAllResourceTemplates().map((t) => ({
       uriTemplate: t.uriTemplate,
       name: t.name,
+      ...(t.title != null ? { title: t.title } : {}),
       ...(t.description ? { description: t.description } : {}),
       ...(t.mimeType ? { mimeType: t.mimeType } : {}),
+      ...(t.icons ? { icons: t.icons } : {}),
+      ...(t._meta ? { _meta: t._meta } : {}),
     }));
     return paginate(all, cursor, this.pageSize);
   }
@@ -191,6 +201,7 @@ export class McpExecutorService {
   async listPrompts(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
     const all = this.registry.getAllPrompts().map((p) => ({
       name: p.name,
+      ...(p.title != null ? { title: p.title } : {}),
       description: p.description,
       ...(p.parameters
         ? {
@@ -201,6 +212,8 @@ export class McpExecutorService {
             })),
           }
         : {}),
+      ...(p.icons ? { icons: p.icons } : {}),
+      ...(p._meta ? { _meta: p._meta } : {}),
     }));
     return paginate(all, cursor, this.pageSize);
   }

@@ -5,10 +5,14 @@ export function Tool(options: ToolOptions): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
     const metadata: ToolMetadata = {
       name: options.name || String(propertyKey),
+      ...(options.title != null ? { title: options.title } : {}),
       description: options.description,
       parameters: options.parameters,
       outputSchema: options.outputSchema,
       annotations: options.annotations,
+      ...(options.icons != null ? { icons: options.icons } : {}),
+      ...(options.execution != null ? { execution: options.execution } : {}),
+      ...('_meta' in options && options._meta != null ? { _meta: options._meta } : {}),
       methodName: String(propertyKey),
       target: target.constructor as abstract new (...args: unknown[]) => unknown,
     };

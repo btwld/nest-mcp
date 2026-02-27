@@ -103,6 +103,6 @@ describe('protocol constants', () => {
   });
 
   it('should have exactly 29 methods to guard against drift', () => {
-    expect(Object.keys(MCP_METHODS)).toHaveLength(31);
+    expect(Object.keys(MCP_METHODS)).toHaveLength(32);
   });
 });

@@ -140,6 +140,31 @@ function buildObjectSchema(def: ZodDef): Record<string, unknown> {
 }
 
 /**
+ * Validates that a Zod schema and all its fields have `.describe()` set.
+ * Logs warnings for any missing descriptions. Does NOT throw.
+ * Intended to be called during tool/prompt registration for dev-time feedback.
+ */
+export function warnMissingDescriptions(schema: ZodType, label: string): void {
+  const def = (schema as unknown as { _def?: ZodDef })?._def;
+  if (!def) return;
+
+  if (!def.description) {
+    console.warn(`[nest-mcp] ${label}: schema is missing a top-level .describe() call`);
+  }
+
+  if (def.typeName === 'ZodObject') {
+    const shape = def.shape?.();
+    if (shape) {
+      for (const [key, value] of Object.entries(shape)) {
+        if (!value?._def?.description) {
+          console.warn(`[nest-mcp] ${label}: field '${key}' is missing a .describe() call`);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Extract parameter descriptions from a Zod schema for prompt argument metadata.
  */
 export function extractZodDescriptions(

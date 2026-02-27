@@ -1,4 +1,4 @@
-import type { McpExecutionContext, McpProgress } from '@btwld/mcp-common';
+import type { ElicitRequest, ElicitResult, McpExecutionContext, McpProgress, ToolContent } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -157,9 +157,31 @@ export function registerToolOnServer(
             }
           : ctx.reportProgress;
 
+      // Build per-request streamContent that sends notifications/tool/streamContent
+      const streamContent = extra.sendNotification
+        ? async (content: ToolContent | ToolContent[]) => {
+            await extra.sendNotification?.({
+              method: 'notifications/tool/streamContent',
+              params: {
+                toolName: tool.name,
+                content: Array.isArray(content) ? content : [content],
+              },
+            });
+          }
+        : undefined;
+
+      // Build per-request elicit that delegates to the SDK's elicitInput method
+      const elicit = (params: ElicitRequest, options?: { signal?: AbortSignal }) =>
+        server.server.elicitInput(
+          params as Parameters<typeof server.server.elicitInput>[0],
+          options,
+        ) as Promise<ElicitResult>;
+
       const ctxWithSignal: McpExecutionContext = {
         ...baseCtxWithSignal,
         reportProgress,
+        ...(streamContent ? { streamContent } : {}),
+        elicit,
       };
 
       try {

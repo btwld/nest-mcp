@@ -1,4 +1,6 @@
 import type { McpTransportType } from './mcp-transport.interface';
+import type { ToolContent } from './mcp-tool.interface';
+import type { ElicitRequest, ElicitResult } from './mcp-elicitation.interface';
 
 export interface McpProgress {
   progress: number;
@@ -15,6 +17,10 @@ export interface McpExecutionContext {
   user?: McpAuthenticatedUser;
   metadata: Record<string, unknown>;
   signal?: AbortSignal;
+  /** Emit incremental content chunks during tool execution (FastMCP streaming extension). */
+  streamContent?: (content: ToolContent | ToolContent[]) => Promise<void>;
+  /** Ask the user for input during tool execution via the elicitation protocol. */
+  elicit?: (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>;
 }
 
 export interface McpContextLogger {

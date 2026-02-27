@@ -13,18 +13,38 @@ export interface ToolAnnotations {
   destructiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
+  /** Hint that this tool emits incremental content via streamContent (FastMCP convention). */
+  streamingHint?: boolean;
+}
+
+export interface Icon {
+  src: string;
+  mimeType?: string;
+  sizes?: string[];
+  theme?: 'light' | 'dark';
+}
+
+export interface ToolExecution {
+  taskSupport?: 'forbidden' | 'optional' | 'required';
 }
 
 export interface ToolOptions {
   name?: string;
+  /** Human-readable display title for the tool (distinct from the machine name). */
+  title?: string;
   description: string;
   parameters?: ZodType;
   outputSchema?: ZodType;
   annotations?: ToolAnnotations;
+  icons?: Icon[];
+  execution?: ToolExecution;
+  _meta?: Record<string, unknown>;
 }
 
 export interface ToolMetadata {
   name: string;
+  /** Human-readable display title for the tool (distinct from the machine name). */
+  title?: string;
   description: string;
   parameters?: ZodType;
   inputSchema?: Record<string, unknown>;
@@ -32,6 +52,9 @@ export interface ToolMetadata {
   /** Raw JSON schema for output — used when no Zod outputSchema is available (e.g. gateway-proxied tools). */
   rawOutputSchema?: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  icons?: Icon[];
+  execution?: ToolExecution;
+  _meta?: Record<string, unknown>;
   // Auth
   isPublic?: boolean;
   requiredScopes?: string[];
@@ -55,7 +78,16 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
-export type ToolContent = TextContent | ImageContent | AudioContent | EmbeddedResource;
+export interface ResourceLink {
+  type: 'resource_link';
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  annotations?: ContentAnnotations;
+}
+
+export type ToolContent = TextContent | ImageContent | AudioContent | EmbeddedResource | ResourceLink;
 
 export interface TextContent {
   type: 'text';

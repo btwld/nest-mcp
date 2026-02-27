@@ -18,11 +18,15 @@ export * from './interfaces/mcp-resilience.interface';
 export * from './interfaces/mcp-middleware.interface';
 export * from './interfaces/http-adapter.interface';
 export * from './interfaces/mcp-completion.interface';
+export * from './interfaces/mcp-elicitation.interface';
 
 // Types
 export * from './types/json-rpc.types';
 export * from './types/content.types';
 export * from './types/capabilities.types';
+
+/** Vendor metadata object for `_meta` fields on tools, prompts, and resources. */
+export type MetaObject = Record<string, unknown>;
 
 // Errors
 export * from './errors/mcp-error';

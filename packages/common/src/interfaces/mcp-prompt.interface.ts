@@ -1,15 +1,24 @@
 import type { ZodObject, ZodRawShape } from 'zod';
+import type { Icon } from './mcp-tool.interface';
 
 export interface PromptOptions {
   name?: string;
+  /** Human-readable display title for the prompt (distinct from the machine name). */
+  title?: string;
   description: string;
   parameters?: ZodObject<ZodRawShape>;
+  icons?: Icon[];
+  _meta?: Record<string, unknown>;
 }
 
 export interface PromptMetadata {
   name: string;
+  /** Human-readable display title for the prompt (distinct from the machine name). */
+  title?: string;
   description: string;
   parameters?: ZodObject<ZodRawShape>;
+  icons?: Icon[];
+  _meta?: Record<string, unknown>;
   methodName: string;
   target: abstract new (...args: unknown[]) => unknown;
 }

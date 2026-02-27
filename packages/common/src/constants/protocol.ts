@@ -55,6 +55,8 @@ export const MCP_METHODS = {
   NOTIFICATION_TASKS_STATUS: 'notifications/tasks/status',
   NOTIFICATION_ELICITATION_COMPLETE: 'notifications/elicitation/complete',
   NOTIFICATION_ROOTS_LIST_CHANGED: 'notifications/roots/list_changed',
+  /** FastMCP streaming extension: server streams incremental tool content to the client. */
+  NOTIFICATION_TOOL_STREAM_CONTENT: 'notifications/tool/streamContent',
 } as const;
 
 export type McpMethod = (typeof MCP_METHODS)[keyof typeof MCP_METHODS];
