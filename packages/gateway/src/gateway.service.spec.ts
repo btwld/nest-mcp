@@ -496,6 +496,101 @@ describe('GatewayService', () => {
     });
   });
 
+  describe('readResourceTemplate', () => {
+    it('should match template, expand original URI, and forward to upstream', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///users/{id}/profile',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///users/{id}/profile',
+        },
+      ]);
+      const mockClient = {
+        readResource: vi.fn().mockResolvedValue({
+          contents: [{ uri: 'file:///users/42/profile', text: 'user data' }],
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.isHealthy.mockReturnValue(true);
+
+      const result = await service.readResourceTemplate('fs://file:///users/42/profile');
+
+      expect(mockClient.readResource).toHaveBeenCalledWith(
+        { uri: 'file:///users/42/profile' },
+        undefined,
+      );
+      expect(result.contents).toEqual([{ uri: 'file:///users/42/profile', text: 'user data' }]);
+    });
+
+    it('should return error when no template matches', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([]);
+
+      const result = await service.readResourceTemplate('file:///unknown/path');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('No resource template matched') }),
+      );
+    });
+
+    it('should return error when upstream is not connected', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///users/{id}',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///users/{id}',
+        },
+      ]);
+      upstreamManager.getClient.mockReturnValue(undefined);
+
+      const result = await service.readResourceTemplate('fs://file:///users/42');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('not connected') }),
+      );
+    });
+
+    it('should return error when upstream is unhealthy', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///users/{id}',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///users/{id}',
+        },
+      ]);
+      upstreamManager.getClient.mockReturnValue({});
+      upstreamManager.isHealthy.mockReturnValue(false);
+
+      const result = await service.readResourceTemplate('fs://file:///users/42');
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
+      );
+    });
+
+    it('should pass signal to upstream client', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///docs/{name}',
+          upstreamName: 'docs',
+          originalUriTemplate: 'file:///docs/{name}',
+        },
+      ]);
+      const mockClient = {
+        readResource: vi.fn().mockResolvedValue({ contents: [] }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.isHealthy.mockReturnValue(true);
+      const controller = new AbortController();
+
+      await service.readResourceTemplate('fs://file:///docs/readme', controller.signal);
+
+      expect(mockClient.readResource).toHaveBeenCalledWith(
+        { uri: 'file:///docs/readme' },
+        { signal: controller.signal },
+      );
+    });
+  });
+
   describe('complete', () => {
     it('should route prompt completion to correct upstream', async () => {
       promptAggregator.getCachedPrompts.mockReturnValue([

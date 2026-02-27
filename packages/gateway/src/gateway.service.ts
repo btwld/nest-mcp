@@ -4,6 +4,8 @@ import {
   type PromptMessage,
   type ResourceContent,
   type ToolContent,
+  expandUriTemplate,
+  matchUriTemplate,
 } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -265,6 +267,53 @@ export class GatewayService {
       this.logger.error(upstreamError.message);
       return { contents: [{ uri, text: `Error reading resource: ${message}` }] };
     }
+  }
+
+  /**
+   * Read a resource template URI by matching against cached templates and
+   * forwarding to the appropriate upstream, stripping any gateway-added prefix
+   * by re-expanding with the original upstream URI template.
+   */
+  async readResourceTemplate(uri: string, signal?: AbortSignal): Promise<GatewayReadResourceResult> {
+    const templates = this.resourceTemplateAggregator.getCachedTemplates();
+
+    for (const template of templates) {
+      const match = matchUriTemplate(template.uriTemplate, uri);
+      if (!match) continue;
+
+      const client = this.upstreamManager.getClient(template.upstreamName);
+      if (!client) {
+        return { contents: [{ uri, text: `Upstream "${template.upstreamName}" is not connected` }] };
+      }
+
+      if (!this.upstreamManager.isHealthy(template.upstreamName)) {
+        return { contents: [{ uri, text: `Upstream "${template.upstreamName}" is unhealthy` }] };
+      }
+
+      try {
+        const originalUri = expandUriTemplate(template.originalUriTemplate, match.params);
+        const timeoutMs = this.upstreamManager.getConfig(template.upstreamName)?.timeout;
+        const readPromise = client.readResource(
+          { uri: originalUri },
+          signal ? { signal } : undefined,
+        );
+        const result = await (timeoutMs
+          ? this.withTimeout(readPromise, `readResourceTemplate:${uri}`, timeoutMs)
+          : readPromise);
+        return { contents: result.contents as ResourceContent[] };
+      } catch (error) {
+        const message = extractErrorMessage(error);
+        const upstreamError = new McpUpstreamError(
+          template.upstreamName,
+          message,
+          error instanceof Error ? error : undefined,
+        );
+        this.logger.error(upstreamError.message);
+        return { contents: [{ uri, text: `Error reading resource template: ${message}` }] };
+      }
+    }
+
+    return { contents: [{ uri, text: `No resource template matched URI: ${uri}` }] };
   }
 
   async listPrompts(): Promise<AggregatedPrompt[]> {

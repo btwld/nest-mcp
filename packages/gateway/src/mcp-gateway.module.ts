@@ -294,7 +294,9 @@ export class McpGatewayModule implements OnApplicationBootstrap {
 
     for (const template of templates) {
       const handlerWrapper = {
-        [template.name]: async () => ({ contents: [] }),
+        [template.name]: async (uri: URL, _params: Record<string, string>, ctx: McpExecutionContext) => {
+          return this.gatewayService.readResourceTemplate(uri.href, ctx.signal);
+        },
       };
 
       const registered: RegisteredResourceTemplate = {
