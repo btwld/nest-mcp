@@ -11,6 +11,7 @@ import {
 import type {
   RegisteredPrompt,
   RegisteredResource,
+  RegisteredResourceTemplate,
   RegisteredTool,
 } from '../../discovery/registry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -31,6 +32,7 @@ import {
   registerHandlers,
   registerPromptOnServer,
   registerResourceOnServer,
+  registerResourceTemplateOnServer,
   registerToolOnServer,
 } from '../register-handlers';
 import type { SdkHandle } from '../register-handlers';
@@ -188,12 +190,33 @@ export class SseService implements OnModuleDestroy {
       }
     };
 
+    const onResourceTemplateRegistered = (template: RegisteredResourceTemplate) => {
+      for (const [sessionId, server] of this.servers) {
+        const ctx = this.contexts.get(sessionId);
+        if (!ctx) continue;
+        const handle = registerResourceTemplateOnServer(server, template, this.pipeline, ctx);
+        this.sdkHandles.get(sessionId)?.set(`resourceTemplate:${template.uriTemplate}`, handle);
+      }
+    };
+
+    const onResourceTemplateUnregistered = (uriTemplate: string) => {
+      for (const [sessionId] of this.servers) {
+        const handle = this.sdkHandles.get(sessionId)?.get(`resourceTemplate:${uriTemplate}`);
+        if (handle) {
+          handle.remove();
+          this.sdkHandles.get(sessionId)?.delete(`resourceTemplate:${uriTemplate}`);
+        }
+      }
+    };
+
     this.registry.events.on('tool.registered', onToolRegistered);
     this.registry.events.on('tool.unregistered', onToolUnregistered);
     this.registry.events.on('resource.registered', onResourceRegistered);
     this.registry.events.on('resource.unregistered', onResourceUnregistered);
     this.registry.events.on('prompt.registered', onPromptRegistered);
     this.registry.events.on('prompt.unregistered', onPromptUnregistered);
+    this.registry.events.on('resourceTemplate.registered', onResourceTemplateRegistered);
+    this.registry.events.on('resourceTemplate.unregistered', onResourceTemplateUnregistered);
 
     this.registryListeners.push(
       { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
@@ -202,6 +225,8 @@ export class SseService implements OnModuleDestroy {
       { event: 'resource.unregistered', listener: onResourceUnregistered as (...args: unknown[]) => void },
       { event: 'prompt.registered', listener: onPromptRegistered as (...args: unknown[]) => void },
       { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
+      { event: 'resourceTemplate.registered', listener: onResourceTemplateRegistered as (...args: unknown[]) => void },
+      { event: 'resourceTemplate.unregistered', listener: onResourceTemplateUnregistered as (...args: unknown[]) => void },
     );
   }
 

@@ -6,6 +6,7 @@ import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nes
 import type {
   RegisteredPrompt,
   RegisteredResource,
+  RegisteredResourceTemplate,
   RegisteredTool,
 } from '../../discovery/registry.service';
 // biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
@@ -25,6 +26,7 @@ import {
   registerHandlers,
   registerPromptOnServer,
   registerResourceOnServer,
+  registerResourceTemplateOnServer,
   registerToolOnServer,
 } from '../register-handlers';
 import type { SdkHandle } from '../register-handlers';
@@ -113,12 +115,28 @@ export class StdioService implements OnModuleDestroy {
       }
     };
 
+    const onResourceTemplateRegistered = (template: RegisteredResourceTemplate) => {
+      if (!this.server || !this.ctx) return;
+      const handle = registerResourceTemplateOnServer(this.server, template, this.pipeline, this.ctx);
+      this.sdkHandles.set(`resourceTemplate:${template.uriTemplate}`, handle);
+    };
+
+    const onResourceTemplateUnregistered = (uriTemplate: string) => {
+      const handle = this.sdkHandles.get(`resourceTemplate:${uriTemplate}`);
+      if (handle) {
+        handle.remove();
+        this.sdkHandles.delete(`resourceTemplate:${uriTemplate}`);
+      }
+    };
+
     this.registry.events.on('tool.registered', onToolRegistered);
     this.registry.events.on('tool.unregistered', onToolUnregistered);
     this.registry.events.on('resource.registered', onResourceRegistered);
     this.registry.events.on('resource.unregistered', onResourceUnregistered);
     this.registry.events.on('prompt.registered', onPromptRegistered);
     this.registry.events.on('prompt.unregistered', onPromptUnregistered);
+    this.registry.events.on('resourceTemplate.registered', onResourceTemplateRegistered);
+    this.registry.events.on('resourceTemplate.unregistered', onResourceTemplateUnregistered);
 
     this.registryListeners.push(
       { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
@@ -127,6 +145,8 @@ export class StdioService implements OnModuleDestroy {
       { event: 'resource.unregistered', listener: onResourceUnregistered as (...args: unknown[]) => void },
       { event: 'prompt.registered', listener: onPromptRegistered as (...args: unknown[]) => void },
       { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
+      { event: 'resourceTemplate.registered', listener: onResourceTemplateRegistered as (...args: unknown[]) => void },
+      { event: 'resourceTemplate.unregistered', listener: onResourceTemplateUnregistered as (...args: unknown[]) => void },
     );
   }
 
