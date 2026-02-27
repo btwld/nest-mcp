@@ -180,6 +180,7 @@ export class GatewayService {
       const timeoutMs = this.upstreamManager.getConfig(route.upstreamName)?.timeout;
       const callPromise = client.callTool(
         { name: request.toolName, arguments: request.arguments },
+        undefined,
         signal ? { signal } : undefined,
       );
       const result = await (timeoutMs

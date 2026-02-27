@@ -1,4 +1,4 @@
-import type { ElicitRequest, ElicitResult, McpExecutionContext, McpProgress, ToolContent } from '@btwld/mcp-common';
+import type { ElicitRequest, ElicitResult, McpExecutionContext, McpModuleOptions, McpProgress, ToolContent } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -74,6 +74,7 @@ export function registerHandlers(
   registry: McpRegistryService,
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
+  options: McpModuleOptions,
   subscriptionManager?: ResourceSubscriptionManager,
 ): void {
   for (const tool of registry.getAllTools()) {
@@ -89,8 +90,8 @@ export function registerHandlers(
     registerPromptOnServer(server, prompt, pipeline, ctx);
   }
   registerCancellationHandler(server);
-  registerListHandlers(server, pipeline);
-  registerCompletionHandler(server, pipeline);
+  registerListHandlers(server, pipeline, registry, options);
+  registerCompletionHandler(server, pipeline, registry, options);
   if (subscriptionManager) {
     registerSubscriptionHandlers(server, subscriptionManager, ctx);
   }
@@ -304,51 +305,78 @@ function registerCancellationHandler(server: McpServer): void {
  * Registers custom list request handlers on the low-level SDK Server to
  * support cursor-based pagination. These override the SDK's default
  * list handlers that were auto-registered by registerTool/resource/prompt.
+ *
+ * Only registers handlers for capabilities the server actually declared —
+ * the MCP SDK (v1.26+) throws if you register a handler for an undeclared capability.
  */
-function registerListHandlers(server: McpServer, pipeline: ExecutionPipelineService): void {
+function registerListHandlers(
+  server: McpServer,
+  pipeline: ExecutionPipelineService,
+  registry: McpRegistryService,
+  options: McpModuleOptions,
+): void {
   server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
     const cursor = request.params?.cursor;
     const result = await pipeline.listTools(cursor);
     return { tools: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
   });
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
-    const cursor = request.params?.cursor;
-    const result = await pipeline.listResources(cursor);
-    return {
-      resources: result.items,
-      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-    };
-  });
+  const hasResources =
+    registry.hasResources || registry.hasResourceTemplates || !!options.capabilities?.resources;
 
-  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
-    const cursor = request.params?.cursor;
-    const result = await pipeline.listResourceTemplates(cursor);
-    return {
-      resourceTemplates: result.items,
-      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-    };
-  });
+  if (hasResources) {
+    server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+      const cursor = request.params?.cursor;
+      const result = await pipeline.listResources(cursor);
+      return {
+        resources: result.items,
+        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+      };
+    });
 
-  server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
-    const cursor = request.params?.cursor;
-    const result = await pipeline.listPrompts(cursor);
-    return {
-      prompts: result.items,
-      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-    };
-  });
+    server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
+      const cursor = request.params?.cursor;
+      const result = await pipeline.listResourceTemplates(cursor);
+      return {
+        resourceTemplates: result.items,
+        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+      };
+    });
+  }
+
+  const hasPrompts = registry.hasPrompts || !!options.capabilities?.prompts;
+
+  if (hasPrompts) {
+    server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
+      const cursor = request.params?.cursor;
+      const result = await pipeline.listPrompts(cursor);
+      return {
+        prompts: result.items,
+        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+      };
+    });
+  }
 }
 
 /**
  * Registers a `completion/complete` handler on the low-level SDK Server.
- * Overrides the SDK's built-in completion handler to delegate to the pipeline,
- * which supports both custom @Completion() handlers and default completion logic.
+ * Only registered when the server declares completions capability (which requires
+ * prompts or resource templates). The MCP SDK enforces this at registration time.
  */
 function registerCompletionHandler(
   server: McpServer,
   pipeline: ExecutionPipelineService,
+  registry: McpRegistryService,
+  options: McpModuleOptions,
 ): void {
+  const hasCompletions =
+    registry.hasPrompts ||
+    registry.hasResourceTemplates ||
+    !!options.capabilities?.prompts ||
+    !!options.capabilities?.resources;
+
+  if (!hasCompletions) return;
+
   server.server.setRequestHandler(CompleteRequestSchema, async (request) => {
     const result = await pipeline.complete({
       ref: request.params.ref,

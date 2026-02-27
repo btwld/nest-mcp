@@ -207,7 +207,7 @@ export class StreamableHttpService implements OnModuleDestroy {
         : undefined,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
+    registerHandlers(server, this.registry, this.pipeline, ctx, this.options, this.subscriptionManager);
 
     // Only store context/handles for stateful sessions (label !== stateless-*)
     if (!label.startsWith('stateless-')) {

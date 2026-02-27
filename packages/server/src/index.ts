@@ -120,6 +120,7 @@ export type {
   RetryConfig,
   CircuitBreakerConfig,
   McpGuard,
+  McpGuardClass,
   McpGuardContext,
   AuthenticatedUser,
   CompletionRequest,

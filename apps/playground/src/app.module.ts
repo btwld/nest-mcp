@@ -1,4 +1,4 @@
-import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType } from '@btwld/mcp-server';
+import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType, type McpGuardClass } from '@btwld/mcp-server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
 import { AuthDemoController } from './auth-demo.controller';
@@ -33,7 +33,7 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
         retry: { maxAttempts: 1, backoff: 'fixed' },
       },
       // Global guards (run JwtAuthGuard on every tool/resource/prompt call)
-      guards: [JwtAuthGuard as unknown as abstract new (...args: unknown[]) => unknown],
+      guards: [JwtAuthGuard as unknown as McpGuardClass],
       // Global middleware
       middleware: [loggingMiddleware],
       // Session management

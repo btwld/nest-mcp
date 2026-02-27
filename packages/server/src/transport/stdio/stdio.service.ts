@@ -66,7 +66,7 @@ export class StdioService implements OnModuleDestroy {
         : undefined,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
+    registerHandlers(server, this.registry, this.pipeline, ctx, this.options, this.subscriptionManager);
 
     this.server = server;
     this.ctx = ctx;

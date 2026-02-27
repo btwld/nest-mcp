@@ -1,4 +1,4 @@
-import type { McpExecutionContext } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
 import { McpTransportType } from '@btwld/mcp-common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -13,8 +13,9 @@ import {
 describe('registerHandlers', () => {
   let mockInnerServer: Record<string, ReturnType<typeof vi.fn>>;
   let mockServer: Record<string, unknown>;
-  let mockRegistry: Record<string, ReturnType<typeof vi.fn>>;
+  let mockRegistry: Record<string, ReturnType<typeof vi.fn> | boolean>;
   let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
+  let mockOptions: McpModuleOptions;
   let ctx: McpExecutionContext;
 
   beforeEach(() => {
@@ -38,7 +39,21 @@ describe('registerHandlers', () => {
       getAllResources: vi.fn().mockReturnValue([]),
       getAllResourceTemplates: vi.fn().mockReturnValue([]),
       getAllPrompts: vi.fn().mockReturnValue([]),
+      hasTools: true,
+      hasResources: true,
+      hasResourceTemplates: true,
+      hasPrompts: true,
     };
+
+    mockOptions = {
+      name: 'test-server',
+      version: '1.0.0',
+      transport: McpTransportType.STDIO,
+      capabilities: {
+        resources: { subscribe: true, listChanged: true },
+        prompts: { listChanged: true },
+      },
+    } as McpModuleOptions;
 
     mockPipeline = {
       callTool: vi.fn().mockResolvedValue({ content: [] }),
@@ -61,7 +76,7 @@ describe('registerHandlers', () => {
   });
 
   it('registers nothing when registry is empty', () => {
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     expect((mockServer.registerTool as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
     expect((mockServer.resource as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
@@ -80,7 +95,7 @@ describe('registerHandlers', () => {
       },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     expect(registerTool).toHaveBeenCalledTimes(1);
@@ -103,7 +118,7 @@ describe('registerHandlers', () => {
       },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     const [, config] = registerTool.mock.calls[0];
@@ -115,7 +130,7 @@ describe('registerHandlers', () => {
       { name: 'ping', description: 'Ping', parameters: null },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     const [, config] = registerTool.mock.calls[0];
@@ -130,7 +145,7 @@ describe('registerHandlers', () => {
       { name: 'config', uri: 'data://config', mimeType: 'application/json' },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     expect(resource).toHaveBeenCalledTimes(1);
@@ -146,7 +161,7 @@ describe('registerHandlers', () => {
       { name: 'data', uri: 'data://data', mimeType: undefined },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const [, , metadata] = resource.mock.calls[0];
@@ -158,7 +173,7 @@ describe('registerHandlers', () => {
       { name: 'user', uriTemplate: 'data://users/{id}', mimeType: 'application/json' },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerResource = mockServer.registerResource as ReturnType<typeof vi.fn>;
     expect(registerResource).toHaveBeenCalledTimes(1);
@@ -181,7 +196,7 @@ describe('registerHandlers', () => {
       { name: 'code_review', description: 'Review code', parameters: schema },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
     expect(registerPrompt).toHaveBeenCalledTimes(1);
@@ -200,7 +215,7 @@ describe('registerHandlers', () => {
       { name: 'greeting', description: 'Greet', parameters: null },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
     const [, config] = registerPrompt.mock.calls[0];
@@ -213,7 +228,7 @@ describe('registerHandlers', () => {
     ]);
     mockPipeline.callTool.mockResolvedValue({ content: [{ type: 'text', text: 'hi' }] });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     const callback = registerTool.mock.calls[0][2];
@@ -233,7 +248,7 @@ describe('registerHandlers', () => {
       { name: 'config', uri: 'data://config', mimeType: undefined },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const callback = resource.mock.calls[0][3];
@@ -250,7 +265,7 @@ describe('registerHandlers', () => {
       { name: 'greet', description: 'Greet', parameters: null },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
     const callback = registerPrompt.mock.calls[0][2];
@@ -266,7 +281,7 @@ describe('registerHandlers', () => {
   // --- Cancellation ---
 
   it('registers notifications/cancelled handler on inner server', () => {
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     expect(mockInnerServer.setNotificationHandler).toHaveBeenCalledWith(
       expect.objectContaining({ shape: expect.any(Object) }),
@@ -285,7 +300,7 @@ describe('registerHandlers', () => {
       () => new Promise((resolve) => { resolveCall = resolve; }),
     );
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     const callback = registerTool.mock.calls[0][2];
@@ -316,7 +331,7 @@ describe('registerHandlers', () => {
       { name: 'config', uri: 'data://config', mimeType: undefined },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const callback = resource.mock.calls[0][3];
@@ -338,7 +353,7 @@ describe('registerHandlers', () => {
       () => new Promise((resolve) => { resolveCall = resolve; }),
     );
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const callback = resource.mock.calls[0][3];
@@ -363,7 +378,7 @@ describe('registerHandlers', () => {
       { name: 'greet', description: 'Greet', parameters: null },
     ]);
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
     const callback = registerPrompt.mock.calls[0][2];
@@ -378,7 +393,7 @@ describe('registerHandlers', () => {
   // --- Pagination ---
 
   it('registers custom list request handlers on inner server', () => {
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     // 4 list handlers + 1 completion handler + 1 notification handler
     expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(5);
@@ -390,7 +405,7 @@ describe('registerHandlers', () => {
       nextCursor: 'abc123',
     });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     // Find the ListToolsRequest handler
     const listToolsCall = mockInnerServer.setRequestHandler.mock.calls.find(
@@ -411,7 +426,7 @@ describe('registerHandlers', () => {
       nextCursor: undefined,
     });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const listToolsCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tools/list',
@@ -429,7 +444,7 @@ describe('registerHandlers', () => {
       nextCursor: 'next',
     });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const listResourcesCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'resources/list',
@@ -447,7 +462,7 @@ describe('registerHandlers', () => {
       nextCursor: undefined,
     });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const listPromptsCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'prompts/list',
@@ -468,7 +483,7 @@ describe('registerHandlers', () => {
       total: 10,
     });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'completion/complete',
@@ -501,7 +516,7 @@ describe('registerHandlers', () => {
   it('completion handler omits hasMore and total when not provided', async () => {
     mockPipeline.complete.mockResolvedValue({ values: ['hello'] });
 
-    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx);
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
     const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'completion/complete',

@@ -79,7 +79,7 @@ export class SseService implements OnModuleDestroy {
         : undefined,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx, this.subscriptionManager);
+    registerHandlers(server, this.registry, this.pipeline, ctx, this.options, this.subscriptionManager);
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
