@@ -5,9 +5,7 @@ import {
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: ModulesContainer needed as value for emitDecoratorMetadata
 import { DiscoveryService, ModulesContainer } from '@nestjs/core';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from './registry.service';
 
 @Injectable()

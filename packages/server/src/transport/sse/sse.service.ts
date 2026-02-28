@@ -14,18 +14,12 @@ import type {
   RegisteredResourceTemplate,
   RegisteredTool,
 } from '../../discovery/registry.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../../discovery/registry.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpContextFactory } from '../../execution/context.factory';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpExecutorService } from '../../execution/executor.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ExecutionPipelineService } from '../../execution/pipeline.service';
 import { createMcpServer } from '../../server/server.factory';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceSubscriptionManager } from '../../subscription/resource-subscription.manager';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { TaskManager } from '../../task/task.manager';
 import type { HttpResponse } from '../http-response.interface';
 import {

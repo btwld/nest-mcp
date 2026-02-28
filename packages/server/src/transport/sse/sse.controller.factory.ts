@@ -1,5 +1,4 @@
 import { Controller, Get, Post, Req, Res, type Type, VERSION_NEUTRAL } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { SseService } from './sse.service';
 
 export function createSseController(

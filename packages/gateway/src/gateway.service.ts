@@ -8,31 +8,21 @@ import {
   matchUriTemplate,
 } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResponseCacheService } from './cache/response-cache.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PolicyEngineService } from './policies/policy-engine.service';
 import type { PolicyContext, PolicyEffect } from './policies/policy.interface';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { PromptAggregatorService } from './routing/prompt-aggregator.service';
 import type { AggregatedPrompt } from './routing/prompt-aggregator.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceAggregatorService } from './routing/resource-aggregator.service';
 import type { AggregatedResource } from './routing/resource-aggregator.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 import type { AggregatedResourceTemplate } from './routing/resource-template-aggregator.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RouterService } from './routing/router.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ToolAggregatorService } from './routing/tool-aggregator.service';
 import type { AggregatedTool } from './routing/tool-aggregator.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RequestTransformService } from './transform/request-transform.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ResponseTransformService } from './transform/response-transform.service';
 import type { ToolCallResponse } from './transform/response-transform.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from './upstream/upstream-manager.service';
 import { extractErrorMessage } from './utils/error-utils';
 

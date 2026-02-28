@@ -1,4 +1,3 @@
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { MetricsService, SessionManager } from '@btwld/mcp-server';
 import { Controller, Get, Header } from '@nestjs/common';
 

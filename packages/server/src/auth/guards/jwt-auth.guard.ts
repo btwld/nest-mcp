@@ -1,6 +1,5 @@
 import type { McpGuard, McpGuardContext } from '@btwld/mcp-common';
 import { Injectable } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { JwtTokenService } from '../services/jwt-token.service';
 
 @Injectable()

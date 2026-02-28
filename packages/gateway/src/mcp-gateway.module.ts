@@ -1,6 +1,5 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import {
   McpModule,
   McpPromptBuilder,

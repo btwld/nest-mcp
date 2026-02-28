@@ -1,6 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { extractErrorMessage } from '../utils/error-utils';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { UpstreamManagerService } from './upstream-manager.service';
 import type { UpstreamConfig } from './upstream.interface';
 

@@ -14,25 +14,15 @@ import type {
 import type { McpGuard, McpGuardClass } from '@btwld/mcp-common';
 import { MCP_OPTIONS, MCP_REQUEST_CANCELLED, McpError, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ModuleRef } from '@nestjs/core';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { MiddlewareService } from '../middleware/middleware.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { MetricsService } from '../observability/metrics.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RateLimiterService } from '../resilience/rate-limiter.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RetryService } from '../resilience/retry.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpExecutorService } from './executor.service';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRequestContextService } from './request-context.service';
 
 @Injectable()

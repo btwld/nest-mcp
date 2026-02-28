@@ -1,6 +1,5 @@
 import type { McpExecutionContext, ResourceReadResult } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredResource } from '../discovery/registry.service';
 

@@ -1,4 +1,3 @@
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { RequestTransformService, ResponseTransformService } from '@btwld/mcp-gateway';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 

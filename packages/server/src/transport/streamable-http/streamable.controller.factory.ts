@@ -8,7 +8,6 @@ import {
   type Type,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { StreamableHttpService } from './streamable.service';
 
 export function createStreamableHttpController(endpoint: string): Type<unknown> {

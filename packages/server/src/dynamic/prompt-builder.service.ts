@@ -1,7 +1,6 @@
 import type { McpExecutionContext, PromptGetResult } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodObject, ZodRawShape } from 'zod';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredPrompt } from '../discovery/registry.service';
 

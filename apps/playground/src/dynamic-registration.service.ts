@@ -1,4 +1,3 @@
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { McpPromptBuilder, McpResourceBuilder, McpToolBuilder } from '@btwld/mcp-server';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';

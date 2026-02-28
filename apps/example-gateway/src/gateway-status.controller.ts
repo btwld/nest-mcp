@@ -1,4 +1,3 @@
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import {
   PolicyEngineService,
   PromptAggregatorService,

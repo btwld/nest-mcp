@@ -11,7 +11,7 @@
         "noExcessiveCognitiveComplexity": "warn"
       },
       "style": {
-        "useImportType": "error"
+        "useImportType": "off"
       }
     }
   },

@@ -6,7 +6,6 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-// biome-ignore lint/style/useImportType: ModulesContainer needed as value for DI injection
 import { ModulesContainer } from '@nestjs/core';
 import {
   MCP_NOTIFICATION_METADATA,

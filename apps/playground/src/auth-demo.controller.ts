@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from 'node:crypto';
-// biome-ignore lint/style/useImportType: needed as value for emitDecoratorMetadata
 import { JwtTokenService, MCP_OAUTH_STORE, OAuthClientService } from '@btwld/mcp-server';
 import type { IOAuthStore } from '@btwld/mcp-server';
 import { Controller, Get, Inject, Query } from '@nestjs/common';

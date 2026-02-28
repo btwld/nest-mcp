@@ -22,11 +22,8 @@ import type {
   TokenPayload,
   TokenResponse,
 } from '../interfaces/oauth-types.interface';
-// biome-ignore lint/style/useImportType: AuthAuditService needed as value for emitDecoratorMetadata
 import { AuthAuditService } from '../services/auth-audit.service';
-// biome-ignore lint/style/useImportType: OAuthClientService needed as value for emitDecoratorMetadata
 import { MCP_OAUTH_STORE, OAuthClientService } from '../services/client.service';
-// biome-ignore lint/style/useImportType: JwtTokenService needed as value for emitDecoratorMetadata
 import { JwtTokenService, MCP_AUTH_OPTIONS } from '../services/jwt-token.service';
 import type { IOAuthStore } from '../stores/oauth-store.interface';
 
