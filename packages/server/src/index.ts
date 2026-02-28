@@ -29,6 +29,7 @@ export type {
   RegisteredResourceTemplate,
   RegisteredPrompt,
   RegisteredCompletion,
+  TaskHandlerConfig,
 } from './discovery/registry.service';
 export type { CompletionOptions, CompletionMetadata } from './decorators/completion.decorator';
 

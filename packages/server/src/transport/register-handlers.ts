@@ -2,11 +2,15 @@ import type { ElicitRequest, ElicitResult, McpExecutionContext, McpModuleOptions
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
+  CancelTaskRequestSchema,
   CancelledNotificationSchema,
   CompleteRequestSchema,
+  GetTaskPayloadRequestSchema,
+  GetTaskRequestSchema,
   ListPromptsRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListResourcesRequestSchema,
+  ListTasksRequestSchema,
   ListToolsRequestSchema,
   SubscribeRequestSchema,
   UnsubscribeRequestSchema,
@@ -18,6 +22,7 @@ import type {
   RegisteredResource,
   RegisteredResourceTemplate,
   RegisteredTool,
+  TaskHandlerConfig,
 } from '../discovery/registry.service';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
 import type { ResourceSubscriptionManager } from '../subscription/resource-subscription.manager';
@@ -94,6 +99,9 @@ export function registerHandlers(
   registerCompletionHandler(server, pipeline, registry, options);
   if (subscriptionManager) {
     registerSubscriptionHandlers(server, subscriptionManager, ctx);
+  }
+  if (registry.taskHandlerConfig && options.capabilities?.tasks?.enabled) {
+    registerTaskProxyHandlers(server, registry.taskHandlerConfig);
   }
 }
 
@@ -390,6 +398,38 @@ function registerCompletionHandler(
         ...(result.total != null ? { total: result.total } : {}),
       },
     };
+  });
+}
+
+/**
+ * Registers task protocol proxy handlers on the low-level SDK Server.
+ * Used by the gateway to forward tasks/list, tasks/get, tasks/cancel, and
+ * tasks/result to the appropriate upstream server.
+ *
+ * Only called when `registry.taskHandlerConfig` is set (gateway mode) and
+ * the server has declared `tasks.enabled` capability.
+ */
+function registerTaskProxyHandlers(server: McpServer, config: TaskHandlerConfig): void {
+  server.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
+    const cursor = request.params?.cursor;
+    const result = await config.listTasks(cursor);
+    return { tasks: result.tasks, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
+  });
+
+  server.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
+    const task = await config.getTask(request.params.taskId);
+    if (!task) throw new Error(`Task "${request.params.taskId}" not found`);
+    return task;
+  });
+
+  server.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
+    const task = await config.cancelTask(request.params.taskId);
+    if (!task) throw new Error(`Task "${request.params.taskId}" not found`);
+    return task;
+  });
+
+  server.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
+    return config.getTaskPayload(request.params.taskId);
   });
 }
 

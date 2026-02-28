@@ -27,6 +27,19 @@ import {
 } from '@btwld/mcp-common';
 import type { CompletionMetadata } from '../decorators/completion.decorator';
 import { Injectable, Logger } from '@nestjs/common';
+import type { GetTaskPayloadResult, Task } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Configuration for proxying MCP task protocol requests to upstream servers.
+ * Used by the gateway to forward tasks/list, tasks/get, tasks/cancel, and
+ * tasks/result to the appropriate upstream client.
+ */
+export interface TaskHandlerConfig {
+  listTasks(cursor?: string): Promise<{ tasks: Task[]; nextCursor?: string }>;
+  getTask(taskId: string): Promise<Task | undefined>;
+  cancelTask(taskId: string): Promise<Task | undefined>;
+  getTaskPayload(taskId: string): Promise<GetTaskPayloadResult>;
+}
 
 export interface RegisteredTool extends ToolMetadata {
   instance: Record<string, unknown>;
@@ -61,6 +74,7 @@ export class McpRegistryService {
   private readonly resourceTemplates = new Map<string, RegisteredResourceTemplate>();
   private readonly prompts = new Map<string, RegisteredPrompt>();
   private readonly completionHandlers = new Map<string, RegisteredCompletion>();
+  private _taskHandlerConfig?: TaskHandlerConfig;
 
   get hasTools(): boolean {
     return this.tools.size > 0;
@@ -76,6 +90,19 @@ export class McpRegistryService {
 
   get hasPrompts(): boolean {
     return this.prompts.size > 0;
+  }
+
+  get taskHandlerConfig(): TaskHandlerConfig | undefined {
+    return this._taskHandlerConfig;
+  }
+
+  /**
+   * Register a task handler config for gateway-style task passthrough.
+   * When set, the transport layer registers tasks/list, tasks/get, tasks/cancel,
+   * and tasks/result handlers that delegate to this config instead of a local TaskManager.
+   */
+  registerTaskHandlers(config: TaskHandlerConfig): void {
+    this._taskHandlerConfig = config;
   }
 
   /**

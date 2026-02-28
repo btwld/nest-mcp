@@ -30,6 +30,9 @@ import type { RoutingConfig } from './routing/route-config.interface';
 import { RouterService } from './routing/router.service';
 import { ToolAggregatorService } from './routing/tool-aggregator.service';
 
+// Tasks
+import { TaskAggregatorService } from './task/task-aggregator.service';
+
 // Policies
 import { PolicyEngineService } from './policies/policy-engine.service';
 import type { PoliciesConfig } from './policies/policy.interface';
@@ -85,12 +88,15 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     private readonly promptAggregator: PromptAggregatorService,
     private readonly resourceTemplateAggregator: ResourceTemplateAggregatorService,
     private readonly registry: McpRegistryService,
+    private readonly taskAggregator: TaskAggregatorService,
   ) {}
 
   static forRoot(options: McpGatewayOptions): DynamicModule {
     const serverOptions: McpModuleOptions = {
       ...options.server,
       transport: options.server.transport ?? McpTransportType.STREAMABLE_HTTP,
+      // Always enable tasks capability so the gateway can proxy task requests from downstream
+      capabilities: { ...options.server.capabilities, tasks: { enabled: true } },
     };
 
     return {
@@ -110,6 +116,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResourceAggregatorService,
         PromptAggregatorService,
         ResourceTemplateAggregatorService,
+        TaskAggregatorService,
       ],
       exports: [
         GatewayService,
@@ -124,6 +131,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResourceAggregatorService,
         PromptAggregatorService,
         ResourceTemplateAggregatorService,
+        TaskAggregatorService,
         MCP_GATEWAY_OPTIONS,
       ],
     };
@@ -146,7 +154,11 @@ export class McpGatewayModule implements OnApplicationBootstrap {
           // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
           useFactory: async (...args: any[]) => {
             const gatewayOpts = await options.useFactory(...args);
-            return gatewayOpts.server;
+            // Always enable tasks capability so the gateway can proxy task requests
+            return {
+              ...gatewayOpts.server,
+              capabilities: { ...gatewayOpts.server.capabilities, tasks: { enabled: true } },
+            };
           },
           inject: options.inject ?? [],
         }),
@@ -165,6 +177,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResourceAggregatorService,
         PromptAggregatorService,
         ResourceTemplateAggregatorService,
+        TaskAggregatorService,
       ],
       exports: [
         GatewayService,
@@ -179,6 +192,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         ResourceAggregatorService,
         PromptAggregatorService,
         ResourceTemplateAggregatorService,
+        TaskAggregatorService,
         MCP_GATEWAY_OPTIONS,
       ],
     };
@@ -202,6 +216,14 @@ export class McpGatewayModule implements OnApplicationBootstrap {
 
     // Start health checks
     this.healthChecker.startAll(this.options.upstreams);
+
+    // Register task proxy handlers so downstream clients can poll/cancel upstream tasks
+    this.registry.registerTaskHandlers({
+      listTasks: (cursor) => this.taskAggregator.listTasks(cursor),
+      getTask: (taskId) => this.taskAggregator.getTask(taskId),
+      cancelTask: (taskId) => this.taskAggregator.cancelTask(taskId),
+      getTaskPayload: (taskId) => this.taskAggregator.getTaskPayload(taskId),
+    });
 
     // Aggregate tools and register them as dynamic tools on the MCP server
     await this.registerUpstreamTools();
