@@ -68,6 +68,9 @@ export type {
   ToolCallResponse,
 } from './transform/response-transform.service';
 
+// Tasks
+export { TaskAggregatorService } from './task/task-aggregator.service';
+
 // Utils
 export { matchGlobPattern } from './utils/pattern-matcher';
 export { collectFulfilled } from './utils/settled-results';

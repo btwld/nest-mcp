@@ -13,7 +13,7 @@ import {
 describe('registerHandlers', () => {
   let mockInnerServer: Record<string, ReturnType<typeof vi.fn>>;
   let mockServer: Record<string, unknown>;
-  let mockRegistry: Record<string, ReturnType<typeof vi.fn> | boolean>;
+  let mockRegistry: Record<string, ReturnType<typeof vi.fn> | boolean | undefined | Record<string, ReturnType<typeof vi.fn>>>;
   let mockPipeline: Record<string, ReturnType<typeof vi.fn>>;
   let mockOptions: McpModuleOptions;
   let ctx: McpExecutionContext;
@@ -43,6 +43,7 @@ describe('registerHandlers', () => {
       hasResources: true,
       hasResourceTemplates: true,
       hasPrompts: true,
+      taskHandlerConfig: undefined,
     };
 
     mockOptions = {
@@ -533,6 +534,93 @@ describe('registerHandlers', () => {
     expect(result).toEqual({ completion: { values: ['hello'] } });
     expect(result.completion).not.toHaveProperty('hasMore');
     expect(result.completion).not.toHaveProperty('total');
+  });
+  // --- Task proxy handlers ---
+
+  it('registers task proxy handlers when taskHandlerConfig is set and tasks capability enabled', () => {
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn().mockResolvedValue({ tasks: [] }),
+      getTask: vi.fn(),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    // 4 list + 1 completion + 4 task proxy = 9 total setRequestHandler calls
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(9);
+  });
+
+  it('does not register task proxy handlers when taskHandlerConfig is undefined', () => {
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    // 4 list + 1 completion = 5 (no task proxy handlers)
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not register task proxy handlers when tasks capability is not enabled', () => {
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn(),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn(),
+    };
+    // mockOptions.capabilities has no tasks.enabled
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    // 4 list + 1 completion = 5 (no task proxy handlers)
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(5);
+  });
+
+  it('task proxy listTasks handler forwards cursor and returns tasks', async () => {
+    const tasks = [{ taskId: 'upstream::t1', status: 'working', ttl: null, createdAt: '', lastUpdatedAt: '' }];
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn().mockResolvedValue({ tasks, nextCursor: 'next' }),
+      getTask: vi.fn(),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const listTasksCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tasks/list',
+    );
+    expect(listTasksCall).toBeDefined();
+
+    const handler = listTasksCall![1];
+    const result = await handler({ method: 'tasks/list', params: { cursor: 'cur' } });
+
+    const config = mockRegistry.taskHandlerConfig as Record<string, ReturnType<typeof vi.fn>>;
+    expect(config.listTasks).toHaveBeenCalledWith('cur');
+    expect(result).toEqual({ tasks, nextCursor: 'next' });
+  });
+
+  it('task proxy getTask handler throws when task not found', async () => {
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn().mockResolvedValue(undefined),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const getTaskCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tasks/get',
+    );
+    expect(getTaskCall).toBeDefined();
+
+    const handler = getTaskCall![1];
+    await expect(handler({ method: 'tasks/get', params: { taskId: 'missing-task' } })).rejects.toThrow(
+      'Task "missing-task" not found',
+    );
   });
 });
 

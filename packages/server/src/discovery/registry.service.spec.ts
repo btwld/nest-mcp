@@ -594,6 +594,35 @@ describe('McpRegistryService', () => {
     });
   });
 
+  describe('registerTaskHandlers / taskHandlerConfig', () => {
+    it('taskHandlerConfig is undefined initially', () => {
+      expect(registry.taskHandlerConfig).toBeUndefined();
+    });
+
+    it('registerTaskHandlers stores the config and taskHandlerConfig getter returns it', () => {
+      const config = {
+        listTasks: vi.fn(),
+        getTask: vi.fn(),
+        cancelTask: vi.fn(),
+        getTaskPayload: vi.fn(),
+      };
+
+      registry.registerTaskHandlers(config);
+
+      expect(registry.taskHandlerConfig).toBe(config);
+    });
+
+    it('registerTaskHandlers overwrites a previous config', () => {
+      const first = { listTasks: vi.fn(), getTask: vi.fn(), cancelTask: vi.fn(), getTaskPayload: vi.fn() };
+      const second = { listTasks: vi.fn(), getTask: vi.fn(), cancelTask: vi.fn(), getTaskPayload: vi.fn() };
+
+      registry.registerTaskHandlers(first);
+      registry.registerTaskHandlers(second);
+
+      expect(registry.taskHandlerConfig).toBe(second);
+    });
+  });
+
   describe('description warnings', () => {
     it('does not warn when tool has a description', () => {
       const warnSpy = vi.spyOn(
