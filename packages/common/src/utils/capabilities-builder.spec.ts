@@ -173,4 +173,27 @@ describe('buildServerCapabilities', () => {
     });
     expect(result.tasks).toBeUndefined();
   });
+
+  it('should include experimental flags when provided in options', () => {
+    const options = makeOptions({
+      capabilities: { experimental: { myFeature: { enabled: true }, version: 2 } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.experimental).toEqual({ myFeature: { enabled: true }, version: 2 });
+  });
+
+  it('should not include experimental when not provided', () => {
+    const result = buildServerCapabilities(makeOptions(), {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.experimental).toBeUndefined();
+  });
 });

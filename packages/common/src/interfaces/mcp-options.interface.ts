@@ -58,6 +58,8 @@ export interface McpModuleOptions {
     resources?: { subscribe?: boolean; listChanged?: boolean };
     prompts?: { listChanged?: boolean };
     tasks?: { enabled?: boolean };
+    /** Vendor-specific experimental capability flags passed verbatim to the SDK. */
+    experimental?: Record<string, unknown>;
   };
 }
 

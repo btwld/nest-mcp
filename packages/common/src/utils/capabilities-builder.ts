@@ -53,5 +53,10 @@ export function buildServerCapabilities(
     };
   }
 
+  // Experimental vendor flags (passed verbatim)
+  if (options.capabilities?.experimental) {
+    capabilities.experimental = options.capabilities.experimental;
+  }
+
   return capabilities;
 }
