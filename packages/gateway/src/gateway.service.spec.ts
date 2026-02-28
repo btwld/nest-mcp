@@ -52,6 +52,10 @@ describe('GatewayService', () => {
       getClient: vi.fn(),
       getConfig: vi.fn().mockReturnValue(undefined),
       isHealthy: vi.fn().mockReturnValue(true),
+      activateSampling: vi.fn(),
+      deactivateSampling: vi.fn(),
+      activateElicitation: vi.fn(),
+      deactivateElicitation: vi.fn(),
     };
 
     policyEngine = {
@@ -241,6 +245,70 @@ describe('GatewayService', () => {
       await service.callTool('admin_deploy', {}, context);
 
       expect(policyEngine.evaluate).toHaveBeenCalledWith('admin_deploy', context);
+    });
+
+    it('should activate and deactivate sampling forwarder around the upstream call', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      const mockClient = {
+        callTool: vi.fn().mockResolvedValue({ content: [], isError: false }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      const createMessage = vi.fn();
+
+      await service.callTool('gh_listRepos', {}, undefined, undefined, createMessage);
+
+      expect(upstreamManager.activateSampling).toHaveBeenCalledWith('github', createMessage);
+      expect(upstreamManager.deactivateSampling).toHaveBeenCalledWith('github');
+    });
+
+    it('should deactivate sampling forwarder even when upstream call throws', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockRejectedValue(new Error('network error')),
+      });
+      const createMessage = vi.fn();
+
+      await service.callTool('gh_listRepos', {}, undefined, undefined, createMessage);
+
+      expect(upstreamManager.deactivateSampling).toHaveBeenCalledWith('github');
+    });
+
+    it('should activate and deactivate elicitation forwarder around the upstream call', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      const mockClient = {
+        callTool: vi.fn().mockResolvedValue({ content: [], isError: false }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      const elicit = vi.fn();
+
+      await service.callTool('gh_listRepos', {}, undefined, undefined, undefined, elicit);
+
+      expect(upstreamManager.activateElicitation).toHaveBeenCalledWith('github', elicit);
+      expect(upstreamManager.deactivateElicitation).toHaveBeenCalledWith('github');
+    });
+
+    it('should deactivate elicitation forwarder even when upstream call throws', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockRejectedValue(new Error('network error')),
+      });
+      const elicit = vi.fn();
+
+      await service.callTool('gh_listRepos', {}, undefined, undefined, undefined, elicit);
+
+      expect(upstreamManager.deactivateElicitation).toHaveBeenCalledWith('github');
+    });
+
+    it('should not activate sampling when createMessage is not provided', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockResolvedValue({ content: [], isError: false }),
+      });
+
+      await service.callTool('gh_listRepos', {});
+
+      expect(upstreamManager.activateSampling).not.toHaveBeenCalled();
+      expect(upstreamManager.deactivateSampling).not.toHaveBeenCalled();
     });
   });
 

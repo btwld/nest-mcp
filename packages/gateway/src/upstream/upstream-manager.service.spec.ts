@@ -4,6 +4,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   const MockClient = vi.fn().mockImplementation(() => ({
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
+    setRequestHandler: vi.fn(),
   }));
   return { Client: MockClient };
 });
@@ -217,6 +218,80 @@ describe('UpstreamManagerService', () => {
 
       expect(service.isHealthy('a')).toBe(false);
       expect(service.getStatus('a')?.error).toBe('timed out');
+    });
+  });
+
+  describe('sampling forwarder', () => {
+    it('activateSampling stores forwarder and deactivateSampling removes it', () => {
+      const forwarder = vi.fn();
+
+      service.activateSampling('my-upstream', forwarder);
+      // Access private field via any cast for assertion
+      expect(
+        (service as unknown as { samplingForwarders: Map<string, unknown> }).samplingForwarders.has(
+          'my-upstream',
+        ),
+      ).toBe(true);
+
+      service.deactivateSampling('my-upstream');
+      expect(
+        (service as unknown as { samplingForwarders: Map<string, unknown> }).samplingForwarders.has(
+          'my-upstream',
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe('elicitation forwarder', () => {
+    it('activateElicitation stores forwarder and deactivateElicitation removes it', () => {
+      const forwarder = vi.fn();
+
+      service.activateElicitation('my-upstream', forwarder);
+      expect(
+        (service as unknown as { elicitForwarders: Map<string, unknown> }).elicitForwarders.has(
+          'my-upstream',
+        ),
+      ).toBe(true);
+
+      service.deactivateElicitation('my-upstream');
+      expect(
+        (service as unknown as { elicitForwarders: Map<string, unknown> }).elicitForwarders.has(
+          'my-upstream',
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe('roots passthrough', () => {
+    it('should pass roots to connectAll and register ListRootsRequestSchema handler', async () => {
+      const roots = [{ uri: 'file:///workspace', name: 'workspace' }];
+      const config: UpstreamConfig = {
+        name: 'server-with-roots',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await service.connectAll([config], roots);
+
+      // Client should have been created (setRequestHandler called for sampling, elicitation, roots)
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+      const instance = MockedClient.mock.results[0].value;
+      // setRequestHandler should have been called 3 times: sampling, elicitation, roots
+      expect(instance.setRequestHandler).toHaveBeenCalledTimes(3);
+    });
+
+    it('should not register ListRootsRequestSchema handler when no roots provided', async () => {
+      const config: UpstreamConfig = {
+        name: 'server-no-roots',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await service.connect(config);
+
+      const instance = MockedClient.mock.results[0].value;
+      // Only sampling and elicitation handlers
+      expect(instance.setRequestHandler).toHaveBeenCalledTimes(2);
     });
   });
 });

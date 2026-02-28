@@ -116,6 +116,78 @@ describe('McpContextFactory', () => {
 
   // --- MCP Log Bridge ---
 
+  // --- createMessage sampling ---
+
+  describe('createMessage with mcpServer', () => {
+    it('delegates to server.server.createMessage and returns structured result', async () => {
+      const sdkResult = {
+        role: 'assistant' as const,
+        content: { type: 'text' as const, text: 'hello from LLM' },
+        model: 'claude-3',
+        stopReason: 'end_turn',
+      };
+      const mockInnerServer = {
+        getClientCapabilities: vi.fn().mockReturnValue({ sampling: {} }),
+        createMessage: vi.fn().mockResolvedValue(sdkResult),
+      };
+      const mockServer = {
+        server: mockInnerServer,
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-1',
+        transport: McpTransportType.STREAMABLE_HTTP,
+        mcpServer: mockServer as never,
+      });
+
+      expect(ctx.createMessage).toBeDefined();
+      const result = await ctx.createMessage!({
+        messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
+        maxTokens: 100,
+      });
+
+      expect(mockInnerServer.createMessage).toHaveBeenCalled();
+      expect(result).toEqual({
+        role: 'assistant',
+        content: { type: 'text', text: 'hello from LLM' },
+        model: 'claude-3',
+        stopReason: 'end_turn',
+      });
+    });
+
+    it('throws when client does not support sampling', async () => {
+      const mockInnerServer = {
+        getClientCapabilities: vi.fn().mockReturnValue({}),
+        createMessage: vi.fn(),
+      };
+      const mockServer = {
+        server: mockInnerServer,
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-1',
+        transport: McpTransportType.STREAMABLE_HTTP,
+        mcpServer: mockServer as never,
+      });
+
+      await expect(
+        ctx.createMessage!({
+          messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
+          maxTokens: 100,
+        }),
+      ).rejects.toThrow('does not support sampling');
+    });
+
+    it('leaves createMessage undefined when mcpServer is not provided', () => {
+      const ctx = factory.createContext({
+        sessionId: 'sess-1',
+        transport: McpTransportType.STDIO,
+      });
+
+      expect(ctx.createMessage).toBeUndefined();
+    });
+  });
+
   describe('log bridge with mcpServer', () => {
     it('calls sendLoggingMessage on debug', () => {
       const mockServer = {
