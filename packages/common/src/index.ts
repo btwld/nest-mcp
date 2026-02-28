@@ -19,6 +19,7 @@ export * from './interfaces/mcp-middleware.interface';
 export * from './interfaces/http-adapter.interface';
 export * from './interfaces/mcp-completion.interface';
 export * from './interfaces/mcp-elicitation.interface';
+export * from './interfaces/mcp-sampling.interface';
 
 // Types
 export * from './types/json-rpc.types';

@@ -1,5 +1,6 @@
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
 import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
+import type { Root } from '@modelcontextprotocol/sdk/types.js';
 import {
   McpModule,
   McpPromptBuilder,
@@ -50,6 +51,8 @@ export interface McpGatewayOptions {
   routing?: RoutingConfig;
   policies?: PoliciesConfig;
   cache?: CacheConfig;
+  /** Roots advertised to upstream servers when they request roots/list. */
+  roots?: Root[];
 }
 
 export interface McpGatewayAsyncOptions {
@@ -194,8 +197,8 @@ export class McpGatewayModule implements OnApplicationBootstrap {
     // Configure cache
     this.responseCache.configure(this.options.cache ?? { enabled: false, defaultTtl: 60000 });
 
-    // Connect to all upstreams
-    await this.upstreamManager.connectAll(this.options.upstreams);
+    // Connect to all upstreams, passing roots so they are advertised during handshake
+    await this.upstreamManager.connectAll(this.options.upstreams, this.options.roots);
 
     // Start health checks
     this.healthChecker.startAll(this.options.upstreams);
@@ -229,7 +232,7 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         rawOutputSchema: tool.outputSchema,
         annotations: tool.annotations,
         handler: async (args: Record<string, unknown>, ctx: McpExecutionContext) => {
-          const result = await this.gatewayService.callTool(tool.name, args, undefined, ctx.signal);
+          const result = await this.gatewayService.callTool(tool.name, args, undefined, ctx.signal, ctx.createMessage, ctx.elicit);
           return {
             content: result.content as ToolContent[],
             isError: result.isError,

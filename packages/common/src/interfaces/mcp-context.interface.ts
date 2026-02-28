@@ -1,6 +1,7 @@
 import type { McpTransportType } from './mcp-transport.interface';
 import type { ToolContent } from './mcp-tool.interface';
 import type { ElicitRequest, ElicitResult } from './mcp-elicitation.interface';
+import type { McpSamplingParams, McpSamplingResult } from './mcp-sampling.interface';
 
 export interface McpProgress {
   progress: number;
@@ -27,6 +28,12 @@ export interface McpExecutionContext {
    * No-op when no clients are subscribed or when subscriptions are not enabled.
    */
   notifyResourceUpdated?: (uri: string) => Promise<void>;
+  /**
+   * Request LLM sampling from the connected downstream client.
+   * Only available when the client declared the `sampling` capability.
+   * Throws if the client does not support sampling.
+   */
+  createMessage?: (params: McpSamplingParams) => Promise<McpSamplingResult>;
 }
 
 export interface McpContextLogger {

@@ -3,6 +3,13 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import {
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
+  ListRootsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitResult as SdkElicitResult, Root } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequest, ElicitResult, McpSamplingParams, McpSamplingResult } from '@btwld/mcp-common';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
@@ -19,13 +26,21 @@ interface ManagedUpstream {
 export class UpstreamManagerService implements OnModuleDestroy {
   private readonly logger = new Logger(UpstreamManagerService.name);
   private readonly upstreams = new Map<string, ManagedUpstream>();
+  private readonly samplingForwarders = new Map<
+    string,
+    (params: McpSamplingParams) => Promise<McpSamplingResult>
+  >();
+  private readonly elicitForwarders = new Map<
+    string,
+    (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>
+  >();
 
-  async connectAll(configs: UpstreamConfig[]): Promise<void> {
+  async connectAll(configs: UpstreamConfig[], roots?: Root[]): Promise<void> {
     const enabled = configs.filter((c) => c.enabled !== false);
-    await Promise.all(enabled.map((config) => this.connect(config)));
+    await Promise.all(enabled.map((config) => this.connect(config, roots)));
   }
 
-  async connect(config: UpstreamConfig): Promise<void> {
+  async connect(config: UpstreamConfig, roots?: Root[]): Promise<void> {
     if (this.upstreams.has(config.name)) {
       this.logger.warn(`Upstream "${config.name}" already connected, skipping`);
       return;
@@ -33,8 +48,48 @@ export class UpstreamManagerService implements OnModuleDestroy {
 
     const client = new Client(
       { name: `gateway-to-${config.name}`, version: '1.0.0' },
-      { capabilities: {} },
+      {
+        capabilities: {
+          sampling: {},
+          elicitation: {},
+          ...(roots?.length ? { roots: { listChanged: true } } : {}),
+        },
+      },
     );
+
+    const upstreamName = config.name;
+
+    // Forward sampling requests from the upstream to the active downstream client context.
+    // The forwarder is set/cleared per tool call via activateSampling/deactivateSampling.
+    client.setRequestHandler(CreateMessageRequestSchema, async (req) => {
+      const forwarder = this.samplingForwarders.get(upstreamName);
+      if (!forwarder) {
+        throw new Error(
+          `Upstream "${upstreamName}" requested sampling but no downstream client context is active`,
+        );
+      }
+      // The SDK SamplingMessage.content union is wider than McpSamplingContent (includes tool_use etc.).
+      // Cast at the SDK→common boundary; runtime values will always be text/image/audio.
+      const result = await forwarder(req.params as McpSamplingParams);
+      return { role: result.role, content: result.content, model: result.model, stopReason: result.stopReason };
+    });
+
+    // Forward elicitation requests from the upstream to the active downstream client context.
+    // The forwarder is set/cleared per tool call via activateElicitation/deactivateElicitation.
+    client.setRequestHandler(ElicitRequestSchema, async (req) => {
+      const forwarder = this.elicitForwarders.get(upstreamName);
+      if (!forwarder) {
+        throw new Error(
+          `Upstream "${upstreamName}" requested elicitation but no downstream client context is active`,
+        );
+      }
+      const result = await forwarder(req.params as ElicitRequest);
+      return result as SdkElicitResult;
+    });
+
+    if (roots?.length) {
+      client.setRequestHandler(ListRootsRequestSchema, () => ({ roots: roots ?? [] }));
+    }
 
     const managed: ManagedUpstream = {
       config,
@@ -169,6 +224,28 @@ export class UpstreamManagerService implements OnModuleDestroy {
   async disconnectAll(): Promise<void> {
     const names = this.getAllNames();
     await Promise.all(names.map((name) => this.disconnect(name)));
+  }
+
+  activateSampling(
+    upstreamName: string,
+    forwarder: (params: McpSamplingParams) => Promise<McpSamplingResult>,
+  ): void {
+    this.samplingForwarders.set(upstreamName, forwarder);
+  }
+
+  deactivateSampling(upstreamName: string): void {
+    this.samplingForwarders.delete(upstreamName);
+  }
+
+  activateElicitation(
+    upstreamName: string,
+    forwarder: (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>,
+  ): void {
+    this.elicitForwarders.set(upstreamName, forwarder);
+  }
+
+  deactivateElicitation(upstreamName: string): void {
+    this.elicitForwarders.delete(upstreamName);
   }
 
   async onModuleDestroy(): Promise<void> {

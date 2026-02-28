@@ -2,9 +2,12 @@ import type {
   McpAuthenticatedUser,
   McpExecutionContext,
   McpProgress,
+  McpSamplingParams,
+  McpSamplingResult,
   McpTransportType,
 } from '@btwld/mcp-common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpSamplingContent } from '@btwld/mcp-common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
@@ -33,6 +36,22 @@ export class McpContextFactory {
       reportProgress: options.progressCallback ?? (async () => {}),
       ...(options.notifyResourceUpdated
         ? { notifyResourceUpdated: options.notifyResourceUpdated }
+        : {}),
+      ...(server
+        ? {
+            createMessage: async (params: McpSamplingParams): Promise<McpSamplingResult> => {
+              if (!server.server.getClientCapabilities()?.sampling) {
+                throw new Error('Connected client does not support sampling');
+              }
+              const result = await server.server.createMessage(params);
+              return {
+                role: result.role,
+                content: result.content as McpSamplingContent,
+                model: result.model,
+                stopReason: result.stopReason,
+              };
+            },
+          }
         : {}),
       log: {
         debug: (message, data) => {

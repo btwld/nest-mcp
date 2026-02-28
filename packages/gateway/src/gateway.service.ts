@@ -1,6 +1,10 @@
 import {
   McpTimeoutError,
   McpUpstreamError,
+  type ElicitRequest,
+  type ElicitResult,
+  type McpSamplingParams,
+  type McpSamplingResult,
   type PromptMessage,
   type ResourceContent,
   type ToolContent,
@@ -106,6 +110,8 @@ export class GatewayService {
     args: Record<string, unknown>,
     context?: PolicyContext,
     signal?: AbortSignal,
+    createMessage?: (params: McpSamplingParams) => Promise<McpSamplingResult>,
+    elicit?: (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>,
   ): Promise<GatewayCallToolResult> {
     // Evaluate policy
     const policy = this.policyEngine.evaluate(toolName, context);
@@ -165,6 +171,13 @@ export class GatewayService {
       };
     }
 
+    if (createMessage) {
+      this.upstreamManager.activateSampling(route.upstreamName, createMessage);
+    }
+    if (elicit) {
+      this.upstreamManager.activateElicitation(route.upstreamName, elicit);
+    }
+
     try {
       // Forward the call to the upstream
       const timeoutMs = this.upstreamManager.getConfig(route.upstreamName)?.timeout;
@@ -209,6 +222,13 @@ export class GatewayService {
         content: [{ type: 'text', text: `Error forwarding to upstream: ${message}` }],
         isError: true,
       };
+    } finally {
+      if (createMessage) {
+        this.upstreamManager.deactivateSampling(route.upstreamName);
+      }
+      if (elicit) {
+        this.upstreamManager.deactivateElicitation(route.upstreamName);
+      }
     }
   }
 
