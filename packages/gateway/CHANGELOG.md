@@ -1,5 +1,15 @@
 # @nest-mcp/gateway
 
+## 0.2.2
+
+### Patch Changes
+
+- 3fd3c19: Exclude .d.ts.map files from published packages — reduces file count by ~50%
+- Updated dependencies [3fd3c19]
+  - @nest-mcp/client@0.2.2
+  - @nest-mcp/common@0.1.6
+  - @nest-mcp/server@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes
