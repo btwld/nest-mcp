@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { McpTransportType } from '@btwld/mcp-common';
+import { z } from 'zod';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { McpRegistryService } from '../discovery/registry.service';
 import { McpExecutorService } from '../execution/executor.service';
@@ -125,6 +126,23 @@ describe('Dynamic Builders', () => {
       builder.unregister('no-such-tool');
 
       expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('propagates Zod parameters and outputSchema', () => {
+      const parameters = z.object({ query: z.string() });
+      const outputSchema = z.object({ result: z.string() });
+
+      builder.register({
+        name: 'zod-tool',
+        description: 'Zod tool',
+        parameters,
+        outputSchema,
+        handler: async () => 'ok',
+      });
+
+      const tool = registry.getTool('zod-tool');
+      expect(tool?.parameters).toBe(parameters);
+      expect(tool?.outputSchema).toBe(outputSchema);
     });
   });
 
@@ -320,6 +338,20 @@ describe('Dynamic Builders', () => {
       builder.unregister('ghost-prompt');
 
       expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('propagates Zod parameters', () => {
+      const parameters = z.object({ topic: z.string() });
+
+      builder.register({
+        name: 'zod-prompt',
+        description: 'Zod prompt',
+        parameters,
+        handler: async () => ({ messages: [] }),
+      });
+
+      const prompt = registry.getPrompt('zod-prompt');
+      expect(prompt?.parameters).toBe(parameters);
     });
   });
 

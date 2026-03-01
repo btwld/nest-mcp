@@ -526,6 +526,20 @@ describe('McpExecutorService', () => {
       const result = await executor.listPrompts();
       expect(result.items[0]).not.toHaveProperty('arguments');
     });
+
+    it('returns PaginatedResult with no nextCursor for small lists', async () => {
+      registry.registerPrompt({
+        name: 'p1',
+        description: 'Prompt 1',
+        methodName: 'p1',
+        target: Object,
+        instance: { p1: vi.fn() },
+      } as RegisteredPrompt);
+
+      const result = await executor.listPrompts();
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('nextCursor', undefined);
+    });
   });
 
   // --- getPrompt ---
