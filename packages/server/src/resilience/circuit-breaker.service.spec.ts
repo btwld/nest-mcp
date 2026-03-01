@@ -161,4 +161,50 @@ describe('CircuitBreakerService', () => {
   it('getState returns undefined for unknown tool', () => {
     expect(service.getState('non-existent')).toBeUndefined();
   });
+
+  it('tracks different tools independently', async () => {
+    // Open circuit for tool-a with 5 failures
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+      ).rejects.toThrow('fail');
+    }
+
+    // tool-a should be OPEN, tool-b should be undefined / still CLOSED
+    expect(service.getState('tool-a')).toBe(CircuitBreakerState.OPEN);
+    expect(service.getState('tool-b')).toBeUndefined();
+
+    // tool-b executes successfully
+    const result = await service.execute('tool-b', defaultConfig, async () => 'ok');
+    expect(result).toBe('ok');
+    expect(service.getState('tool-b')).toBe(CircuitBreakerState.CLOSED);
+  });
+
+  it('resets counters after HALF_OPEN -> CLOSED transition', async () => {
+    const config = { ...defaultConfig, halfOpenTimeout: 1_000 };
+
+    // Open the circuit
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        service.execute('tool-x', config, async () => { throw new Error('fail'); }),
+      ).rejects.toThrow('fail');
+    }
+    expect(service.getState('tool-x')).toBe(CircuitBreakerState.OPEN);
+
+    // Advance to half-open
+    vi.advanceTimersByTime(1_000);
+
+    // Succeed once → CLOSED and counters reset
+    await service.execute('tool-x', config, async () => 'ok');
+    expect(service.getState('tool-x')).toBe(CircuitBreakerState.CLOSED);
+
+    // Need 5 fresh failures to re-open (counters reset)
+    for (let i = 0; i < 4; i++) {
+      await expect(
+        service.execute('tool-x', config, async () => { throw new Error('fail'); }),
+      ).rejects.toThrow('fail');
+    }
+    // Only 4 failures with minRequests=5 should not open circuit
+    expect(service.getState('tool-x')).toBe(CircuitBreakerState.CLOSED);
+  });
 });

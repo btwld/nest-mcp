@@ -53,4 +53,27 @@ describe('drainAllPages', () => {
     await expect(drainAllPages(fetch)).rejects.toThrow('timeout');
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('stops when nextCursor is an empty string (falsy)', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [1, 2], nextCursor: '' })
+      .mockResolvedValueOnce({ data: [3], nextCursor: undefined });
+
+    const result = await drainAllPages(fetch);
+    // Empty string is falsy — loop should stop after first page
+    expect(result).toEqual([1, 2]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accumulates items from exactly two pages', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: ['a', 'b'], nextCursor: 'pg2' })
+      .mockResolvedValueOnce({ data: ['c'], nextCursor: undefined });
+
+    const result = await drainAllPages(fetch);
+    expect(result).toEqual(['a', 'b', 'c']);
+    expect(fetch).toHaveBeenNthCalledWith(2, 'pg2');
+  });
 });

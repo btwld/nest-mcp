@@ -183,4 +183,31 @@ describe('HealthCheckerService', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('interval behavior', () => {
+    it('should call check when interval fires', async () => {
+      vi.useFakeTimers();
+
+      const pingFn = vi.fn().mockResolvedValue(undefined);
+      upstreamManager.getClient.mockReturnValue({ ping: pingFn });
+
+      service.start({
+        name: 'periodic',
+        url: 'http://localhost:3001',
+        transport: 'sse',
+        healthCheck: { intervalMs: 1000 },
+      });
+
+      // Before interval fires — ping not called
+      expect(upstreamManager.setHealthy).not.toHaveBeenCalled();
+
+      // Advance past one interval
+      await vi.advanceTimersByTimeAsync(1001);
+
+      expect(upstreamManager.setHealthy).toHaveBeenCalledWith('periodic', true);
+
+      service.stop('periodic');
+      vi.useRealTimers();
+    });
+  });
 });

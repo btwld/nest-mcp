@@ -99,3 +99,44 @@ describe('getDecoratedMethods', () => {
     expect(result).toEqual([{ propertyKey: 'handler', metadata: 'data' }]);
   });
 });
+
+describe('metadata key isolation', () => {
+  it('different metadata keys on the same method are independent', () => {
+    const keyA = Symbol('key:a');
+    const keyB = Symbol('key:b');
+
+    class MyClass {
+      myMethod() {}
+    }
+
+    setMethodMetadata(keyA, 'value-a', MyClass.prototype, 'myMethod');
+    setMethodMetadata(keyB, 'value-b', MyClass.prototype, 'myMethod');
+
+    expect(getMethodMetadata(keyA, MyClass.prototype, 'myMethod')).toBe('value-a');
+    expect(getMethodMetadata(keyB, MyClass.prototype, 'myMethod')).toBe('value-b');
+  });
+
+  it('setMethodMetadata overwrites existing value', () => {
+    const key = Symbol('overwrite');
+
+    class MyClass {
+      myMethod() {}
+    }
+
+    setMethodMetadata(key, 'first', MyClass.prototype, 'myMethod');
+    setMethodMetadata(key, 'second', MyClass.prototype, 'myMethod');
+
+    expect(getMethodMetadata(key, MyClass.prototype, 'myMethod')).toBe('second');
+  });
+
+  it('setClassMetadata overwrites existing class value', () => {
+    const key = Symbol('class-overwrite');
+
+    class MyClass {}
+
+    setClassMetadata(key, 'first', MyClass);
+    setClassMetadata(key, 'second', MyClass);
+
+    expect(getClassMetadata(key, MyClass)).toBe('second');
+  });
+});

@@ -112,4 +112,39 @@ describe('createClientTransport', () => {
       cwd: '/tmp',
     });
   });
+
+  it('should pass authProvider for streamable-http connections', () => {
+    const mockAuthProvider = { clientId: 'test', redirectUrl: 'http://localhost/cb' };
+    const connection: McpClientConnection = {
+      name: 'test',
+      transport: 'streamable-http',
+      url: 'http://localhost:3000/mcp',
+      authProvider: mockAuthProvider as never,
+    };
+
+    createClientTransport(connection);
+
+    const [, options] = vi.mocked(StreamableHTTPClientTransport).mock.calls[0];
+    expect(options?.authProvider).toBe(mockAuthProvider);
+  });
+
+  it('should pass authProvider for sse connections', () => {
+    const mockAuthProvider = { clientId: 'test', redirectUrl: 'http://localhost/cb' };
+    const connection: McpClientConnection = {
+      name: 'test',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+      authProvider: mockAuthProvider as never,
+    };
+
+    createClientTransport(connection);
+
+    const [, options] = vi.mocked(SSEClientTransport).mock.calls[0];
+    expect(options?.authProvider).toBe(mockAuthProvider);
+  });
+
+  it('should throw for unsupported transport type', () => {
+    const connection = { name: 'test', transport: 'unknown' } as never;
+    expect(() => createClientTransport(connection)).toThrow('Unsupported transport type: unknown');
+  });
 });

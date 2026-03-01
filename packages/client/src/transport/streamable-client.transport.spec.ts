@@ -92,4 +92,10 @@ describe('createStreamableHttpTransport', () => {
 
     expect(transport).toEqual({ type: 'streamable' });
   });
+
+  it('should call StreamableHTTPClientTransport constructor exactly once per call', () => {
+    createStreamableHttpTransport({ name: 'a', transport: 'streamable-http', url: 'http://a.com/mcp' });
+    createStreamableHttpTransport({ name: 'b', transport: 'streamable-http', url: 'http://b.com/mcp' });
+    expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(2);
+  });
 });

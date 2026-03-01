@@ -50,4 +50,20 @@ describe('applyAuthHeaders', () => {
 
     expect(requestInit.headers).toBeUndefined();
   });
+
+  it('should handle Headers instance as existing headers', () => {
+    const existingHeaders = new Headers({ 'X-Custom': 'value' });
+    const requestInit: RequestInit = { headers: existingHeaders };
+    const auth = { type: 'bearer' as const, token: 'abc' };
+    const result = applyAuthHeaders(requestInit, auth);
+
+    const resultHeaders = new Headers(result.headers);
+    expect(resultHeaders.get('X-Custom')).toBe('value');
+    expect(resultHeaders.get('Authorization')).toBe('Bearer abc');
+  });
+
+  it('should return empty object (no headers key) when auth is absent and no requestInit', () => {
+    const result = applyAuthHeaders(undefined, undefined);
+    expect('headers' in result).toBe(false);
+  });
 });
