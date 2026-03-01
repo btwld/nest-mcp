@@ -570,6 +570,90 @@ describe('McpClient', () => {
     });
   });
 
+  describe('constructor handler routing', () => {
+    it('calls setSamplingHandler when connection.samplingHandler is provided', () => {
+      const samplingHandler = vi.fn().mockResolvedValue({
+        model: 'm',
+        stopReason: 'endTurn',
+        role: 'assistant',
+        content: { type: 'text', text: '' },
+      });
+      const conn = createConnection({ samplingHandler });
+      const client = new McpClient('test', conn);
+
+      const clientInstance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ sampling: {} });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+
+    it('calls setElicitationHandler when connection.elicitationHandler is provided', () => {
+      const elicitationHandler = vi.fn().mockResolvedValue({ action: 'cancel' });
+      const conn = createConnection({ elicitationHandler });
+      const client = new McpClient('test', conn);
+
+      const clientInstance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ elicitation: {} });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+
+    it('calls setRootsHandler when connection.rootsHandler is provided', () => {
+      const rootsHandler = vi.fn().mockResolvedValue({ roots: [] });
+      const conn = createConnection({ rootsHandler });
+      const client = new McpClient('test', conn);
+
+      const clientInstance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({
+        roots: { listChanged: true },
+      });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+
+    it('inherits connection.capabilities as declared capabilities', () => {
+      const conn = createConnection({ capabilities: { sampling: {} } });
+      const client = new McpClient('test', conn);
+
+      // The Client constructor should have been called with the provided capabilities
+      const lastCall = MockedClient.mock.calls[MockedClient.mock.calls.length - 1];
+      expect(lastCall[1]).toMatchObject({ capabilities: { sampling: {} } });
+    });
+  });
+
+  describe('reconnect re-applies handlers (_reapplyRequestHandlers)', () => {
+    it('re-applies elicitationHandler to new Client instance on reconnect', async () => {
+      const connWithReconnect = createConnection({ reconnect: { maxAttempts: 2, delay: 1 } });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      mcpClient.setElicitationHandler(vi.fn().mockResolvedValue({ action: 'cancel' }));
+
+      await mcpClient.connect();
+
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      expect(mcpClient.isConnected()).toBe(true);
+
+      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
+    });
+
+    it('re-applies rootsHandler to new Client instance on reconnect', async () => {
+      const connWithReconnect = createConnection({ reconnect: { maxAttempts: 2, delay: 1 } });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      mcpClient.setRootsHandler(vi.fn().mockResolvedValue({ roots: [] }));
+
+      await mcpClient.connect();
+
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      expect(mcpClient.isConnected()).toBe(true);
+
+      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
+    });
+  });
+
   describe('listAll methods', () => {
     beforeEach(async () => {
       await mcpClient.connect();
