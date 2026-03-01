@@ -13,7 +13,7 @@ export interface McpModuleOptions {
   description?: string;
 
   // Transport
-  transport: McpTransportType;
+  transport: McpTransportType | McpTransportType[];
   transportOptions?: TransportOptions;
 
   // Auth
@@ -66,7 +66,7 @@ export interface McpModuleOptions {
 export interface McpModuleAsyncOptions {
   // biome-ignore lint/suspicious/noExplicitAny: NestJS DynamicModule requires broad module types
   imports?: any[];
-  transport: McpTransportType;
+  transport: McpTransportType | McpTransportType[];
   transportOptions?: TransportOptions;
   // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
   useFactory: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;

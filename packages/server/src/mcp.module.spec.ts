@@ -176,6 +176,42 @@ describe('McpModule', () => {
     });
   });
 
+  describe('multiple transports (array)', () => {
+    it('includes services and controllers for both streamable-http and SSE', () => {
+      const mod = McpModule.forRoot({
+        name: 'test',
+        version: '1.0',
+        transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+      });
+
+      // 1 streamable-http controller + 2 SSE controllers
+      expect(mod.controllers).toHaveLength(3);
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
+      expect(providerNames).toContain('StreamableHttpService');
+      expect(providerNames).toContain('SseService');
+    });
+
+    it('forRootAsync supports array of transports', () => {
+      const mod = McpModule.forRootAsync({
+        transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+        useFactory: () => ({
+          name: 'test',
+          version: '1.0',
+          transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+        }),
+      });
+
+      expect(mod.controllers).toHaveLength(3);
+      const providerNames = mod.providers?.map(
+        (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
+      );
+      expect(providerNames).toContain('StreamableHttpService');
+      expect(providerNames).toContain('SseService');
+    });
+  });
+
   describe('forFeature', () => {
     it('returns a module with the given providers', () => {
       class FakeProvider {}

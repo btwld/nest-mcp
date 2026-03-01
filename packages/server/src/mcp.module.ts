@@ -69,6 +69,12 @@ import {
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from './constants/module.constants';
 
+function normalizeTransports(
+  transport: McpTransportType | McpTransportType[],
+): McpTransportType[] {
+  return Array.isArray(transport) ? transport : [transport];
+}
+
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes
 export class McpModule {
@@ -98,15 +104,17 @@ export class McpModule {
       TaskManager,
     ];
 
+    const transports = normalizeTransports(options.transport);
+
     // Streamable HTTP transport
-    if (options.transport === McpTransportType.STREAMABLE_HTTP) {
+    if (transports.includes(McpTransportType.STREAMABLE_HTTP)) {
       const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
       controllers.push(createStreamableHttpController(endpoint));
     }
 
     // SSE transport
-    if (options.transport === McpTransportType.SSE) {
+    if (transports.includes(McpTransportType.SSE)) {
       const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
       const messagesEndpoint =
         options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
@@ -115,7 +123,7 @@ export class McpModule {
     }
 
     // STDIO transport
-    if (options.transport === McpTransportType.STDIO) {
+    if (transports.includes(McpTransportType.STDIO)) {
       providers.push(StdioService);
     }
 
@@ -169,15 +177,17 @@ export class McpModule {
       TaskManager,
     ];
 
+    const transports = normalizeTransports(options.transport);
+
     // Streamable HTTP transport
-    if (options.transport === McpTransportType.STREAMABLE_HTTP) {
+    if (transports.includes(McpTransportType.STREAMABLE_HTTP)) {
       const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
       controllers.push(createStreamableHttpController(endpoint));
     }
 
     // SSE transport
-    if (options.transport === McpTransportType.SSE) {
+    if (transports.includes(McpTransportType.SSE)) {
       const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
       const messagesEndpoint =
         options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
@@ -186,7 +196,7 @@ export class McpModule {
     }
 
     // STDIO transport
-    if (options.transport === McpTransportType.STDIO) {
+    if (transports.includes(McpTransportType.STDIO)) {
       providers.push(StdioService);
     }
 
