@@ -1,8 +1,8 @@
-import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
-import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
 import type {
   RegisteredPrompt,
   RegisteredResource,
@@ -33,7 +33,10 @@ export class StdioService implements OnModuleDestroy {
   /** SDK handles keyed by item name/uri for removal. */
   private readonly sdkHandles = new Map<string, SdkHandle>();
 
-  private readonly registryListeners: Array<{ event: string; listener: (...args: unknown[]) => void }> = [];
+  private readonly registryListeners: Array<{
+    event: string;
+    listener: (...args: unknown[]) => void;
+  }> = [];
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
@@ -56,11 +59,18 @@ export class StdioService implements OnModuleDestroy {
       transport: McpTransportType.STDIO,
       mcpServer: server,
       notifyResourceUpdated: this.subscriptionManager
-        ? (uri) => this.subscriptionManager!.notifyResourceUpdated(uri)
+        ? (uri) => this.subscriptionManager?.notifyResourceUpdated(uri)
         : undefined,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx, this.options, this.subscriptionManager);
+    registerHandlers(
+      server,
+      this.registry,
+      this.pipeline,
+      ctx,
+      this.options,
+      this.subscriptionManager,
+    );
 
     this.server = server;
     this.ctx = ctx;
@@ -114,7 +124,12 @@ export class StdioService implements OnModuleDestroy {
 
     const onResourceTemplateRegistered = (template: RegisteredResourceTemplate) => {
       if (!this.server || !this.ctx) return;
-      const handle = registerResourceTemplateOnServer(this.server, template, this.pipeline, this.ctx);
+      const handle = registerResourceTemplateOnServer(
+        this.server,
+        template,
+        this.pipeline,
+        this.ctx,
+      );
       this.sdkHandles.set(`resourceTemplate:${template.uriTemplate}`, handle);
     };
 
@@ -138,12 +153,27 @@ export class StdioService implements OnModuleDestroy {
     this.registryListeners.push(
       { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
       { event: 'tool.unregistered', listener: onToolUnregistered as (...args: unknown[]) => void },
-      { event: 'resource.registered', listener: onResourceRegistered as (...args: unknown[]) => void },
-      { event: 'resource.unregistered', listener: onResourceUnregistered as (...args: unknown[]) => void },
+      {
+        event: 'resource.registered',
+        listener: onResourceRegistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resource.unregistered',
+        listener: onResourceUnregistered as (...args: unknown[]) => void,
+      },
       { event: 'prompt.registered', listener: onPromptRegistered as (...args: unknown[]) => void },
-      { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
-      { event: 'resourceTemplate.registered', listener: onResourceTemplateRegistered as (...args: unknown[]) => void },
-      { event: 'resourceTemplate.unregistered', listener: onResourceTemplateUnregistered as (...args: unknown[]) => void },
+      {
+        event: 'prompt.unregistered',
+        listener: onPromptUnregistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resourceTemplate.registered',
+        listener: onResourceTemplateRegistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resourceTemplate.unregistered',
+        listener: onResourceTemplateUnregistered as (...args: unknown[]) => void,
+      },
     );
   }
 

@@ -1,10 +1,10 @@
 import {
-  McpTimeoutError,
-  McpUpstreamError,
   type ElicitRequest,
   type ElicitResult,
   type McpSamplingParams,
   type McpSamplingResult,
+  McpTimeoutError,
+  McpUpstreamError,
   type PromptMessage,
   type ResourceContent,
   type ToolContent,
@@ -105,6 +105,7 @@ export class GatewayService {
     return this.toolAggregator.getCachedTools();
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: routing through multiple upstream strategies with prefix handling requires branching
   async callTool(
     toolName: string,
     args: Record<string, unknown>,
@@ -285,7 +286,11 @@ export class GatewayService {
    * forwarding to the appropriate upstream, stripping any gateway-added prefix
    * by re-expanding with the original upstream URI template.
    */
-  async readResourceTemplate(uri: string, signal?: AbortSignal): Promise<GatewayReadResourceResult> {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: URI template matching and prefix stripping across multiple upstreams requires branching
+  async readResourceTemplate(
+    uri: string,
+    signal?: AbortSignal,
+  ): Promise<GatewayReadResourceResult> {
     const templates = this.resourceTemplateAggregator.getCachedTemplates();
 
     for (const template of templates) {
@@ -294,7 +299,9 @@ export class GatewayService {
 
       const client = this.upstreamManager.getClient(template.upstreamName);
       if (!client) {
-        return { contents: [{ uri, text: `Upstream "${template.upstreamName}" is not connected` }] };
+        return {
+          contents: [{ uri, text: `Upstream "${template.upstreamName}" is not connected` }],
+        };
       }
 
       if (!this.upstreamManager.isHealthy(template.upstreamName)) {
@@ -335,7 +342,11 @@ export class GatewayService {
     return this.promptAggregator.getCachedPrompts();
   }
 
-  async getPrompt(name: string, args: Record<string, string>, signal?: AbortSignal): Promise<GatewayGetPromptResult> {
+  async getPrompt(
+    name: string,
+    args: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<GatewayGetPromptResult> {
     // Find the aggregated prompt to determine the upstream
     const cached = this.promptAggregator.getCachedPrompts();
     const prompt = cached.find((p) => p.name === name);

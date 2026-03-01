@@ -40,12 +40,12 @@ export class PolicyEngineService {
   private matchesContext(rule: PolicyRule, context?: PolicyContext): boolean {
     if (rule.roles?.length) {
       if (!context?.roles?.length) return false;
-      if (!rule.roles.some((r) => context.roles!.includes(r))) return false;
+      if (!rule.roles.some((r) => context.roles?.includes(r))) return false;
     }
 
     if (rule.scopes?.length) {
       if (!context?.scopes?.length) return false;
-      if (!rule.scopes.some((s) => context.scopes!.includes(s))) return false;
+      if (!rule.scopes.some((s) => context.scopes?.includes(s))) return false;
     }
 
     if (rule.userMatch) {

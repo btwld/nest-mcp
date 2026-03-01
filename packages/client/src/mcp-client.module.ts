@@ -7,11 +7,11 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';
+import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 import {
   MCP_NOTIFICATION_METADATA,
   type McpNotificationMetadata,
 } from './decorators/on-notification.decorator';
-import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 import type {
   McpClientModuleAsyncOptions,
   McpClientModuleOptions,
@@ -50,7 +50,11 @@ export class McpClientModule {
         bootstrapProvider,
         McpClientsService,
       ],
-      exports: [MCP_CLIENT_OPTIONS, ...connectionProviders.map((p) => p.provide), McpClientsService],
+      exports: [
+        MCP_CLIENT_OPTIONS,
+        ...connectionProviders.map((p) => p.provide),
+        McpClientsService,
+      ],
     };
   }
 
@@ -102,7 +106,13 @@ export class McpClientModule {
       module: McpClientModule,
       global: true,
       imports: options.imports ?? [],
-      providers: [asyncOptionsProvider, connectionsProvider, ...namedProviders, bootstrapProvider, McpClientsService],
+      providers: [
+        asyncOptionsProvider,
+        connectionsProvider,
+        ...namedProviders,
+        bootstrapProvider,
+        McpClientsService,
+      ],
       exports: [
         MCP_CLIENT_OPTIONS,
         connectionsProvider.provide,
@@ -157,6 +167,7 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
     }
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: nested iteration over NestJS module/provider graph is inherently complex
   private wireNotificationHandlers(): void {
     if (!this.modulesContainer) return;
 
@@ -176,8 +187,10 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
           // NestJS SetMetadata stores metadata on the descriptor.value (the method
           // function itself), so we read from prototype[methodName] rather than
           // using the (target, propertyKey) overload.
-          const metadata: McpNotificationMetadata | undefined =
-            Reflect.getMetadata(MCP_NOTIFICATION_METADATA, prototype[methodName]);
+          const metadata: McpNotificationMetadata | undefined = Reflect.getMetadata(
+            MCP_NOTIFICATION_METADATA,
+            prototype[methodName],
+          );
 
           if (!metadata) continue;
 
@@ -190,7 +203,9 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
             continue;
           }
 
-          const boundHandler = (instance as Record<string, Function>)[methodName].bind(instance);
+          const boundHandler = (instance as Record<string, (...args: unknown[]) => unknown>)[
+            methodName
+          ].bind(instance);
           client.onNotification(metadata.method, boundHandler);
           wiredCount++;
         }

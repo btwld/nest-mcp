@@ -9,10 +9,15 @@ import {
   ListRootsRequestSchema,
   TaskStatusNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { ElicitResult as SdkElicitResult, Root } from '@modelcontextprotocol/sdk/types.js';
-import type { ElicitRequest, ElicitResult, McpSamplingParams, McpSamplingResult } from '@nest-mcp/common';
-import { Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
+import type { Root, ElicitResult as SdkElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  ElicitRequest,
+  ElicitResult,
+  McpSamplingParams,
+  McpSamplingResult,
+} from '@nest-mcp/common';
 import { McpRegistryService } from '@nest-mcp/server';
+import { Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
 import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
 interface ManagedUpstream {
@@ -75,7 +80,12 @@ export class UpstreamManagerService implements OnModuleDestroy {
       // The SDK SamplingMessage.content union is wider than McpSamplingContent (includes tool_use etc.).
       // Cast at the SDK→common boundary; runtime values will always be text/image/audio.
       const result = await forwarder(req.params as McpSamplingParams);
-      return { role: result.role, content: result.content, model: result.model, stopReason: result.stopReason };
+      return {
+        role: result.role,
+        content: result.content,
+        model: result.model,
+        stopReason: result.stopReason,
+      };
     });
 
     // Forward elicitation requests from the upstream to the active downstream client context.
@@ -111,7 +121,10 @@ export class UpstreamManagerService implements OnModuleDestroy {
           ...notification.params,
           taskId: `${upstreamName}::${notification.params.taskId}`,
         };
-        this.registry!.broadcastNotification('notifications/tasks/status', prefixed as Record<string, unknown>);
+        this.registry?.broadcastNotification(
+          'notifications/tasks/status',
+          prefixed as Record<string, unknown>,
+        );
       });
     }
 

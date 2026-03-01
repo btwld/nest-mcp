@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
-import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
 import {
   DEFAULT_PING_INTERVAL,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
@@ -41,7 +41,10 @@ export class SseService implements OnModuleDestroy {
   /** SDK handles per session, keyed by item name/uri for removal. */
   private readonly sdkHandles = new Map<string, Map<string, SdkHandle>>();
 
-  private readonly registryListeners: Array<{ event: string; listener: (...args: unknown[]) => void }> = [];
+  private readonly registryListeners: Array<{
+    event: string;
+    listener: (...args: unknown[]) => void;
+  }> = [];
 
   constructor(
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
@@ -69,11 +72,18 @@ export class SseService implements OnModuleDestroy {
       request: req,
       mcpServer: server,
       notifyResourceUpdated: this.subscriptionManager
-        ? (uri) => this.subscriptionManager!.notifyResourceUpdated(uri)
+        ? (uri) => this.subscriptionManager?.notifyResourceUpdated(uri)
         : undefined,
     });
 
-    registerHandlers(server, this.registry, this.pipeline, ctx, this.options, this.subscriptionManager);
+    registerHandlers(
+      server,
+      this.registry,
+      this.pipeline,
+      ctx,
+      this.options,
+      this.subscriptionManager,
+    );
 
     this.transports.set(sessionId, transport);
     this.servers.set(sessionId, server);
@@ -206,11 +216,16 @@ export class SseService implements OnModuleDestroy {
       }
     };
 
-    const onOutboundNotification = ({ method, params }: { method: string; params: Record<string, unknown> }) => {
+    const onOutboundNotification = ({
+      method,
+      params,
+    }: { method: string; params: Record<string, unknown> }) => {
       for (const server of this.servers.values()) {
         (server.server as unknown as { notification: (n: unknown) => Promise<void> })
           .notification({ method, params })
-          .catch((err: unknown) => this.logger.warn(`Failed to forward notification to session: ${err}`));
+          .catch((err: unknown) =>
+            this.logger.warn(`Failed to forward notification to session: ${err}`),
+          );
       }
     };
 
@@ -227,13 +242,31 @@ export class SseService implements OnModuleDestroy {
     this.registryListeners.push(
       { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
       { event: 'tool.unregistered', listener: onToolUnregistered as (...args: unknown[]) => void },
-      { event: 'resource.registered', listener: onResourceRegistered as (...args: unknown[]) => void },
-      { event: 'resource.unregistered', listener: onResourceUnregistered as (...args: unknown[]) => void },
+      {
+        event: 'resource.registered',
+        listener: onResourceRegistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resource.unregistered',
+        listener: onResourceUnregistered as (...args: unknown[]) => void,
+      },
       { event: 'prompt.registered', listener: onPromptRegistered as (...args: unknown[]) => void },
-      { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
-      { event: 'resourceTemplate.registered', listener: onResourceTemplateRegistered as (...args: unknown[]) => void },
-      { event: 'resourceTemplate.unregistered', listener: onResourceTemplateUnregistered as (...args: unknown[]) => void },
-      { event: 'notification.outbound', listener: onOutboundNotification as (...args: unknown[]) => void },
+      {
+        event: 'prompt.unregistered',
+        listener: onPromptUnregistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resourceTemplate.registered',
+        listener: onResourceTemplateRegistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'resourceTemplate.unregistered',
+        listener: onResourceTemplateUnregistered as (...args: unknown[]) => void,
+      },
+      {
+        event: 'notification.outbound',
+        listener: onOutboundNotification as (...args: unknown[]) => void,
+      },
     );
   }
 

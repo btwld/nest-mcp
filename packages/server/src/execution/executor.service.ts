@@ -1,7 +1,7 @@
 import {
-  MCP_OPTIONS,
   type CompletionRequest,
   type CompletionResult,
+  MCP_OPTIONS,
   type McpExecutionContext,
   type McpModuleOptions,
   type PaginatedResult,
@@ -245,9 +245,7 @@ export class McpExecutorService {
 
   // ---- Completions ----
 
-  async complete(
-    request: CompletionRequest,
-  ): Promise<CompletionResult> {
+  async complete(request: CompletionRequest): Promise<CompletionResult> {
     const refName = request.ref.type === 'ref/prompt' ? request.ref.name : request.ref.uri;
     const handler = this.registry.getCompletionHandler(request.ref.type, refName);
 
@@ -255,7 +253,12 @@ export class McpExecutorService {
       const fn = handler.instance[handler.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      const result = await fn.call(handler.instance, request.argument.name, request.argument.value, request.context);
+      const result = await fn.call(
+        handler.instance,
+        request.argument.name,
+        request.argument.value,
+        request.context,
+      );
       return this.normalizeCompletionResult(result);
     }
 
@@ -283,7 +286,13 @@ export class McpExecutorService {
     const prompt = this.registry.getPrompt(promptName);
     if (!prompt?.parameters) return { values: [] };
 
-    const def = (prompt.parameters as unknown as { _def?: { shape?: () => Record<string, { _def?: { typeName?: string; values?: string[] } }> } })?._def;
+    const def = (
+      prompt.parameters as unknown as {
+        _def?: {
+          shape?: () => Record<string, { _def?: { typeName?: string; values?: string[] } }>;
+        };
+      }
+    )?._def;
     const shape = def?.shape?.();
     if (!shape) return { values: [] };
 
@@ -293,8 +302,8 @@ export class McpExecutorService {
     // Support ZodEnum fields: filter values by prefix
     if (field._def.typeName === 'ZodEnum' && Array.isArray(field._def.values)) {
       const prefix = argument.value.toLowerCase();
-      const filtered = (field._def.values as string[]).filter(
-        (v) => v.toLowerCase().startsWith(prefix),
+      const filtered = (field._def.values as string[]).filter((v) =>
+        v.toLowerCase().startsWith(prefix),
       );
       return this.normalizeCompletionResult({ values: filtered });
     }

@@ -28,8 +28,8 @@ vi.mock('./transport/client-transport.factory', () => ({
 import 'reflect-metadata';
 import { MCP_CLIENT_OPTIONS } from '@nest-mcp/common';
 import type { ModulesContainer } from '@nestjs/core';
-import { MCP_NOTIFICATION_METADATA } from './decorators/on-notification.decorator';
 import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';
+import { MCP_NOTIFICATION_METADATA } from './decorators/on-notification.decorator';
 import type {
   McpClientSseConnection,
   McpClientStdioConnection,
@@ -313,12 +313,8 @@ describe('McpClientBootstrap', () => {
 });
 
 describe('McpClientBootstrap notification wiring', () => {
-  function createMockModulesContainer(
-    providers: Array<{ instance: unknown }>,
-  ): ModulesContainer {
-    const moduleProviders = new Map(
-      providers.map((p, i) => [String(i), { instance: p.instance }]),
-    );
+  function createMockModulesContainer(providers: Array<{ instance: unknown }>): ModulesContainer {
+    const moduleProviders = new Map(providers.map((p, i) => [String(i), { instance: p.instance }]));
     const moduleRef = { providers: moduleProviders };
     return new Map([['testModule', moduleRef]]) as unknown as ModulesContainer;
   }
@@ -343,9 +339,7 @@ describe('McpClientBootstrap notification wiring', () => {
       TestHandler.prototype.handleToolsChanged,
     );
 
-    const modulesContainer = createMockModulesContainer([
-      { instance: handlerInstance },
-    ]);
+    const modulesContainer = createMockModulesContainer([{ instance: handlerInstance }]);
 
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
@@ -376,9 +370,7 @@ describe('McpClientBootstrap notification wiring', () => {
       TestHandler.prototype.handleNotification,
     );
 
-    const modulesContainer = createMockModulesContainer([
-      { instance: handlerInstance },
-    ]);
+    const modulesContainer = createMockModulesContainer([{ instance: handlerInstance }]);
 
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
@@ -405,9 +397,7 @@ describe('McpClientBootstrap notification wiring', () => {
       TestHandler.prototype.handleNotification,
     );
 
-    const modulesContainer = createMockModulesContainer([
-      { instance: handlerInstance },
-    ]);
+    const modulesContainer = createMockModulesContainer([{ instance: handlerInstance }]);
 
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
@@ -419,15 +409,17 @@ describe('McpClientBootstrap notification wiring', () => {
   });
 
   it('binds the handler to the correct instance', async () => {
-    let capturedHandler: Function | undefined;
+    let capturedHandler: ((...args: unknown[]) => unknown) | undefined;
     const clientA = {
       name: 'server-a',
       connect: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn().mockResolvedValue(undefined),
       isConnected: vi.fn().mockReturnValue(true),
-      onNotification: vi.fn().mockImplementation((_method: string, handler: Function) => {
-        capturedHandler = handler;
-      }),
+      onNotification: vi
+        .fn()
+        .mockImplementation((_method: string, handler: (...args: unknown[]) => unknown) => {
+          capturedHandler = handler;
+        }),
     } as unknown as McpClient;
 
     class TestHandler {
@@ -443,15 +435,13 @@ describe('McpClientBootstrap notification wiring', () => {
       TestHandler.prototype.handleNotification,
     );
 
-    const modulesContainer = createMockModulesContainer([
-      { instance: handlerInstance },
-    ]);
+    const modulesContainer = createMockModulesContainer([{ instance: handlerInstance }]);
 
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
 
     expect(capturedHandler).toBeDefined();
-    const result = capturedHandler!({});
+    const result = capturedHandler?.({});
     expect(result).toBe('bound-correctly');
   });
 
@@ -470,9 +460,7 @@ describe('McpClientBootstrap notification wiring', () => {
     }
     const plainInstance = new PlainService();
 
-    const modulesContainer = createMockModulesContainer([
-      { instance: plainInstance },
-    ]);
+    const modulesContainer = createMockModulesContainer([{ instance: plainInstance }]);
 
     const boot = new McpClientBootstrap([clientA], modulesContainer);
     await boot.onApplicationBootstrap();
