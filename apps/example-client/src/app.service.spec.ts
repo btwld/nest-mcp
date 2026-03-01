@@ -1,4 +1,4 @@
-import { MockMcpClient, getMcpClientToken } from '@btwld/mcp-client';
+import { MockMcpClient, getMcpClientToken } from '@nest-mcp/client';
 import { Test } from '@nestjs/testing';
 import { AppService } from './app.service';
 

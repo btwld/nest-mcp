@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_COMPLETION_METADATA } from '@btwld/mcp-common';
+import { MCP_COMPLETION_METADATA } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { Completion } from './completion.decorator';
 import type { CompletionMetadata } from './completion.decorator';

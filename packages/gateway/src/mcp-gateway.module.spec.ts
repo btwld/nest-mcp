@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpRegistryService } from '../../server/src/discovery/registry.service';
 import { McpToolBuilder } from '../../server/src/dynamic/tool-builder.service';

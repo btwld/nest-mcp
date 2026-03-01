@@ -4,7 +4,7 @@ import {
   MCP_PUBLIC_METADATA,
   MCP_ROLES_METADATA,
   MCP_SCOPES_METADATA,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import { Guards } from './guards.decorator';
 import { Public } from './public.decorator';
 import { Roles } from './roles.decorator';

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_PROMPT_METADATA } from '@btwld/mcp-common';
+import { MCP_PROMPT_METADATA } from '@nest-mcp/common';
 import { z } from 'zod';
 import { Prompt } from './prompt.decorator';
 

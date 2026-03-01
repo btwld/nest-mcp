@@ -1,8 +1,8 @@
 {
-  "name": "@btwld/mcp-example-client",
+  "name": "@nest-mcp/example-client",
   "version": "0.1.0",
   "private": true,
-  "description": "Example NestJS app consuming an MCP server via @btwld/mcp-client",
+  "description": "Example NestJS app consuming an MCP server via @nest-mcp/client",
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",
@@ -10,8 +10,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-client": "workspace:*",
-    "@btwld/mcp-common": "workspace:*",
+    "@nest-mcp/client": "workspace:*",
+    "@nest-mcp/common": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",

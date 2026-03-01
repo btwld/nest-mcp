@@ -26,7 +26,7 @@ vi.mock('./transport/client-transport.factory', () => ({
 }));
 
 import 'reflect-metadata';
-import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
+import { MCP_CLIENT_OPTIONS } from '@nest-mcp/common';
 import type { ModulesContainer } from '@nestjs/core';
 import { MCP_NOTIFICATION_METADATA } from './decorators/on-notification.decorator';
 import { getMcpClientToken } from './decorators/inject-mcp-client.decorator';

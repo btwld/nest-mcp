@@ -1,4 +1,4 @@
-import { MetricsService, SessionManager } from '@btwld/mcp-server';
+import { MetricsService, SessionManager } from '@nest-mcp/server';
 import { Controller, Get, Header } from '@nestjs/common';
 
 @Controller()

@@ -3,7 +3,7 @@ import {
   McpError,
   type RateLimitConfig,
   parseDurationMs,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 interface RateLimitEntry {

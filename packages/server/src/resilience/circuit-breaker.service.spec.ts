@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { CircuitBreakerState, MCP_CIRCUIT_OPEN, McpError } from '@btwld/mcp-common';
+import { CircuitBreakerState, MCP_CIRCUIT_OPEN, McpError } from '@nest-mcp/common';
 import { CircuitBreakerService } from './circuit-breaker.service';
 
 describe('CircuitBreakerService', () => {

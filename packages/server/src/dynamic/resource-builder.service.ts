@@ -1,4 +1,4 @@
-import type { McpExecutionContext, ResourceReadResult } from '@btwld/mcp-common';
+import type { McpExecutionContext, ResourceReadResult } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredResource } from '../discovery/registry.service';

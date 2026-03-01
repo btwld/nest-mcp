@@ -1,4 +1,4 @@
-import type { McpMiddleware } from '@btwld/mcp-server';
+import type { McpMiddleware } from '@nest-mcp/server';
 
 export const loggingMiddleware: McpMiddleware = async (ctx, args, next) => {
   const start = Date.now();

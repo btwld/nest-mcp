@@ -1,4 +1,4 @@
-import { McpError } from '@btwld/mcp-common';
+import { McpError } from '@nest-mcp/common';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';

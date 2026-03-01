@@ -1,5 +1,5 @@
-import type { McpExecutionContext } from '@btwld/mcp-common';
-import { McpTransportType } from '@btwld/mcp-common';
+import type { McpExecutionContext } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/common';
 
 export function mockMcpContext(overrides: Partial<McpExecutionContext> = {}): McpExecutionContext {
   return {

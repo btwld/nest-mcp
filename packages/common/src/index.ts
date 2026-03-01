@@ -1,4 +1,4 @@
-// @btwld/mcp-common - Shared foundation for @btwld/mcp ecosystem
+// @nest-mcp/common - Shared foundation for @nest-mcp ecosystem
 
 // Constants
 export * from './constants/metadata-keys';

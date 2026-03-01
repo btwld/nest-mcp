@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';

@@ -1,4 +1,4 @@
-import { RequestTransformService, ResponseTransformService } from '@btwld/mcp-gateway';
+import { RequestTransformService, ResponseTransformService } from '@nest-mcp/gateway';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 
 @Injectable()

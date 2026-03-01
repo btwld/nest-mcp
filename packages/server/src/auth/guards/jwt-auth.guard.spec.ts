@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import type { McpGuardContext } from '@btwld/mcp-common';
+import type { McpGuardContext } from '@nest-mcp/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 describe('JwtAuthGuard', () => {

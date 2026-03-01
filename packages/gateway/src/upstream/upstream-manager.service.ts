@@ -10,9 +10,9 @@ import {
   TaskStatusNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ElicitResult as SdkElicitResult, Root } from '@modelcontextprotocol/sdk/types.js';
-import type { ElicitRequest, ElicitResult, McpSamplingParams, McpSamplingResult } from '@btwld/mcp-common';
+import type { ElicitRequest, ElicitResult, McpSamplingParams, McpSamplingResult } from '@nest-mcp/common';
 import { Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
-import { McpRegistryService } from '@btwld/mcp-server';
+import { McpRegistryService } from '@nest-mcp/server';
 import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
 interface ManagedUpstream {

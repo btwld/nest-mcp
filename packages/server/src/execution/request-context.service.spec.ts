@@ -1,5 +1,5 @@
-import { McpTransportType } from '@btwld/mcp-common';
-import type { McpExecutionContext } from '@btwld/mcp-common';
+import { McpTransportType } from '@nest-mcp/common';
+import type { McpExecutionContext } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { McpRequestContextService } from './request-context.service';
 

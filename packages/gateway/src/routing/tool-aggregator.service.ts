@@ -1,5 +1,5 @@
-import type { ToolAnnotations } from '@btwld/mcp-common';
-import { drainAllPages } from '@btwld/mcp-common';
+import type { ToolAnnotations } from '@nest-mcp/common';
+import { drainAllPages } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
 import { extractErrorMessage } from '../utils/error-utils';

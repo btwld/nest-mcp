@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Tool } from '@btwld/mcp-server';
+import { Tool } from '@nest-mcp/server';
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { BrowserService } from '../browser/browser.service';

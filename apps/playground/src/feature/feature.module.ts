@@ -1,4 +1,4 @@
-import { McpModule } from '@btwld/mcp-server';
+import { McpModule } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { AnalyticsTools } from './analytics.tools';
 

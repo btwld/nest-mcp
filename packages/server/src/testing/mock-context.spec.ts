@@ -1,4 +1,4 @@
-import { McpTransportType } from '@btwld/mcp-common';
+import { McpTransportType } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { mockMcpContext } from './mock-context';
 

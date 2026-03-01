@@ -1,4 +1,4 @@
-import { Public, Tool } from '@btwld/mcp-server';
+import { Public, Tool } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 

@@ -1,4 +1,4 @@
-// @btwld/mcp-gateway - NestJS MCP Gateway
+// @nest-mcp/gateway - NestJS MCP Gateway
 
 // Module
 export { McpGatewayModule } from './mcp-gateway.module';

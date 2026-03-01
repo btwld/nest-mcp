@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { McpTransportType, ToolExecutionError, ValidationError } from '@btwld/mcp-common';
-import type { McpModuleOptions } from '@btwld/mcp-common';
+import { McpTransportType, ToolExecutionError, ValidationError } from '@nest-mcp/common';
+import type { McpModuleOptions } from '@nest-mcp/common';
 import { z } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type {

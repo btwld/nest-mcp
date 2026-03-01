@@ -3,9 +3,9 @@ import {
   MCP_RESOURCE_METADATA,
   MCP_RESOURCE_TEMPLATE_METADATA,
   MCP_TOOL_METADATA,
-} from '@btwld/mcp-common';
-import type { McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS } from '@btwld/mcp-common';
+} from '@nest-mcp/common';
+import type { McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS } from '@nest-mcp/common';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { InjectionToken } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';

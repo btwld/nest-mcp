@@ -1,5 +1,5 @@
 {
-  "name": "@btwld/mcp-client",
+  "name": "@nest-mcp/client",
   "version": "0.1.0",
   "description": "NestJS MCP Client - Connect to and consume MCP servers from NestJS",
   "license": "MIT",
@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.js.map"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
@@ -21,7 +24,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-common": "workspace:*"
+    "@nest-mcp/common": "workspace:*"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",

@@ -1,5 +1,5 @@
-import type { McpModuleOptions } from '@btwld/mcp-common';
-import { buildServerCapabilities } from '@btwld/mcp-common';
+import type { McpModuleOptions } from '@nest-mcp/common';
+import { buildServerCapabilities } from '@nest-mcp/common';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '@nestjs/common';

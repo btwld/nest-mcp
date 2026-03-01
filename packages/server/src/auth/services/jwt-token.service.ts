@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AuthorizationError, parseDurationSeconds } from '@btwld/mcp-common';
+import { AuthorizationError, parseDurationSeconds } from '@nest-mcp/common';
 import { Inject, Injectable } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';

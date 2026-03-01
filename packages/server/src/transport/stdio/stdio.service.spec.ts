@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { EventEmitter } from 'node:events';
-import { McpTransportType } from '@btwld/mcp-common';
+import { McpTransportType } from '@nest-mcp/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock IO-creating dependencies before importing the service

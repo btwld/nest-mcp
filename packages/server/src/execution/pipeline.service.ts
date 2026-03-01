@@ -10,9 +10,9 @@ import type {
   ResourceReadResult,
   RetryConfig,
   ToolCallResult,
-} from '@btwld/mcp-common';
-import type { McpGuard, McpGuardClass } from '@btwld/mcp-common';
-import { MCP_OPTIONS, MCP_REQUEST_CANCELLED, McpError, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
+} from '@nest-mcp/common';
+import type { McpGuard, McpGuardClass } from '@nest-mcp/common';
+import { MCP_OPTIONS, MCP_REQUEST_CANCELLED, McpError, McpTimeoutError, ToolExecutionError } from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';

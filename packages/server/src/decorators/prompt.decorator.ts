@@ -1,5 +1,5 @@
-import { MCP_PROMPT_METADATA } from '@btwld/mcp-common';
-import type { PromptMetadata, PromptOptions } from '@btwld/mcp-common';
+import { MCP_PROMPT_METADATA } from '@nest-mcp/common';
+import type { PromptMetadata, PromptOptions } from '@nest-mcp/common';
 
 export function Prompt(options: PromptOptions): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

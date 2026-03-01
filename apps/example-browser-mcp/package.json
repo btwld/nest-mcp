@@ -1,5 +1,5 @@
 {
-  "name": "@btwld/mcp-example-browser-mcp",
+  "name": "@nest-mcp/example-browser-mcp",
   "version": "0.1.0",
   "private": true,
   "description": "Example MCP server using Playwright headless browser for web content fetching (streamable HTTP transport)",
@@ -14,8 +14,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-common": "workspace:*",
-    "@btwld/mcp-server": "workspace:*",
+    "@nest-mcp/common": "workspace:*",
+    "@nest-mcp/server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@mozilla/readability": "^0.5.0",
     "@nestjs/common": "^11.0.0",

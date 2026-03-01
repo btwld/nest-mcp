@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { AuthorizationError } from '@btwld/mcp-common';
-import type { McpGuardContext } from '@btwld/mcp-common';
+import { AuthorizationError } from '@nest-mcp/common';
+import type { McpGuardContext } from '@nest-mcp/common';
 import type { RegisteredTool } from '../../discovery/registry.service';
 import { ToolAuthGuardService } from './tool-auth.guard';
 

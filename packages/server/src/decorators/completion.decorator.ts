@@ -1,4 +1,4 @@
-import { MCP_COMPLETION_METADATA } from '@btwld/mcp-common';
+import { MCP_COMPLETION_METADATA } from '@nest-mcp/common';
 
 export interface CompletionOptions {
   /** Which ref this completer handles: 'ref/prompt' or 'ref/resource' */

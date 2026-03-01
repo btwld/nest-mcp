@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { McpTransportType } from '@btwld/mcp-common';
+import { McpTransportType } from '@nest-mcp/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it } from 'vitest';
 import { McpRegistryService } from '../discovery/registry.service';

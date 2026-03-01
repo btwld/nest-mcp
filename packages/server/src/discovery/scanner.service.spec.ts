@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import type { McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import type { McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import { Prompt, Resource, Tool } from '../decorators';
 import { MCP_FEATURE_REGISTRATION } from './feature-registration.constants';
 import { McpRegistryService } from './registry.service';

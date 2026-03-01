@@ -1,4 +1,4 @@
-import type { McpHttpAdapter } from '@btwld/mcp-common';
+import type { McpHttpAdapter } from '@nest-mcp/common';
 
 export class FastifyAdapter implements McpHttpAdapter {
   getRequestMethod(request: unknown): string {

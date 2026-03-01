@@ -1,5 +1,5 @@
-import { drainAllPages } from '@btwld/mcp-common';
-import type { PromptArgument } from '@btwld/mcp-common';
+import { drainAllPages } from '@nest-mcp/common';
+import type { PromptArgument } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import { UpstreamManagerService } from '../upstream/upstream-manager.service';
 import { extractErrorMessage } from '../utils/error-utils';

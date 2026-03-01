@@ -14,7 +14,7 @@ import {
   matchUriTemplate,
   paginate,
   zodToJsonSchema,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';

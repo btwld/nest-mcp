@@ -1,4 +1,4 @@
-import { Scopes, Tool } from '@btwld/mcp-server';
+import { Scopes, Tool } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 

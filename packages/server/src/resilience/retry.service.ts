@@ -1,5 +1,5 @@
-import type { RetryConfig } from '@btwld/mcp-common';
-import { McpError } from '@btwld/mcp-common';
+import type { RetryConfig } from '@nest-mcp/common';
+import { McpError } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

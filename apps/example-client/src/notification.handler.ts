@@ -1,4 +1,4 @@
-import { OnMcpNotification } from '@btwld/mcp-client';
+import { OnMcpNotification } from '@nest-mcp/client';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

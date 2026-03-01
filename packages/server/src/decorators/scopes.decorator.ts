@@ -1,4 +1,4 @@
-import { MCP_SCOPES_METADATA } from '@btwld/mcp-common';
+import { MCP_SCOPES_METADATA } from '@nest-mcp/common';
 
 export function Scopes(scopes: string[]): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

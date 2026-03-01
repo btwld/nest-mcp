@@ -1,5 +1,5 @@
-import { McpTransportType } from '@btwld/mcp-common';
-import { McpGatewayModule } from '@btwld/mcp-gateway';
+import { McpTransportType } from '@nest-mcp/common';
+import { McpGatewayModule } from '@nest-mcp/gateway';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GatewayStatusController } from './gateway-status.controller';

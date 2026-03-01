@@ -1,4 +1,4 @@
-import type { McpExecutionContext, McpMiddleware } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpMiddleware } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

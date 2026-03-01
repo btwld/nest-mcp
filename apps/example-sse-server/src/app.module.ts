@@ -1,5 +1,5 @@
-import { McpTransportType } from '@btwld/mcp-common';
-import { McpModule } from '@btwld/mcp-server';
+import { McpTransportType } from '@nest-mcp/common';
+import { McpModule } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CatalogResources } from './catalog.resources';

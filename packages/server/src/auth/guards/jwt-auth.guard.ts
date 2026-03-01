@@ -1,4 +1,4 @@
-import type { McpGuard, McpGuardContext } from '@btwld/mcp-common';
+import type { McpGuard, McpGuardContext } from '@nest-mcp/common';
 import { Injectable } from '@nestjs/common';
 import { JwtTokenService } from '../services/jwt-token.service';
 

@@ -1,4 +1,4 @@
-import { Prompt, Resource } from '@btwld/mcp-server';
+import { Prompt, Resource } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 

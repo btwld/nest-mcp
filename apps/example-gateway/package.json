@@ -1,5 +1,5 @@
 {
-  "name": "@btwld/mcp-example-gateway",
+  "name": "@nest-mcp/example-gateway",
   "version": "0.1.0",
   "private": true,
   "description": "Example MCP gateway aggregating upstream MCP servers",
@@ -10,9 +10,9 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-common": "workspace:*",
-    "@btwld/mcp-gateway": "workspace:*",
-    "@btwld/mcp-server": "workspace:*",
+    "@nest-mcp/common": "workspace:*",
+    "@nest-mcp/gateway": "workspace:*",
+    "@nest-mcp/server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

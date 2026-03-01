@@ -1,4 +1,4 @@
-import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@btwld/mcp-common';
+import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';

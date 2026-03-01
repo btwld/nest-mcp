@@ -3,8 +3,8 @@ import type {
   PromptGetResult,
   ResourceReadResult,
   ToolCallResult,
-} from '@btwld/mcp-common';
-import { McpTransportType } from '@btwld/mcp-common';
+} from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/common';
 import type { DynamicModule, ForwardReference, Provider, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';

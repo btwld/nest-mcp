@@ -1,4 +1,4 @@
-// @btwld/mcp-server - NestJS MCP Server
+// @nest-mcp/server - NestJS MCP Server
 
 // Module
 export { McpModule } from './mcp.module';
@@ -129,6 +129,6 @@ export type {
   CompletionRequest,
   CompletionResult,
   CompletionHandler,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 
-export { McpTransportType } from '@btwld/mcp-common';
+export { McpTransportType } from '@nest-mcp/common';

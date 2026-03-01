@@ -1,5 +1,5 @@
-import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
-import { McpTransportType } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {

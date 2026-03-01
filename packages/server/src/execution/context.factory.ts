@@ -5,9 +5,9 @@ import type {
   McpSamplingParams,
   McpSamplingResult,
   McpTransportType,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { McpSamplingContent } from '@btwld/mcp-common';
+import type { McpSamplingContent } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

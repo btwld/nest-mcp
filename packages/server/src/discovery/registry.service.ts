@@ -8,7 +8,7 @@ import type {
   ResourceTemplateMetadata,
   RetryConfig,
   ToolMetadata,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import {
   MCP_CIRCUIT_BREAKER_METADATA,
   MCP_COMPLETION_METADATA,
@@ -24,7 +24,7 @@ import {
   MCP_SCOPES_METADATA,
   MCP_TIMEOUT_METADATA,
   MCP_TOOL_METADATA,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import type { CompletionMetadata } from '../decorators/completion.decorator';
 import { Injectable, Logger } from '@nestjs/common';
 import type { GetTaskPayloadResult, Task } from '@modelcontextprotocol/sdk/types.js';

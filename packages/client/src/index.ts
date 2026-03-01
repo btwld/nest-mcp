@@ -1,4 +1,4 @@
-// @btwld/mcp-client - NestJS MCP Client
+// @nest-mcp/client - NestJS MCP Client
 
 // Module
 export { McpClientModule, McpClientBootstrap } from './mcp-client.module';

@@ -3,7 +3,7 @@ import {
   CircuitBreakerState,
   MCP_CIRCUIT_OPEN,
   McpError,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 interface CircuitState {

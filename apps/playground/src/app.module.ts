@@ -1,4 +1,4 @@
-import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType, type McpGuardClass } from '@btwld/mcp-server';
+import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType, type McpGuardClass } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
 import { AuthDemoController } from './auth-demo.controller';
@@ -14,7 +14,7 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
     McpModule.forRoot({
       name: 'playground-server',
       version: '1.0.0',
-      description: 'A comprehensive MCP server demonstrating all @btwld/mcp features',
+      description: 'A comprehensive MCP server demonstrating all @nest-mcp features',
       transport: McpTransportType.STREAMABLE_HTTP,
       transportOptions: {
         streamableHttp: {

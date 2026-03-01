@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS } from '@btwld/mcp-common';
-import { McpTransportType } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';

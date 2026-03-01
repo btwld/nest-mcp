@@ -1,5 +1,5 @@
-import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@btwld/mcp-common';
+import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
+import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@nest-mcp/common';
 import type { Root } from '@modelcontextprotocol/sdk/types.js';
 import {
   McpModule,
@@ -7,8 +7,8 @@ import {
   McpRegistryService,
   McpResourceBuilder,
   McpToolBuilder,
-} from '@btwld/mcp-server';
-import type { RegisteredResourceTemplate } from '@btwld/mcp-server';
+} from '@nest-mcp/server';
+import type { RegisteredResourceTemplate } from '@nest-mcp/server';
 import {
   type DynamicModule,
   Inject,

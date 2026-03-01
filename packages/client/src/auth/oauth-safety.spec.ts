@@ -1,6 +1,6 @@
 /**
  * Smoke tests verifying that OAuth utilities from the MCP SDK are re-exported
- * correctly from @btwld/mcp-client and behave as expected.
+ * correctly from @nest-mcp/client and behave as expected.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

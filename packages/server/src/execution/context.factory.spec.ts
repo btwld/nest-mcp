@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { McpTransportType } from '@btwld/mcp-common';
+import { McpTransportType } from '@nest-mcp/common';
 import { McpContextFactory } from './context.factory';
 
 describe('McpContextFactory', () => {

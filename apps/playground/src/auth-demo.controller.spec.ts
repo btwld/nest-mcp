@@ -1,4 +1,4 @@
-import type { IOAuthStore, TokenResponse } from '@btwld/mcp-server';
+import type { IOAuthStore, TokenResponse } from '@nest-mcp/server';
 import { AuthDemoController } from './auth-demo.controller';
 
 describe('AuthDemoController', () => {

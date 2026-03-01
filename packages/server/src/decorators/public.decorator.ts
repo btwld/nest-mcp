@@ -1,4 +1,4 @@
-import { MCP_PUBLIC_METADATA } from '@btwld/mcp-common';
+import { MCP_PUBLIC_METADATA } from '@nest-mcp/common';
 
 export function Public(): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

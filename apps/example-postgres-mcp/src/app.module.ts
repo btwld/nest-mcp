@@ -1,4 +1,4 @@
-import { McpModule, McpTransportType } from '@btwld/mcp-server';
+import { McpModule, McpTransportType } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { DatabaseService } from './database/database.service';
 import { QueryPrompts } from './prompts/query.prompts';

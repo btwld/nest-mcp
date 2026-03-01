@@ -1,4 +1,4 @@
-import { McpError } from '@btwld/mcp-common';
+import { McpError } from '@nest-mcp/common';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-types.interface';
 import type { IOAuthStore } from './oauth-store.interface';

@@ -1,5 +1,5 @@
-import { AuthorizationError } from '@btwld/mcp-common';
-import type { AuthorizableItem, McpGuard, McpGuardClass, McpGuardContext } from '@btwld/mcp-common';
+import { AuthorizationError } from '@nest-mcp/common';
+import type { AuthorizableItem, McpGuard, McpGuardClass, McpGuardContext } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

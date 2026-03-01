@@ -1,5 +1,5 @@
-import { Guards, Roles, Scopes, Tool } from '@btwld/mcp-server';
-import type { McpExecutionContext } from '@btwld/mcp-server';
+import { Guards, Roles, Scopes, Tool } from '@nest-mcp/server';
+import type { McpExecutionContext } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { ApiKeyGuard } from './guards/api-key.guard';

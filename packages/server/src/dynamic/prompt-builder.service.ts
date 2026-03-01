@@ -1,4 +1,4 @@
-import type { McpExecutionContext, PromptGetResult } from '@btwld/mcp-common';
+import type { McpExecutionContext, PromptGetResult } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodObject, ZodRawShape } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';

@@ -1,8 +1,8 @@
 {
-  "name": "@btwld/mcp-playground",
+  "name": "@nest-mcp/playground",
   "version": "0.1.0",
   "private": true,
-  "description": "Playground app demonstrating @btwld/mcp packages",
+  "description": "Playground app demonstrating @nest-mcp packages",
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",
@@ -10,8 +10,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-common": "workspace:*",
-    "@btwld/mcp-server": "workspace:*",
+    "@nest-mcp/common": "workspace:*",
+    "@nest-mcp/server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

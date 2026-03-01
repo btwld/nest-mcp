@@ -10,7 +10,7 @@ import {
   type ToolContent,
   expandUriTemplate,
   matchUriTemplate,
-} from '@btwld/mcp-common';
+} from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import { ResponseCacheService } from './cache/response-cache.service';
 import { PolicyEngineService } from './policies/policy-engine.service';

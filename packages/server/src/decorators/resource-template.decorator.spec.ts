@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_RESOURCE_TEMPLATE_METADATA } from '@btwld/mcp-common';
+import { MCP_RESOURCE_TEMPLATE_METADATA } from '@nest-mcp/common';
 import { ResourceTemplate } from './resource-template.decorator';
 
 describe('ResourceTemplate decorator', () => {

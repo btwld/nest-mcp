@@ -1,4 +1,4 @@
-import { McpClientsService } from '@btwld/mcp-client';
+import { McpClientsService } from '@nest-mcp/client';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()

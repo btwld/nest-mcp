@@ -5,8 +5,8 @@ import {
   MCP_RATE_LIMIT_METADATA,
   MCP_RETRY_METADATA,
   MCP_TIMEOUT_METADATA,
-} from '@btwld/mcp-common';
-import type { McpMiddleware } from '@btwld/mcp-common';
+} from '@nest-mcp/common';
+import type { McpMiddleware } from '@nest-mcp/common';
 import { CircuitBreaker } from './circuit-breaker.decorator';
 import { RateLimit } from './rate-limit.decorator';
 import { Retry } from './retry.decorator';

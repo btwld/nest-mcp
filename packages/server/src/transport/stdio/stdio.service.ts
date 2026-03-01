@@ -1,5 +1,5 @@
-import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Inject, Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';

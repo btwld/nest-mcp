@@ -1,4 +1,4 @@
-import { parseDurationMs } from '@btwld/mcp-common';
+import { parseDurationMs } from '@nest-mcp/common';
 import {
   type CanActivate,
   type ExecutionContext,

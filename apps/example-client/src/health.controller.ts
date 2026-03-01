@@ -1,5 +1,5 @@
-import { McpClientHealthIndicator } from '@btwld/mcp-client';
-import type { McpClient } from '@btwld/mcp-client';
+import { McpClientHealthIndicator } from '@nest-mcp/client';
+import type { McpClient } from '@nest-mcp/client';
 import { Controller, Get, Inject } from '@nestjs/common';
 
 @Controller()

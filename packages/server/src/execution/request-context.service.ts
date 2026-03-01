@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { McpExecutionContext } from '@btwld/mcp-common';
+import type { McpExecutionContext } from '@nest-mcp/common';
 
 @Injectable()
 export class McpRequestContextService {

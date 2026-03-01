@@ -1,4 +1,4 @@
-import { Public, Resource, ResourceTemplate } from '@btwld/mcp-server';
+import { Public, Resource, ResourceTemplate } from '@nest-mcp/server';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 

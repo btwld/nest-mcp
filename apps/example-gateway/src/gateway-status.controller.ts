@@ -4,7 +4,7 @@ import {
   ResourceAggregatorService,
   ToolAggregatorService,
   UpstreamManagerService,
-} from '@btwld/mcp-gateway';
+} from '@nest-mcp/gateway';
 import { Controller, Get, Param } from '@nestjs/common';
 
 @Controller('gateway')

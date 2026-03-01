@@ -9,9 +9,9 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   external: [
-    '@btwld/mcp-common',
-    '@btwld/mcp-server',
-    '@btwld/mcp-client',
+    '@nest-mcp/common',
+    '@nest-mcp/server',
+    '@nest-mcp/client',
     '@modelcontextprotocol/sdk',
     /^@modelcontextprotocol\/sdk\//,
     '@nestjs/common',

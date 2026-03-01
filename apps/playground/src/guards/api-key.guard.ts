@@ -1,4 +1,4 @@
-import type { McpGuard, McpGuardContext } from '@btwld/mcp-server';
+import type { McpGuard, McpGuardContext } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()

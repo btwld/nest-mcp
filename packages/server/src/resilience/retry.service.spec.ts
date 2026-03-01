@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { AuthenticationError, McpTimeoutError } from '@btwld/mcp-common';
+import { AuthenticationError, McpTimeoutError } from '@nest-mcp/common';
 import { RetryService } from './retry.service';
 
 describe('RetryService', () => {

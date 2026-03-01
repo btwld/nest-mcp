@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { JwtTokenService, MCP_OAUTH_STORE, OAuthClientService } from '@btwld/mcp-server';
-import type { IOAuthStore } from '@btwld/mcp-server';
+import { JwtTokenService, MCP_OAUTH_STORE, OAuthClientService } from '@nest-mcp/server';
+import type { IOAuthStore } from '@nest-mcp/server';
 import { Controller, Get, Inject, Query } from '@nestjs/common';
 
 @Controller('auth/demo')

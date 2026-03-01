@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@btwld/mcp-common';
-import type { McpExecutionContext, McpModuleOptions } from '@btwld/mcp-common';
+import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@nest-mcp/common';
+import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { mockMcpContext } from '../testing/mock-context';
 import { ExecutionPipelineService } from './pipeline.service';
 import { McpRequestContextService } from './request-context.service';

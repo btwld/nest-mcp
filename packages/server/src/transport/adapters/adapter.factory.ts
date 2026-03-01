@@ -1,4 +1,4 @@
-import type { HttpAdapterType, McpHttpAdapter } from '@btwld/mcp-common';
+import type { HttpAdapterType, McpHttpAdapter } from '@nest-mcp/common';
 import { Logger } from '@nestjs/common';
 import { ExpressAdapter } from './express.adapter';
 import { FastifyAdapter } from './fastify.adapter';

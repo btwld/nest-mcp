@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { StdioService, bootstrapStdioApp } from '@btwld/mcp-server';
+import { StdioService, bootstrapStdioApp } from '@nest-mcp/server';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

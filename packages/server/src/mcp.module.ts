@@ -1,5 +1,5 @@
-import type { McpModuleAsyncOptions, McpModuleOptions } from '@btwld/mcp-common';
-import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
+import type { McpModuleAsyncOptions, McpModuleOptions } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import {
   type DynamicModule,
   Logger,

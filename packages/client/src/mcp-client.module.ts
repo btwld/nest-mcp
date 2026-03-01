@@ -1,4 +1,4 @@
-import { MCP_CLIENT_OPTIONS } from '@btwld/mcp-common';
+import { MCP_CLIENT_OPTIONS } from '@nest-mcp/common';
 import {
   type DynamicModule,
   Logger,

@@ -1,4 +1,4 @@
-import { McpModule, McpTransportType } from '@btwld/mcp-server';
+import { McpModule, McpTransportType } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { CalculatorTools } from './calculator.tools';
 import { ServerResources } from './file.resources';

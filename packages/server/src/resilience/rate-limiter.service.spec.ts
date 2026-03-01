@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_RATE_LIMIT_EXCEEDED, McpError } from '@btwld/mcp-common';
+import { MCP_RATE_LIMIT_EXCEEDED, McpError } from '@nest-mcp/common';
 import { RateLimiterService } from './rate-limiter.service';
 
 describe('RateLimiterService', () => {

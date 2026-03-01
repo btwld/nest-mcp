@@ -1,4 +1,4 @@
-import { McpError } from '@btwld/mcp-common';
+import { McpError } from '@nest-mcp/common';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   DEFAULT_CLEANUP_INTERVAL,

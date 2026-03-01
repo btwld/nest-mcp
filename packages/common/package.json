@@ -1,7 +1,7 @@
 {
-  "name": "@btwld/mcp-common",
+  "name": "@nest-mcp/common",
   "version": "0.1.0",
-  "description": "Shared types, interfaces, constants, utilities, and decorators for @btwld/mcp",
+  "description": "Shared types, interfaces, constants, utilities, and decorators for @nest-mcp",
   "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.js.map"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",

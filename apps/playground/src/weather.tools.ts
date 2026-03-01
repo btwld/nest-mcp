@@ -9,8 +9,8 @@ import {
   Scopes,
   Tool,
   UseMiddleware,
-} from '@btwld/mcp-server';
-import type { McpExecutionContext } from '@btwld/mcp-server';
+} from '@nest-mcp/server';
+import type { McpExecutionContext } from '@nest-mcp/server';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { timingMiddleware } from './middleware/timing.middleware';

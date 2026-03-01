@@ -1,4 +1,4 @@
-import type { ToolContent } from '@btwld/mcp-common';
+import type { ToolContent } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import { extractErrorMessage } from '../utils/error-utils';
 

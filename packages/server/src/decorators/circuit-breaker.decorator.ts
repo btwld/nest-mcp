@@ -1,5 +1,5 @@
-import { MCP_CIRCUIT_BREAKER_METADATA } from '@btwld/mcp-common';
-import type { CircuitBreakerConfig } from '@btwld/mcp-common';
+import { MCP_CIRCUIT_BREAKER_METADATA } from '@nest-mcp/common';
+import type { CircuitBreakerConfig } from '@nest-mcp/common';
 
 export function CircuitBreaker(config: CircuitBreakerConfig): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

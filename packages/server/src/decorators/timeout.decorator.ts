@@ -1,4 +1,4 @@
-import { MCP_TIMEOUT_METADATA } from '@btwld/mcp-common';
+import { MCP_TIMEOUT_METADATA } from '@nest-mcp/common';
 
 export function Timeout(ms: number): MethodDecorator {
   return (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {

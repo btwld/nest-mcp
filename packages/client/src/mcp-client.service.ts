@@ -1,4 +1,4 @@
-import { drainAllPages } from '@btwld/mcp-common';
+import { drainAllPages } from '@nest-mcp/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';

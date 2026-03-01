@@ -35,10 +35,10 @@ importers:
 
   apps/example-browser-mcp:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -90,10 +90,10 @@ importers:
 
   apps/example-client:
     dependencies:
-      '@btwld/mcp-client':
+      '@nest-mcp/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
       '@modelcontextprotocol/sdk':
@@ -127,13 +127,13 @@ importers:
 
   apps/example-gateway:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-gateway':
+      '@nest-mcp/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -164,10 +164,10 @@ importers:
 
   apps/example-postgres-mcp:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -204,10 +204,10 @@ importers:
 
   apps/example-sse-server:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -241,10 +241,10 @@ importers:
 
   apps/example-stdio:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -272,10 +272,10 @@ importers:
 
   apps/playground:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../../packages/server
       '@modelcontextprotocol/sdk':
@@ -309,7 +309,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../common
     devDependencies:
@@ -361,13 +361,13 @@ importers:
 
   packages/gateway:
     dependencies:
-      '@btwld/mcp-client':
+      '@nest-mcp/client':
         specifier: workspace:*
         version: link:../client
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../common
-      '@btwld/mcp-server':
+      '@nest-mcp/server':
         specifier: workspace:*
         version: link:../server
     devDependencies:
@@ -398,7 +398,7 @@ importers:
 
   packages/server:
     dependencies:
-      '@btwld/mcp-common':
+      '@nest-mcp/common':
         specifier: workspace:*
         version: link:../common
       jsonwebtoken:

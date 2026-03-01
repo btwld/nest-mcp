@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { MCP_TOOL_METADATA } from '@btwld/mcp-common';
+import { MCP_TOOL_METADATA } from '@nest-mcp/common';
 import { z } from 'zod';
 import { Tool } from './tool.decorator';
 

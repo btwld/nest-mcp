@@ -1,5 +1,5 @@
 {
-  "name": "@btwld/mcp-gateway",
+  "name": "@nest-mcp/gateway",
   "version": "0.1.0",
   "description": "NestJS MCP Gateway - Proxy, route, and aggregate multiple MCP servers",
   "license": "MIT",
@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.js.map"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
@@ -21,9 +24,9 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@btwld/mcp-common": "workspace:*",
-    "@btwld/mcp-server": "workspace:*",
-    "@btwld/mcp-client": "workspace:*"
+    "@nest-mcp/common": "workspace:*",
+    "@nest-mcp/server": "workspace:*",
+    "@nest-mcp/client": "workspace:*"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",

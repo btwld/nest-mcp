@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import type { McpExecutionContext, McpMiddleware } from '@btwld/mcp-common';
+import type { McpExecutionContext, McpMiddleware } from '@nest-mcp/common';
 import { mockMcpContext } from '../testing/mock-context';
 import { MiddlewareService } from './middleware.service';
 
