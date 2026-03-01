@@ -9,6 +9,7 @@ import { createWellKnownController } from './oauth/well-known.controller';
 import { AuthAuditService } from './services/auth-audit.service';
 import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
 import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
+import { OAuthFlowService } from './services/oauth-flow.service';
 import { MemoryOAuthStore } from './stores/memory-store.service';
 
 @Module({})
@@ -32,6 +33,7 @@ export class McpAuthModule {
         { provide: MCP_OAUTH_STORE, useValue: store },
         JwtTokenService,
         OAuthClientService,
+        OAuthFlowService,
         JwtAuthGuard,
         AuthRateLimitGuard,
         AuthAuditService,
