@@ -12,7 +12,6 @@ import { NotificationHandler } from './notification.handler';
 
     McpClientModule.forRootAsync({
       imports: [ConfigModule],
-      connectionNames: ['playground', 'sse-server', 'stdio-server'],
       useFactory: (config: ConfigService) => ({
         connections: [
           {

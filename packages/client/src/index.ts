@@ -5,6 +5,7 @@ export { McpClientModule, McpClientBootstrap } from './mcp-client.module';
 
 // Service
 export { McpClient } from './mcp-client.service';
+export { McpClientsService } from './mcp-clients.service';
 
 // Decorators
 export { InjectMcpClient, getMcpClientToken } from './decorators/inject-mcp-client.decorator';

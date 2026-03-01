@@ -17,6 +17,7 @@ import type {
   McpClientModuleOptions,
 } from './interfaces/client-options.interface';
 import { McpClient } from './mcp-client.service';
+import { McpClientsService } from './mcp-clients.service';
 
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes for DI
@@ -47,8 +48,9 @@ export class McpClientModule {
         ...connectionProviders,
         connectionsAggregateProvider,
         bootstrapProvider,
+        McpClientsService,
       ],
-      exports: [MCP_CLIENT_OPTIONS, ...connectionProviders.map((p) => p.provide)],
+      exports: [MCP_CLIENT_OPTIONS, ...connectionProviders.map((p) => p.provide), McpClientsService],
     };
   }
 
@@ -100,11 +102,12 @@ export class McpClientModule {
       module: McpClientModule,
       global: true,
       imports: options.imports ?? [],
-      providers: [asyncOptionsProvider, connectionsProvider, ...namedProviders, bootstrapProvider],
+      providers: [asyncOptionsProvider, connectionsProvider, ...namedProviders, bootstrapProvider, McpClientsService],
       exports: [
         MCP_CLIENT_OPTIONS,
         connectionsProvider.provide,
         ...namedProviders.map((p) => p.provide),
+        McpClientsService,
       ],
     };
   }

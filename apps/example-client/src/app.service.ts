@@ -1,15 +1,21 @@
-import { InjectMcpClient } from '@btwld/mcp-client';
-import type { McpClient } from '@btwld/mcp-client';
-import { Inject, Injectable } from '@nestjs/common';
+import { McpClientsService } from '@btwld/mcp-client';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  constructor(
-    @InjectMcpClient('playground') private readonly playground: McpClient,
-    @InjectMcpClient('sse-server') private readonly sseServer: McpClient,
-    @InjectMcpClient('stdio-server') private readonly stdioServer: McpClient,
-    @Inject('MCP_CLIENT_CONNECTIONS') private readonly allClients: McpClient[],
-  ) {}
+  constructor(private readonly mcpClients: McpClientsService) {}
+
+  private get playground() {
+    return this.mcpClients.getClient('playground');
+  }
+
+  private get sseServer() {
+    return this.mcpClients.getClient('sse-server');
+  }
+
+  private get stdioServer() {
+    return this.mcpClients.getClient('stdio-server');
+  }
 
   // --- Playground operations ---
 
@@ -84,8 +90,9 @@ export class AppService {
   // --- Multi-client operations ---
 
   async listAllTools() {
+    const allClients = this.mcpClients.getClients();
     const results = await Promise.allSettled(
-      this.allClients.map(async (client) => {
+      allClients.map(async (client) => {
         const tools = await client.listTools();
         return {
           connection: client.name,
@@ -98,7 +105,7 @@ export class AppService {
       result.status === 'fulfilled'
         ? result.value
         : {
-            connection: this.allClients[i].name,
+            connection: allClients[i]?.name,
             error: (result.reason as Error).message,
             tools: [],
           },
@@ -106,7 +113,7 @@ export class AppService {
   }
 
   getConnectionStatus() {
-    return this.allClients.map((client) => ({
+    return this.mcpClients.getClients().map((client) => ({
       name: client.name,
       connected: client.isConnected(),
       serverVersion: client.getServerVersion(),
