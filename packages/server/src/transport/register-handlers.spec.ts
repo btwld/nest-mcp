@@ -742,6 +742,69 @@ describe('registerToolOnServer', () => {
     expect(sentParams).not.toHaveProperty('total');
     expect(sentParams).not.toHaveProperty('message');
   });
+
+  // --- streamContent ---
+
+  it('tool callback wires streamContent when sendNotification is available', async () => {
+    const tool = { name: 'stream-tool', description: 'Streaming', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const sendNotification = vi.fn().mockResolvedValue(undefined);
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-s1', sendNotification });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.streamContent).toBeDefined();
+
+    await passedCtx.streamContent!({ type: 'text', text: 'chunk' });
+    expect(sendNotification).toHaveBeenCalledWith({
+      method: 'notifications/tool/streamContent',
+      params: { toolName: 'stream-tool', content: [{ type: 'text', text: 'chunk' }] },
+    });
+  });
+
+  it('tool callback arrays streamContent content unchanged', async () => {
+    const tool = { name: 'stream-arr', description: 'Array streaming', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const sendNotification = vi.fn().mockResolvedValue(undefined);
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-s2', sendNotification });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    const chunks = [{ type: 'text' as const, text: 'a' }, { type: 'text' as const, text: 'b' }];
+    await passedCtx.streamContent!(chunks);
+
+    const sentParams = sendNotification.mock.calls[0][0].params;
+    expect(sentParams.content).toEqual(chunks);
+  });
+
+  it('tool callback does not wire streamContent when sendNotification is absent', async () => {
+    const tool = { name: 'no-stream', description: 'No stream', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-s3' });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.streamContent).toBeUndefined();
+  });
+
+  // --- createSignalContext: already-aborted signal ---
+
+  it('propagates already-aborted signal to internal controller', async () => {
+    const tool = { name: 'abort-tool', description: 'Abort', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const controller = new AbortController();
+    controller.abort();
+
+    await callback({}, { signal: controller.signal, requestId: 'req-a1' });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.signal!.aborted).toBe(true);
+  });
 });
 
 describe('registerResourceOnServer', () => {
