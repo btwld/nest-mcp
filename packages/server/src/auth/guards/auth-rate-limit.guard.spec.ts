@@ -89,4 +89,51 @@ describe('AuthRateLimitGuard', () => {
     expect(() => guard.canActivate(createMockContext('10.0.0.1'))).toThrow(HttpException);
     expect(auditService.logRateLimited).toHaveBeenCalledWith('10.0.0.1');
   });
+
+  it('falls back to socket.remoteAddress when ip is absent', () => {
+    const options = { jwtSecret: 'x'.repeat(32), authRateLimit: { max: 5, window: '1m' } };
+    guard = new AuthRateLimitGuard(options as McpAuthModuleOptions);
+
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => ({ socket: { remoteAddress: '10.0.0.5' } }),
+      }),
+    } as unknown as import('@nestjs/common').ExecutionContext;
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  it('falls back to "unknown" when both ip and socket are absent', () => {
+    const options = { jwtSecret: 'x'.repeat(32), authRateLimit: { max: 5, window: '1m' } };
+    guard = new AuthRateLimitGuard(options as McpAuthModuleOptions);
+
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => ({}),
+      }),
+    } as unknown as import('@nestjs/common').ExecutionContext;
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  it('resets bucket after window expires', () => {
+    vi.useFakeTimers();
+    try {
+      const options = { jwtSecret: 'x'.repeat(32), authRateLimit: { max: 2, window: '1m' } };
+      guard = new AuthRateLimitGuard(options as McpAuthModuleOptions);
+
+      // Use up the limit
+      guard.canActivate(createMockContext('5.5.5.5'));
+      guard.canActivate(createMockContext('5.5.5.5'));
+      expect(() => guard.canActivate(createMockContext('5.5.5.5'))).toThrow(HttpException);
+
+      // Advance past the 1-minute window
+      vi.advanceTimersByTime(61_000);
+
+      // Should be allowed again (new window)
+      expect(guard.canActivate(createMockContext('5.5.5.5'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
