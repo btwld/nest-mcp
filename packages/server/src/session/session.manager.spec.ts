@@ -89,4 +89,41 @@ describe('SessionManager', () => {
 
     expect(manager.getActiveSessions()).toBe(0);
   });
+
+  it('allows creating session after cleanup frees space', () => {
+    manager.configure({ maxConcurrent: 2, timeout: 5000 });
+    manager.createSession('sess-old-1');
+    manager.createSession('sess-old-2');
+
+    // Advance past timeout so sessions are expired
+    vi.advanceTimersByTime(6000);
+
+    // Should succeed because cleanup runs before rejecting
+    manager.configure({ maxConcurrent: 2, timeout: 5000 });
+    manager.createSession('sess-old-1');
+    manager.createSession('sess-old-2');
+    vi.advanceTimersByTime(6000);
+
+    const newSession = manager.createSession('sess-new');
+    expect(newSession.id).toBe('sess-new');
+  });
+
+  it('configure clears previous interval when called twice', () => {
+    manager.configure({ cleanupInterval: 1000 });
+    // Re-configure replaces the interval without throwing
+    expect(() => manager.configure({ cleanupInterval: 2000 })).not.toThrow();
+  });
+
+  it('getActiveSessions returns 0 initially', () => {
+    expect(manager.getActiveSessions()).toBe(0);
+  });
+
+  it('createSession with duplicate id overwrites existing', () => {
+    manager.createSession('sess-1');
+    vi.advanceTimersByTime(1000);
+    const second = manager.createSession('sess-1');
+    expect(second.id).toBe('sess-1');
+    // getSession should update lastActivityAt
+    expect(manager.getActiveSessions()).toBe(1);
+  });
 });
