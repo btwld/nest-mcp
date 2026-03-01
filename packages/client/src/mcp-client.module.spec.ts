@@ -36,6 +36,7 @@ import type {
 } from './interfaces/client-options.interface';
 import { McpClientBootstrap, McpClientModule } from './mcp-client.module';
 import type { McpClient } from './mcp-client.service';
+import { McpClientsService } from './mcp-clients.service';
 
 interface DynamicProvider {
   provide: unknown;
@@ -107,6 +108,37 @@ describe('McpClientModule', () => {
       expect(providerA).toBeDefined();
       expect(providerB).toBeDefined();
     });
+
+    it('includes McpClientsService in providers', () => {
+      const mod = McpClientModule.forRoot({
+        connections: [
+          {
+            name: 'server-a',
+            transport: 'sse',
+            url: 'http://localhost:3000/sse',
+          } satisfies McpClientSseConnection,
+        ],
+      });
+
+      const provider = (mod.providers as DynamicProvider[]).find(
+        (p) => p === McpClientsService || p.provide === McpClientsService,
+      );
+      expect(provider).toBeDefined();
+    });
+
+    it('exports McpClientsService', () => {
+      const mod = McpClientModule.forRoot({
+        connections: [
+          {
+            name: 'server-a',
+            transport: 'sse',
+            url: 'http://localhost:3000/sse',
+          } satisfies McpClientSseConnection,
+        ],
+      });
+
+      expect(mod.exports).toContain(McpClientsService);
+    });
   });
 
   describe('forRootAsync', () => {
@@ -148,6 +180,67 @@ describe('McpClientModule', () => {
         (p) => p.provide === 'MCP_CLIENT_CONNECTIONS',
       );
       expect(connectionsProvider).toBeDefined();
+    });
+
+    it('includes McpClientsService in providers', () => {
+      const mod = McpClientModule.forRootAsync({
+        useFactory: () => ({
+          connections: [
+            {
+              name: 'server-a',
+              transport: 'sse',
+              url: 'http://localhost:3000/sse',
+            } satisfies McpClientSseConnection,
+          ],
+        }),
+      });
+
+      const provider = (mod.providers as DynamicProvider[]).find(
+        (p) => p === McpClientsService || p.provide === McpClientsService,
+      );
+      expect(provider).toBeDefined();
+    });
+
+    it('exports McpClientsService', () => {
+      const mod = McpClientModule.forRootAsync({
+        useFactory: () => ({
+          connections: [
+            {
+              name: 'server-a',
+              transport: 'sse',
+              url: 'http://localhost:3000/sse',
+            } satisfies McpClientSseConnection,
+          ],
+        }),
+      });
+
+      expect(mod.exports).toContain(McpClientsService);
+    });
+
+    it('creates named providers for connectionNames and includes McpClientsService', () => {
+      const mod = McpClientModule.forRootAsync({
+        connectionNames: ['server-a'],
+        useFactory: () => ({
+          connections: [
+            {
+              name: 'server-a',
+              transport: 'sse',
+              url: 'http://localhost:3000/sse',
+            } satisfies McpClientSseConnection,
+          ],
+        }),
+      });
+
+      const namedProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p.provide === getMcpClientToken('server-a'),
+      );
+      expect(namedProvider).toBeDefined();
+
+      const clientsServiceProvider = (mod.providers as DynamicProvider[]).find(
+        (p) => p === McpClientsService || p.provide === McpClientsService,
+      );
+      expect(clientsServiceProvider).toBeDefined();
+      expect(mod.exports).toContain(McpClientsService);
     });
   });
 });
