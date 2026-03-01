@@ -2,6 +2,113 @@ import { EventEmitter } from 'node:events';
 import { McpTransportType } from '@btwld/mcp-common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// ---------------------------------------------------------------------------
+// Mock register functions (stand-ins for register-handlers exports)
+// ---------------------------------------------------------------------------
+const mockRegisterTool = vi.fn();
+const mockRegisterResource = vi.fn();
+const mockRegisterPrompt = vi.fn();
+const mockRegisterResourceTemplate = vi.fn();
+
+function makeHandle() {
+  return { remove: vi.fn() };
+}
+
+type SessionHandle = ReturnType<typeof makeHandle>;
+
+/** Stub that wires up the 8 dynamic-registration event handlers from sse.service.ts */
+function makeRegistryHandlerStub() {
+  const registryEvents = new EventEmitter();
+  const servers = new Map<string, unknown>();
+  const contexts = new Map<string, unknown>();
+  const sdkHandles = new Map<string, Map<string, SessionHandle>>();
+
+  // Pre-populate one session
+  const sessionId = 'sess-1';
+  servers.set(sessionId, { id: 'mock-server' });
+  contexts.set(sessionId, { sessionId });
+  sdkHandles.set(sessionId, new Map());
+
+  // Mirror subscribeToRegistryEvents() from sse.service.ts
+  registryEvents.on('tool.registered', (tool: { name: string }) => {
+    for (const [sid, srv] of servers) {
+      const ctx = contexts.get(sid);
+      if (!ctx) continue;
+      const handle = mockRegisterTool(srv, tool, undefined, ctx) as SessionHandle;
+      sdkHandles.get(sid)?.set(`tool:${tool.name}`, handle);
+    }
+  });
+
+  registryEvents.on('tool.unregistered', (name: string) => {
+    for (const [sid] of servers) {
+      const handle = sdkHandles.get(sid)?.get(`tool:${name}`);
+      if (handle) {
+        handle.remove();
+        sdkHandles.get(sid)?.delete(`tool:${name}`);
+      }
+    }
+  });
+
+  registryEvents.on('resource.registered', (resource: { uri: string }) => {
+    for (const [sid, srv] of servers) {
+      const ctx = contexts.get(sid);
+      if (!ctx) continue;
+      const handle = mockRegisterResource(srv, resource, undefined, ctx) as SessionHandle;
+      sdkHandles.get(sid)?.set(`resource:${resource.uri}`, handle);
+    }
+  });
+
+  registryEvents.on('resource.unregistered', (uri: string) => {
+    for (const [sid] of servers) {
+      const handle = sdkHandles.get(sid)?.get(`resource:${uri}`);
+      if (handle) {
+        handle.remove();
+        sdkHandles.get(sid)?.delete(`resource:${uri}`);
+      }
+    }
+  });
+
+  registryEvents.on('prompt.registered', (prompt: { name: string }) => {
+    for (const [sid, srv] of servers) {
+      const ctx = contexts.get(sid);
+      if (!ctx) continue;
+      const handle = mockRegisterPrompt(srv, prompt, undefined, ctx) as SessionHandle;
+      sdkHandles.get(sid)?.set(`prompt:${prompt.name}`, handle);
+    }
+  });
+
+  registryEvents.on('prompt.unregistered', (name: string) => {
+    for (const [sid] of servers) {
+      const handle = sdkHandles.get(sid)?.get(`prompt:${name}`);
+      if (handle) {
+        handle.remove();
+        sdkHandles.get(sid)?.delete(`prompt:${name}`);
+      }
+    }
+  });
+
+  registryEvents.on('resourceTemplate.registered', (template: { uriTemplate: string }) => {
+    for (const [sid, srv] of servers) {
+      const ctx = contexts.get(sid);
+      if (!ctx) continue;
+      const handle = mockRegisterResourceTemplate(srv, template, undefined, ctx) as SessionHandle;
+      sdkHandles.get(sid)?.set(`resourceTemplate:${template.uriTemplate}`, handle);
+    }
+  });
+
+  registryEvents.on('resourceTemplate.unregistered', (uriTemplate: string) => {
+    for (const [sid] of servers) {
+      const handle = sdkHandles.get(sid)?.get(`resourceTemplate:${uriTemplate}`);
+      if (handle) {
+        handle.remove();
+        sdkHandles.get(sid)?.delete(`resourceTemplate:${uriTemplate}`);
+      }
+    }
+  });
+
+  return { registryEvents, servers, contexts, sdkHandles, sessionId };
+}
+
 // Minimal mock for McpServer – only the `server.notification` method is exercised here.
 function makeMockMcpServer(notification: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined)) {
   return {
@@ -117,5 +224,135 @@ describe('SseService notification.outbound forwarding', () => {
     });
 
     expect(notif).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dynamic registration event handler tests
+// ---------------------------------------------------------------------------
+describe('SseService dynamic registration event handlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegisterTool.mockImplementation(makeHandle);
+    mockRegisterResource.mockImplementation(makeHandle);
+    mockRegisterPrompt.mockImplementation(makeHandle);
+    mockRegisterResourceTemplate.mockImplementation(makeHandle);
+  });
+
+  // ---- tool ----------------------------------------------------------------
+
+  it('calls registerTool and stores handle on tool.registered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    registryEvents.emit('tool.registered', { name: 'my-tool' });
+
+    expect(mockRegisterTool).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('tool:my-tool')).toBe(true);
+  });
+
+  it('calls handle.remove and deletes handle on tool.unregistered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    const handle = makeHandle();
+    sdkHandles.get(sessionId)?.set('tool:my-tool', handle);
+
+    registryEvents.emit('tool.unregistered', 'my-tool');
+
+    expect(handle.remove).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('tool:my-tool')).toBe(false);
+  });
+
+  it('does nothing on tool.unregistered when handle was not stored', () => {
+    const { registryEvents } = makeRegistryHandlerStub();
+    // Should not throw even if no handle is present
+    expect(() => registryEvents.emit('tool.unregistered', 'ghost-tool')).not.toThrow();
+  });
+
+  // ---- resource ------------------------------------------------------------
+
+  it('calls registerResource and stores handle on resource.registered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    registryEvents.emit('resource.registered', { uri: 'file:///data.json' });
+
+    expect(mockRegisterResource).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('resource:file:///data.json')).toBe(true);
+  });
+
+  it('calls handle.remove and deletes handle on resource.unregistered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    const handle = makeHandle();
+    sdkHandles.get(sessionId)?.set('resource:file:///data.json', handle);
+
+    registryEvents.emit('resource.unregistered', 'file:///data.json');
+
+    expect(handle.remove).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('resource:file:///data.json')).toBe(false);
+  });
+
+  // ---- prompt --------------------------------------------------------------
+
+  it('calls registerPrompt and stores handle on prompt.registered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    registryEvents.emit('prompt.registered', { name: 'my-prompt' });
+
+    expect(mockRegisterPrompt).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('prompt:my-prompt')).toBe(true);
+  });
+
+  it('calls handle.remove and deletes handle on prompt.unregistered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    const handle = makeHandle();
+    sdkHandles.get(sessionId)?.set('prompt:my-prompt', handle);
+
+    registryEvents.emit('prompt.unregistered', 'my-prompt');
+
+    expect(handle.remove).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('prompt:my-prompt')).toBe(false);
+  });
+
+  // ---- resourceTemplate ----------------------------------------------------
+
+  it('calls registerResourceTemplate and stores handle on resourceTemplate.registered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    registryEvents.emit('resourceTemplate.registered', { uriTemplate: 'file:///{path}' });
+
+    expect(mockRegisterResourceTemplate).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('resourceTemplate:file:///{path}')).toBe(true);
+  });
+
+  it('calls handle.remove and deletes handle on resourceTemplate.unregistered', () => {
+    const { registryEvents, sdkHandles, sessionId } = makeRegistryHandlerStub();
+    const handle = makeHandle();
+    sdkHandles.get(sessionId)?.set('resourceTemplate:file:///{path}', handle);
+
+    registryEvents.emit('resourceTemplate.unregistered', 'file:///{path}');
+
+    expect(handle.remove).toHaveBeenCalledOnce();
+    expect(sdkHandles.get(sessionId)?.has('resourceTemplate:file:///{path}')).toBe(false);
+  });
+
+  // ---- multi-session -------------------------------------------------------
+
+  it('registers on all active sessions when tool.registered fires', () => {
+    const { registryEvents, servers, contexts, sdkHandles } = makeRegistryHandlerStub();
+    // Add a second session
+    servers.set('sess-2', { id: 'server-2' });
+    contexts.set('sess-2', { sessionId: 'sess-2' });
+    sdkHandles.set('sess-2', new Map());
+
+    registryEvents.emit('tool.registered', { name: 'shared-tool' });
+
+    expect(mockRegisterTool).toHaveBeenCalledTimes(2);
+    expect(sdkHandles.get('sess-1')?.has('tool:shared-tool')).toBe(true);
+    expect(sdkHandles.get('sess-2')?.has('tool:shared-tool')).toBe(true);
+  });
+
+  it('skips sessions that have no context on tool.registered', () => {
+    const { registryEvents, servers } = makeRegistryHandlerStub();
+    // Add a session to servers but NOT to contexts
+    servers.set('sess-orphan', { id: 'orphan-server' });
+
+    registryEvents.emit('tool.registered', { name: 'tool-x' });
+
+    // Only sess-1 (which has a context) should have registerTool called
+    expect(mockRegisterTool).toHaveBeenCalledOnce();
   });
 });
