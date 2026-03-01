@@ -195,6 +195,21 @@ describe('UpstreamManagerService', () => {
     it('should be a no-op for unknown upstream', async () => {
       await expect(service.disconnect('nonexistent')).resolves.toBeUndefined();
     });
+
+    it('logs a warning and still removes upstream when client.close() throws', async () => {
+      const config: UpstreamConfig = { name: 'err-server', transport: 'sse', url: 'http://localhost/sse' };
+      await service.connect(config);
+
+      // Make the mock client's close() reject
+      const mockClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      mockClient.close.mockRejectedValueOnce(new Error('close failed'));
+
+      // Should resolve without throwing
+      await expect(service.disconnect('err-server')).resolves.toBeUndefined();
+
+      // Upstream should have been removed
+      expect(service.getClient('err-server')).toBeUndefined();
+    });
   });
 
   describe('status methods', () => {

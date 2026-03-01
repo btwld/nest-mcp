@@ -118,6 +118,22 @@ describe('StdioService', () => {
       ).not.toThrow();
       expect(registerResourceOnServer).not.toHaveBeenCalled();
     });
+
+    it('ignores prompt.registered events when server is not yet connected', () => {
+      const { registry } = makeService();
+      expect(() =>
+        registry.events.emit('prompt.registered', { name: 'greet' }),
+      ).not.toThrow();
+      expect(registerPromptOnServer).not.toHaveBeenCalled();
+    });
+
+    it('ignores resourceTemplate.registered events when server is not yet connected', () => {
+      const { registry } = makeService();
+      expect(() =>
+        registry.events.emit('resourceTemplate.registered', { uriTemplate: 'docs://{id}' }),
+      ).not.toThrow();
+      expect(registerResourceTemplateOnServer).not.toHaveBeenCalled();
+    });
   });
 
   // ─── start() ────────────────────────────────────────────────────────────
