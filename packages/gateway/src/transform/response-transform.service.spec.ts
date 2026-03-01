@@ -57,5 +57,31 @@ describe('ResponseTransformService', () => {
 
       await expect(service.apply(baseResponse)).rejects.toThrow('transform failed');
     });
+
+    it('transforms earlier in the chain see original values', async () => {
+      const seen: string[] = [];
+
+      service.register((res) => {
+        seen.push(res.toolName);
+        return { ...res, toolName: 'renamed' };
+      });
+      service.register((res) => {
+        seen.push(res.toolName);
+        return res;
+      });
+
+      await service.apply(baseResponse);
+      expect(seen[0]).toBe('listRepos');
+      expect(seen[1]).toBe('renamed');
+    });
+
+    it('does not mutate the original response object', async () => {
+      const original = { ...baseResponse };
+
+      service.register((res) => ({ ...res, toolName: 'mutated' }));
+      await service.apply(baseResponse);
+
+      expect(baseResponse.toolName).toBe(original.toolName);
+    });
   });
 });

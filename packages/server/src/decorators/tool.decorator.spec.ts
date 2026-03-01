@@ -97,4 +97,72 @@ describe('Tool decorator', () => {
     expect(metaB.name).toBe('tool-b');
     expect(metaB.description).toBe('second');
   });
+
+  it('stores title when provided', () => {
+    class TestService {
+      @Tool({ description: 'desc', title: 'My Tool' })
+      titled() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'titled');
+    expect(metadata.title).toBe('My Tool');
+  });
+
+  it('does not include title key when title is not provided', () => {
+    class TestService {
+      @Tool({ description: 'desc' })
+      noTitle() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'noTitle');
+    expect('title' in metadata).toBe(false);
+  });
+
+  it('stores icons when provided', () => {
+    const icons = [{ uri: 'https://example.com/tool-icon.png' }];
+
+    class TestService {
+      @Tool({ description: 'with icons', icons })
+      withIcons() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'withIcons');
+    expect(metadata.icons).toBe(icons);
+  });
+
+  it('stores execution config when provided', () => {
+    const execution = { timeout: 5000 };
+
+    class TestService {
+      @Tool({ description: 'with execution', execution })
+      withExecution() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'withExecution');
+    expect(metadata.execution).toBe(execution);
+  });
+
+  it('does not affect other methods without the decorator', () => {
+    class TestService {
+      @Tool({ description: 'decorated' })
+      decorated() {
+        return 'ok';
+      }
+
+      undecorated() {
+        return 'ok';
+      }
+    }
+
+    const meta = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'undecorated');
+    expect(meta).toBeUndefined();
+  });
 });

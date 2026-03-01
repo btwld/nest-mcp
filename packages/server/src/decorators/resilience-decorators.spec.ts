@@ -122,5 +122,83 @@ describe('Resilience decorators', () => {
 
       expect(value).toBe(5000);
     });
+
+    it('does not affect other methods on same class', () => {
+      class TestService {
+        @Timeout(1000)
+        timed() {
+          return 'ok';
+        }
+
+        untimed() {
+          return 'ok';
+        }
+      }
+
+      expect(
+        Reflect.getMetadata(MCP_TIMEOUT_METADATA, TestService.prototype, 'untimed'),
+      ).toBeUndefined();
+    });
+  });
+
+  describe('decorator isolation', () => {
+    it('@UseMiddleware with a single middleware', () => {
+      const mw: McpMiddleware = async (_ctx, _args, next) => next();
+
+      class TestService {
+        @UseMiddleware(mw)
+        singleMw() {
+          return 'ok';
+        }
+      }
+
+      const value = Reflect.getMetadata(MCP_MIDDLEWARE_METADATA, TestService.prototype, 'singleMw');
+      expect(value).toHaveLength(1);
+      expect(value[0]).toBe(mw);
+    });
+
+    it('@Retry with minimal config', () => {
+      class TestService {
+        @Retry({ maxAttempts: 1, backoff: 'linear', initialDelay: 50 })
+        minimal() {
+          return 'ok';
+        }
+      }
+
+      const config = Reflect.getMetadata(MCP_RETRY_METADATA, TestService.prototype, 'minimal');
+      expect(config.maxAttempts).toBe(1);
+      expect(config.backoff).toBe('linear');
+    });
+
+    it('@RateLimit without perUser defaults to undefined', () => {
+      class TestService {
+        @RateLimit({ max: 10, window: '30s' })
+        limited() {
+          return 'ok';
+        }
+      }
+
+      const config = Reflect.getMetadata(MCP_RATE_LIMIT_METADATA, TestService.prototype, 'limited');
+      expect(config.max).toBe(10);
+      expect(config.window).toBe('30s');
+      expect(config.perUser).toBeUndefined();
+    });
+
+    it('@CircuitBreaker does not affect other methods', () => {
+      class TestService {
+        @CircuitBreaker({ errorThreshold: 3, timeWindow: 30000 })
+        breaker() {
+          return 'ok';
+        }
+
+        normal() {
+          return 'ok';
+        }
+      }
+
+      expect(
+        Reflect.getMetadata(MCP_CIRCUIT_BREAKER_METADATA, TestService.prototype, 'normal'),
+      ).toBeUndefined();
+    });
   });
 });

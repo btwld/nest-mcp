@@ -36,4 +36,18 @@ describe('matchGlobPattern', () => {
     expect(matchGlobPattern('prefix_tool_action', 'prefix_*_action')).toBe(true);
     expect(matchGlobPattern('prefix_tool_other', 'prefix_*_action')).toBe(false);
   });
+
+  it('should not match partial names when no wildcard is used', () => {
+    expect(matchGlobPattern('myToolExtra', 'myTool')).toBe(false);
+    expect(matchGlobPattern('prefixmyTool', 'myTool')).toBe(false);
+  });
+
+  it('should match empty string with standalone wildcard', () => {
+    expect(matchGlobPattern('', '*')).toBe(true);
+  });
+
+  it('should handle multiple ? placeholders', () => {
+    expect(matchGlobPattern('ab', '??')).toBe(true);
+    expect(matchGlobPattern('abc', '??')).toBe(false);
+  });
 });
