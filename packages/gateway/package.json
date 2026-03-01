@@ -2,7 +2,7 @@
   "name": "@nest-mcp/gateway",
   "version": "0.1.1",
   "description": "NestJS MCP Gateway - Proxy, route, and aggregate multiple MCP servers",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -71,4 +71,4 @@ Full documentation: [github.com/btwld/nest-mcp/docs/client](https://github.com/b
 
 ## License
 
-MIT
+BSD-3-Clause

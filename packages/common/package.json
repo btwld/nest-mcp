@@ -2,7 +2,7 @@
   "name": "@nest-mcp/common",
   "version": "0.1.1",
   "description": "Shared types, interfaces, constants, utilities, and decorators for @nest-mcp",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

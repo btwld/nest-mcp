@@ -62,4 +62,4 @@ Full documentation: [github.com/btwld/nest-mcp/docs/gateway](https://github.com/
 
 ## License
 
-MIT
+BSD-3-Clause

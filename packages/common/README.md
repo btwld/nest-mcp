@@ -30,4 +30,4 @@ Full documentation: [github.com/btwld/nest-mcp](https://github.com/btwld/nest-mc
 
 ## License
 
-MIT
+BSD-3-Clause
