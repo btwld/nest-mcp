@@ -120,6 +120,37 @@ describe('TaskManager', () => {
     await expect(manager.removeSession('session-1')).resolves.not.toThrow();
   });
 
+  it('removeSession skips tasks already in terminal state (cancelled)', async () => {
+    const task = await manager.store.createTask(
+      { ttl: null },
+      'req-1',
+      { method: 'tools/call', params: { name: 'test' } },
+    );
+
+    // Pre-cancel the task before session cleanup
+    await manager.store.storeTaskResult(task.taskId, 'cancelled', { content: [] });
+
+    manager.trackTask(task.taskId, 'session-1');
+    await manager.removeSession('session-1');
+
+    const updated = await manager.store.getTask(task.taskId);
+    expect(updated!.status).toBe('cancelled');
+    // taskId should be gone from store since it was already cancelled by removeSession
+    // (the important thing is no double-cancel / no error)
+  });
+
+  it('removeSession gracefully handles tasks that throw during getTask lookup', async () => {
+    // Simulate a task that exists in tracking but throws on getTask (TTL expired etc.)
+    const storeGetTask = vi.spyOn(manager.store, 'getTask').mockRejectedValueOnce(
+      new Error('Task not found'),
+    );
+
+    manager.trackTask('ghost-task-id', 'session-err');
+    await expect(manager.removeSession('session-err')).resolves.not.toThrow();
+
+    storeGetTask.mockRestore();
+  });
+
   it('onModuleDestroy cleans up internal state', async () => {
     const task = await manager.store.createTask(
       { ttl: null },
