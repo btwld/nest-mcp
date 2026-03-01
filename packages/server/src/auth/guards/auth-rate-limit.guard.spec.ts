@@ -136,4 +136,49 @@ describe('AuthRateLimitGuard', () => {
       vi.useRealTimers();
     }
   });
+
+  it('onModuleDestroy stops the cleanup interval from firing', () => {
+    vi.useFakeTimers();
+    try {
+      const options = { jwtSecret: 'x'.repeat(32), authRateLimit: { max: 10, window: '10s' } };
+      guard = new AuthRateLimitGuard(options as McpAuthModuleOptions);
+
+      guard.canActivate(createMockContext('9.9.9.9'));
+      const buckets = (guard as unknown as { buckets: Map<string, unknown> }).buckets;
+      expect(buckets.size).toBe(1);
+
+      // Destroy the guard — this should clear the interval
+      guard.onModuleDestroy();
+
+      // Advance time well past the window + interval; since the timer was cleared,
+      // the cleanup() method should NOT fire and the expired bucket remains
+      vi.advanceTimersByTime(30_000);
+      expect(buckets.size).toBe(1); // NOT cleaned up — timer was cancelled
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cleanup interval removes expired buckets from memory', () => {
+    vi.useFakeTimers();
+    try {
+      const options = { jwtSecret: 'x'.repeat(32), authRateLimit: { max: 10, window: '10s' } };
+      guard = new AuthRateLimitGuard(options as McpAuthModuleOptions);
+
+      // Add some buckets by making requests
+      guard.canActivate(createMockContext('10.0.0.1'));
+      guard.canActivate(createMockContext('10.0.0.2'));
+
+      const buckets = (guard as unknown as { buckets: Map<string, unknown> }).buckets;
+      expect(buckets.size).toBe(2);
+
+      // Advance past both the window (10s) and the cleanup interval (also windowMs = 10s)
+      vi.advanceTimersByTime(20_000);
+
+      // cleanup() fires when the interval triggers — expired buckets should be purged
+      expect(buckets.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
