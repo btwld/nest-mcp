@@ -821,5 +821,67 @@ describe('McpRegistryService', () => {
         'Tool "no-desc-tool" registered without a description. Descriptions are strongly recommended by the MCP specification.',
       );
     });
+
+    it('warns when dynamically registered resource has no description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      const resource: RegisteredResource = {
+        uri: 'file:///bare.json',
+        name: 'bare-resource',
+        description: undefined,
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResource(resource);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Resource "bare-resource" registered without a description. Descriptions are strongly recommended by the MCP specification.',
+      );
+    });
+
+    it('warns when dynamically registered resource template has no description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      const template: RegisteredResourceTemplate = {
+        uriTemplate: 'file:///items/{id}',
+        name: 'item-template',
+        description: undefined,
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResourceTemplate(template);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'ResourceTemplate "item-template" registered without a description. Descriptions are strongly recommended by the MCP specification.',
+      );
+    });
+
+    it('warns when dynamically registered prompt has no description', () => {
+      const warnSpy = vi.spyOn(
+        (registry as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn',
+      );
+
+      const prompt: RegisteredPrompt = {
+        name: 'no-desc-prompt',
+        description: undefined,
+        methodName: 'handle',
+        target: Object,
+        instance: {},
+      };
+      registry.registerPrompt(prompt);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Prompt "no-desc-prompt" registered without a description. Descriptions are strongly recommended by the MCP specification.',
+      );
+    });
   });
 });
