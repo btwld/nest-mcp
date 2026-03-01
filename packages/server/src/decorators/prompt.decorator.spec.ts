@@ -114,6 +114,32 @@ describe('Prompt decorator', () => {
     expect(metaSecond.name).toBe('second-prompt');
   });
 
+  it('stores _meta when provided', () => {
+    const _meta = { version: '2.0', category: 'writing' };
+
+    class TestService {
+      @Prompt({ description: 'prompt with meta', _meta })
+      withMeta() {
+        return { messages: [] };
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_PROMPT_METADATA, TestService.prototype, 'withMeta');
+    expect(metadata._meta).toBe(_meta);
+  });
+
+  it('does not include _meta key when _meta is not provided', () => {
+    class TestService {
+      @Prompt({ description: 'no meta' })
+      noMeta() {
+        return { messages: [] };
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_PROMPT_METADATA, TestService.prototype, 'noMeta');
+    expect('_meta' in metadata).toBe(false);
+  });
+
   it('does not affect other methods without the decorator', () => {
     class TestService {
       @Prompt({ name: 'only-one', description: 'desc' })

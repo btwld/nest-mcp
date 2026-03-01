@@ -150,6 +150,32 @@ describe('Tool decorator', () => {
     expect(metadata.execution).toBe(execution);
   });
 
+  it('stores _meta when provided', () => {
+    const _meta = { version: '1.0', category: 'search' };
+
+    class TestService {
+      @Tool({ description: 'tool with meta', _meta })
+      withMeta() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'withMeta');
+    expect(metadata._meta).toBe(_meta);
+  });
+
+  it('does not include _meta key when _meta is not provided', () => {
+    class TestService {
+      @Tool({ description: 'no meta' })
+      noMeta() {
+        return 'ok';
+      }
+    }
+
+    const metadata = Reflect.getMetadata(MCP_TOOL_METADATA, TestService.prototype, 'noMeta');
+    expect('_meta' in metadata).toBe(false);
+  });
+
   it('does not affect other methods without the decorator', () => {
     class TestService {
       @Tool({ description: 'decorated' })
