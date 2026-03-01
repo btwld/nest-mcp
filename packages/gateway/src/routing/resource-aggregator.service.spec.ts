@@ -209,4 +209,21 @@ describe('ResourceAggregatorService', () => {
       expect(service.getCachedResources()).toEqual([]);
     });
   });
+
+  describe('name fallback', () => {
+    it('falls back to resource.uri when name is absent', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['files']);
+      upstreamManager.getClient.mockReturnValue({
+        listResources: vi.fn().mockResolvedValue({
+          resources: [{ uri: 'file:///nameless.txt' }], // no name field
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const resources = await service.aggregateAll();
+
+      expect(resources[0].name).toBe('file:///nameless.txt');
+    });
+  });
 });

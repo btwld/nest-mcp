@@ -212,4 +212,21 @@ describe('ResourceTemplateAggregatorService', () => {
       expect(service.getCachedTemplates()).toEqual([]);
     });
   });
+
+  describe('name fallback', () => {
+    it('falls back to uriTemplate when name is absent', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['store']);
+      upstreamManager.getClient.mockReturnValue({
+        listResourceTemplates: vi.fn().mockResolvedValue({
+          resourceTemplates: [{ uriTemplate: 'db:///{table}' }], // no name field
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const templates = await service.aggregateAll();
+
+      expect(templates[0].name).toBe('db:///{table}');
+    });
+  });
 });
