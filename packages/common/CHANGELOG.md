@@ -1,5 +1,11 @@
 # @nest-mcp/common
 
+## 0.1.3
+
+### Patch Changes
+
+- 378b3c3: Enable npm provenance on publish
+
 ## 0.1.2
 
 ### Patch Changes
