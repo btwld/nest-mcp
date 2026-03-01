@@ -179,6 +179,22 @@ describe('ExecutionPipelineService', () => {
       expect(circuitBreaker.execute).toHaveBeenCalledWith('test', cbConfig, expect.any(Function));
     });
 
+    it('wraps with both retry and circuit breaker when both are configured', async () => {
+      const retryConfig = { maxAttempts: 2, backoff: 'fixed' as const };
+      const cbConfig = { errorThreshold: 0.5, timeWindow: 60000 };
+      registry.getTool.mockReturnValue({
+        name: 'test',
+        isPublic: true,
+        retry: retryConfig,
+        circuitBreaker: cbConfig,
+      });
+
+      await pipeline.callTool('test', {}, ctx);
+
+      expect(retry.execute).toHaveBeenCalledWith('test', retryConfig, expect.any(Function));
+      expect(circuitBreaker.execute).toHaveBeenCalledWith('test', cbConfig, expect.any(Function));
+    });
+
     it('records metrics on success', async () => {
       registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
 
@@ -479,6 +495,24 @@ describe('ExecutionPipelineService', () => {
       const abortedCtx = mockMcpContext({ signal: controller.signal });
 
       await expect(pipeline.callTool('test', {}, abortedCtx)).rejects.toThrow('Request cancelled');
+    });
+
+    it('rejects with cancelled error when signal fires during execution', async () => {
+      options.resilience = { timeout: 5000 };
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      const controller = new AbortController();
+      const ctxWithSignal = mockMcpContext({ signal: controller.signal });
+
+      // Make the executor hang indefinitely
+      executor.callTool.mockImplementation(() => new Promise(() => {}));
+
+      const callPromise = pipeline.callTool('test', {}, ctxWithSignal);
+
+      // Abort while in-flight
+      controller.abort();
+
+      await expect(callPromise).rejects.toThrow('Request cancelled');
     });
   });
 
