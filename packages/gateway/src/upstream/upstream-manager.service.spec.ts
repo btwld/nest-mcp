@@ -5,6 +5,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     setRequestHandler: vi.fn(),
+    setNotificationHandler: vi.fn(),
   }));
   return { Client: MockClient };
 });
@@ -292,6 +293,63 @@ describe('UpstreamManagerService', () => {
       const instance = MockedClient.mock.results[0].value;
       // Only sampling and elicitation handlers
       expect(instance.setRequestHandler).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('task status notification passthrough', () => {
+    it('registers setNotificationHandler when registry is provided', async () => {
+      const mockRegistry = { broadcastNotification: vi.fn() };
+      const serviceWithRegistry = new UpstreamManagerService(mockRegistry as never);
+      const config: UpstreamConfig = {
+        name: 'task-server',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await serviceWithRegistry.connect(config);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(instance.setNotificationHandler).toHaveBeenCalledOnce();
+    });
+
+    it('does not register setNotificationHandler when no registry is provided', async () => {
+      // service is created without registry in beforeEach
+      const config: UpstreamConfig = {
+        name: 'no-registry-server',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await service.connect(config);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(instance.setNotificationHandler).not.toHaveBeenCalled();
+    });
+
+    it('prefixes taskId with upstream name and calls broadcastNotification', async () => {
+      const broadcastNotification = vi.fn();
+      const mockRegistry = { broadcastNotification };
+      const serviceWithRegistry = new UpstreamManagerService(mockRegistry as never);
+      const config: UpstreamConfig = {
+        name: 'my-upstream',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+
+      await serviceWithRegistry.connect(config);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      // Extract the registered notification handler
+      const [, handler] = instance.setNotificationHandler.mock.calls[0] as [unknown, (n: unknown) => void];
+
+      // Simulate the upstream emitting a task status notification
+      handler({ params: { taskId: 't1', status: 'completed', progress: 1 } });
+
+      expect(broadcastNotification).toHaveBeenCalledWith('notifications/tasks/status', {
+        taskId: 'my-upstream::t1',
+        status: 'completed',
+        progress: 1,
+      });
     });
   });
 });

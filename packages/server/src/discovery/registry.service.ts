@@ -106,6 +106,15 @@ export class McpRegistryService {
   }
 
   /**
+   * Broadcast a server-initiated notification to all active downstream sessions.
+   * Used by the gateway to forward upstream notifications (e.g. notifications/tasks/status)
+   * to every connected downstream client.
+   */
+  broadcastNotification(method: string, params: Record<string, unknown>): void {
+    this.events.emit('notification.outbound', { method, params });
+  }
+
+  /**
    * Scan a provider instance for decorated methods and register them.
    */
   registerProvider(instance: unknown): void {

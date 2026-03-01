@@ -7,10 +7,12 @@ import {
   CreateMessageRequestSchema,
   ElicitRequestSchema,
   ListRootsRequestSchema,
+  TaskStatusNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ElicitResult as SdkElicitResult, Root } from '@modelcontextprotocol/sdk/types.js';
 import type { ElicitRequest, ElicitResult, McpSamplingParams, McpSamplingResult } from '@btwld/mcp-common';
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, Optional, type OnModuleDestroy } from '@nestjs/common';
+import { McpRegistryService } from '@btwld/mcp-server';
 import type { UpstreamConfig, UpstreamStatus } from './upstream.interface';
 
 interface ManagedUpstream {
@@ -34,6 +36,8 @@ export class UpstreamManagerService implements OnModuleDestroy {
     string,
     (params: ElicitRequest, options?: { signal?: AbortSignal }) => Promise<ElicitResult>
   >();
+
+  constructor(@Optional() private readonly registry?: McpRegistryService) {}
 
   async connectAll(configs: UpstreamConfig[], roots?: Root[]): Promise<void> {
     const enabled = configs.filter((c) => c.enabled !== false);
@@ -99,6 +103,17 @@ export class UpstreamManagerService implements OnModuleDestroy {
     };
 
     this.upstreams.set(config.name, managed);
+
+    // Forward task status notifications from the upstream to all downstream sessions.
+    if (this.registry) {
+      client.setNotificationHandler(TaskStatusNotificationSchema, (notification) => {
+        const prefixed = {
+          ...notification.params,
+          taskId: `${upstreamName}::${notification.params.taskId}`,
+        };
+        this.registry!.broadcastNotification('notifications/tasks/status', prefixed as Record<string, unknown>);
+      });
+    }
 
     try {
       const transport = this.createTransport(config);

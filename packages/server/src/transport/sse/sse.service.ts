@@ -206,6 +206,14 @@ export class SseService implements OnModuleDestroy {
       }
     };
 
+    const onOutboundNotification = ({ method, params }: { method: string; params: Record<string, unknown> }) => {
+      for (const server of this.servers.values()) {
+        (server.server as unknown as { notification: (n: unknown) => Promise<void> })
+          .notification({ method, params })
+          .catch((err: unknown) => this.logger.warn(`Failed to forward notification to session: ${err}`));
+      }
+    };
+
     this.registry.events.on('tool.registered', onToolRegistered);
     this.registry.events.on('tool.unregistered', onToolUnregistered);
     this.registry.events.on('resource.registered', onResourceRegistered);
@@ -214,6 +222,7 @@ export class SseService implements OnModuleDestroy {
     this.registry.events.on('prompt.unregistered', onPromptUnregistered);
     this.registry.events.on('resourceTemplate.registered', onResourceTemplateRegistered);
     this.registry.events.on('resourceTemplate.unregistered', onResourceTemplateUnregistered);
+    this.registry.events.on('notification.outbound', onOutboundNotification);
 
     this.registryListeners.push(
       { event: 'tool.registered', listener: onToolRegistered as (...args: unknown[]) => void },
@@ -224,6 +233,7 @@ export class SseService implements OnModuleDestroy {
       { event: 'prompt.unregistered', listener: onPromptUnregistered as (...args: unknown[]) => void },
       { event: 'resourceTemplate.registered', listener: onResourceTemplateRegistered as (...args: unknown[]) => void },
       { event: 'resourceTemplate.unregistered', listener: onResourceTemplateUnregistered as (...args: unknown[]) => void },
+      { event: 'notification.outbound', listener: onOutboundNotification as (...args: unknown[]) => void },
     );
   }
 
