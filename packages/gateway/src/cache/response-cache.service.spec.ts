@@ -176,5 +176,26 @@ describe('ResponseCacheService', () => {
 
       expect(service.size).toBe(0);
     });
+
+    it('is a no-op for the interval when cache was never enabled', () => {
+      // No configure() call — cleanupInterval is undefined
+      expect(() => service.onModuleDestroy()).not.toThrow();
+    });
+  });
+
+  describe('cleanup interval', () => {
+    it('evicts expired entries from store when cleanup interval fires', () => {
+      service.configure({ enabled: true, defaultTtl: 5000 });
+      service.set('k1', 'v1');
+      service.set('k2', 'v2');
+      expect(service.size).toBe(2);
+
+      // Advance past TTL — entries expire, but no get() call, so inline eviction doesn't run
+      // The cleanup interval fires at defaultTtl (5000ms), so advance past 5000ms twice
+      vi.advanceTimersByTime(10001);
+
+      // Cleanup interval should have fired and removed the expired entries
+      expect(service.size).toBe(0);
+    });
   });
 });
