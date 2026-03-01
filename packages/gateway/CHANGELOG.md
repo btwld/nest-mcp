@@ -1,5 +1,17 @@
 # @nest-mcp/gateway
 
+## 0.2.0
+
+### Minor Changes
+
+- 95170f0: Re-export all @nest-mcp/common types from each package — users no longer need to install or import from @nest-mcp/common directly
+
+### Patch Changes
+
+- Updated dependencies [95170f0]
+  - @nest-mcp/client@0.2.0
+  - @nest-mcp/server@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes
