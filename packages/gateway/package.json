@@ -1,6 +1,6 @@
 {
   "name": "@nest-mcp/gateway",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NestJS MCP Gateway - Proxy, route, and aggregate multiple MCP servers",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "!dist/**/*.js.map"],
+  "files": [
+    "dist",
+    "!dist/**/*.js.map"
+  ],
   "publishConfig": {
     "access": "public"
   },

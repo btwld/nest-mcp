@@ -1,6 +1,6 @@
 {
   "name": "@nest-mcp/server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NestJS MCP Server - Build Model Context Protocol servers with NestJS",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -15,7 +15,10 @@
       "default": "./dist/testing/index.js"
     }
   },
-  "files": ["dist", "!dist/**/*.js.map"],
+  "files": [
+    "dist",
+    "!dist/**/*.js.map"
+  ],
   "publishConfig": {
     "access": "public"
   },

@@ -1,6 +1,6 @@
 {
   "name": "@nest-mcp/common",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared types, interfaces, constants, utilities, and decorators for @nest-mcp",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "!dist/**/*.js.map"],
+  "files": [
+    "dist",
+    "!dist/**/*.js.map"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -29,7 +32,9 @@
     "zod": "^3.0.0"
   },
   "peerDependenciesMeta": {
-    "zod": { "optional": true }
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@nestjs/common": "^11.0.0",
