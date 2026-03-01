@@ -772,4 +772,90 @@ describe('GatewayService', () => {
       expect(result).toEqual({ values: [] });
     });
   });
+
+  describe('timeout enforcement', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('should return error when callTool exceeds configured timeout', async () => {
+      vi.useFakeTimers();
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockImplementation(() => new Promise(() => {})),
+      });
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      const resultPromise = service.callTool('gh_listRepos', {});
+      await vi.advanceTimersByTimeAsync(150);
+      const result = await resultPromise;
+
+      expect(result.isError).toBe(true);
+      expect((result.content[0] as { text: string }).text).toContain('Error forwarding to upstream');
+    });
+
+    it('should return error when readResource exceeds configured timeout', async () => {
+      vi.useFakeTimers();
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi.fn().mockImplementation(() => new Promise(() => {})),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      const resultPromise = service.readResource('fs://file:///a');
+      await vi.advanceTimersByTimeAsync(150);
+      const result = await resultPromise;
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('Error reading resource') }),
+      );
+    });
+
+    it('should return error when getPrompt exceeds configured timeout', async () => {
+      vi.useFakeTimers();
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        getPrompt: vi.fn().mockImplementation(() => new Promise(() => {})),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      const resultPromise = service.getPrompt('ai_summarize', {});
+      await vi.advanceTimersByTimeAsync(150);
+      const result = await resultPromise;
+
+      expect(result.messages[0]).toEqual(
+        expect.objectContaining({
+          content: expect.objectContaining({ text: expect.stringContaining('Error getting prompt') }),
+        }),
+      );
+    });
+
+    it('should return error when readResourceTemplate exceeds configured timeout', async () => {
+      vi.useFakeTimers();
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///docs/{name}',
+          upstreamName: 'docs',
+          originalUriTemplate: 'file:///docs/{name}',
+        },
+      ]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi.fn().mockImplementation(() => new Promise(() => {})),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      const resultPromise = service.readResourceTemplate('fs://file:///docs/readme');
+      await vi.advanceTimersByTimeAsync(150);
+      const result = await resultPromise;
+
+      expect(result.contents[0]).toEqual(
+        expect.objectContaining({ text: expect.stringContaining('Error reading resource template') }),
+      );
+    });
+  });
 });
