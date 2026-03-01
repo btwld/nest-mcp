@@ -391,6 +391,24 @@ describe('registerHandlers', () => {
     expect(passedCtx.signal?.aborted).toBe(false);
   });
 
+  it('cancellation handler is a no-op when notification has no requestId', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
+    await expect(
+      cancelHandler({ method: 'notifications/cancelled', params: {} }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('cancellation handler is a no-op when requestId is not tracked', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
+    await expect(
+      cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'unknown-req' } }),
+    ).resolves.toBeUndefined();
+  });
+
   // --- Pagination ---
 
   it('registers custom list request handlers on inner server', () => {
@@ -414,7 +432,7 @@ describe('registerHandlers', () => {
     );
     expect(listToolsCall).toBeDefined();
 
-    const handler = listToolsCall![1];
+    const handler = listToolsCall?.[1];
     const result = await handler({ method: 'tools/list', params: { cursor: 'abc123' } });
 
     expect(mockPipeline.listTools).toHaveBeenCalledWith('abc123');
@@ -432,7 +450,7 @@ describe('registerHandlers', () => {
     const listToolsCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tools/list',
     );
-    const handler = listToolsCall![1];
+    const handler = listToolsCall?.[1];
     const result = await handler({ method: 'tools/list', params: {} });
 
     expect(result).toEqual({ tools: [{ name: 'tool-a' }] });
@@ -450,7 +468,7 @@ describe('registerHandlers', () => {
     const listResourcesCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'resources/list',
     );
-    const handler = listResourcesCall![1];
+    const handler = listResourcesCall?.[1];
     const result = await handler({ method: 'resources/list', params: { cursor: 'next' } });
 
     expect(mockPipeline.listResources).toHaveBeenCalledWith('next');
@@ -468,7 +486,7 @@ describe('registerHandlers', () => {
     const listPromptsCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'prompts/list',
     );
-    const handler = listPromptsCall![1];
+    const handler = listPromptsCall?.[1];
     const result = await handler({ method: 'prompts/list', params: {} });
 
     expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined);
@@ -491,7 +509,7 @@ describe('registerHandlers', () => {
     );
     expect(completeCall).toBeDefined();
 
-    const handler = completeCall![1];
+    const handler = completeCall?.[1];
     const result = await handler({
       method: 'completion/complete',
       params: {
@@ -522,7 +540,7 @@ describe('registerHandlers', () => {
     const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
       (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'completion/complete',
     );
-    const handler = completeCall![1];
+    const handler = completeCall?.[1];
     const result = await handler({
       method: 'completion/complete',
       params: {
@@ -610,7 +628,7 @@ describe('registerHandlers', () => {
     );
     expect(listTasksCall).toBeDefined();
 
-    const handler = listTasksCall![1];
+    const handler = listTasksCall?.[1];
     const result = await handler({ method: 'tasks/list', params: { cursor: 'cur' } });
 
     const config = mockRegistry.taskHandlerConfig as Record<string, ReturnType<typeof vi.fn>>;
@@ -634,7 +652,7 @@ describe('registerHandlers', () => {
     );
     expect(getTaskCall).toBeDefined();
 
-    const handler = getTaskCall![1];
+    const handler = getTaskCall?.[1];
     await expect(handler({ method: 'tasks/get', params: { taskId: 'missing-task' } })).rejects.toThrow(
       'Task "missing-task" not found',
     );
@@ -656,10 +674,75 @@ describe('registerHandlers', () => {
     );
     expect(cancelTaskCall).toBeDefined();
 
-    const handler = cancelTaskCall![1];
+    const handler = cancelTaskCall?.[1];
     await expect(handler({ method: 'tasks/cancel', params: { taskId: 'missing-task' } })).rejects.toThrow(
       'Task "missing-task" not found',
     );
+  });
+
+  it('task proxy getTask handler returns task when found', async () => {
+    const task = { taskId: 'upstream::t1', status: 'completed', ttl: null, createdAt: '', lastUpdatedAt: '' };
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn().mockResolvedValue(task),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const getTaskCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tasks/get',
+    );
+    const handler = getTaskCall?.[1];
+    const result = await handler({ method: 'tasks/get', params: { taskId: 'upstream::t1' } });
+
+    expect(result).toEqual(task);
+  });
+
+  it('task proxy cancelTask handler returns task when found', async () => {
+    const task = { taskId: 'upstream::t1', status: 'cancelled', ttl: null, createdAt: '', lastUpdatedAt: '' };
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn(),
+      cancelTask: vi.fn().mockResolvedValue(task),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const cancelTaskCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tasks/cancel',
+    );
+    const handler = cancelTaskCall?.[1];
+    const result = await handler({ method: 'tasks/cancel', params: { taskId: 'upstream::t1' } });
+
+    expect(result).toEqual(task);
+  });
+
+  it('task proxy getTaskPayload handler returns payload', async () => {
+    const payload = { content: [{ type: 'text', text: 'result' }] };
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn(),
+      cancelTask: vi.fn(),
+      getTaskPayload: vi.fn().mockResolvedValue(payload),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    // getTaskPayload is the last registered task handler (index 8 of setRequestHandler calls)
+    const allCalls = mockInnerServer.setRequestHandler.mock.calls;
+    const getTaskPayloadCall = allCalls[allCalls.length - 1];
+    const handler = getTaskPayloadCall?.[1];
+    const result = await handler({ params: { taskId: 'upstream::t1' } });
+
+    const config = mockRegistry.taskHandlerConfig as Record<string, ReturnType<typeof vi.fn>>;
+    expect(config.getTaskPayload).toHaveBeenCalledWith('upstream::t1');
+    expect(result).toEqual(payload);
   });
 
   // --- Subscription handlers ---
@@ -696,7 +779,7 @@ describe('registerHandlers', () => {
     );
     expect(subscribeCall).toBeDefined();
 
-    const handler = subscribeCall![1];
+    const handler = subscribeCall?.[1];
     const result = await handler({ method: 'resources/subscribe', params: { uri: 'file:///test.txt' } });
 
     expect(subscriptionManager.subscribe).toHaveBeenCalledWith('test-session', 'file:///test.txt', mockServer);
@@ -716,7 +799,7 @@ describe('registerHandlers', () => {
     );
     expect(unsubscribeCall).toBeDefined();
 
-    const handler = unsubscribeCall![1];
+    const handler = unsubscribeCall?.[1];
     const result = await handler({ method: 'resources/unsubscribe', params: { uri: 'file:///test.txt' } });
 
     expect(subscriptionManager.unsubscribe).toHaveBeenCalledWith('test-session', 'file:///test.txt');
