@@ -46,8 +46,8 @@ describe('TaskManager', () => {
 
     const updated = await manager.store.getTask(task.taskId);
     expect(updated).not.toBeNull();
-    expect(updated!.status).toBe('cancelled');
-    expect(updated!.statusMessage).toBe('Session closed');
+    expect(updated?.status).toBe('cancelled');
+    expect(updated?.statusMessage).toBe('Session closed');
   });
 
   it('removeSession does not affect tasks in other sessions', async () => {
@@ -70,8 +70,8 @@ describe('TaskManager', () => {
     const updated1 = await manager.store.getTask(task1.taskId);
     const updated2 = await manager.store.getTask(task2.taskId);
 
-    expect(updated1!.status).toBe('cancelled');
-    expect(updated2!.status).toBe('working');
+    expect(updated1?.status).toBe('cancelled');
+    expect(updated2?.status).toBe('working');
   });
 
   it('removeSession skips tasks already in terminal state (completed)', async () => {
@@ -88,7 +88,7 @@ describe('TaskManager', () => {
     await manager.removeSession('session-1');
 
     const updated = await manager.store.getTask(task.taskId);
-    expect(updated!.status).toBe('completed');
+    expect(updated?.status).toBe('completed');
   });
 
   it('removeSession skips tasks already in terminal state (failed)', async () => {
@@ -105,7 +105,7 @@ describe('TaskManager', () => {
     await manager.removeSession('session-1');
 
     const updated = await manager.store.getTask(task.taskId);
-    expect(updated!.status).toBe('failed');
+    expect(updated?.status).toBe('failed');
   });
 
   it('removeSession is safe for unknown sessions', async () => {
@@ -134,7 +134,7 @@ describe('TaskManager', () => {
     await manager.removeSession('session-1');
 
     const updated = await manager.store.getTask(task.taskId);
-    expect(updated!.status).toBe('cancelled');
+    expect(updated?.status).toBe('cancelled');
     // taskId should be gone from store since it was already cancelled by removeSession
     // (the important thing is no double-cancel / no error)
   });
@@ -186,7 +186,7 @@ describe('TaskManager', () => {
     const updated1 = await manager.store.getTask(task1.taskId);
     const updated2 = await manager.store.getTask(task2.taskId);
 
-    expect(updated1!.status).toBe('cancelled');
-    expect(updated2!.status).toBe('cancelled');
+    expect(updated1?.status).toBe('cancelled');
+    expect(updated2?.status).toBe('cancelled');
   });
 });

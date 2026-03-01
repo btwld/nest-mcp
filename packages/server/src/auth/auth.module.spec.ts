@@ -141,7 +141,7 @@ describe('McpAuthModule', () => {
 
       expect(optionsProvider).toBeDefined();
 
-      const user = await optionsProvider!.useValue.validateUser({ headers: {} });
+      const user = await optionsProvider?.useValue.validateUser({ headers: {} });
       expect(validateSpy).toHaveBeenCalledWith({ headers: {} });
       expect(user).toEqual({ id: 'user-123', email: 'test@example.com' });
     });

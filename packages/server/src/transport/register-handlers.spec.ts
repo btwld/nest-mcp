@@ -313,14 +313,14 @@ describe('registerHandlers', () => {
     // Get the signal passed to the pipeline
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
     expect(passedCtx.signal).toBeDefined();
-    expect(passedCtx.signal!.aborted).toBe(false);
+    expect(passedCtx.signal?.aborted).toBe(false);
 
     // Invoke the cancellation handler
     const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
     await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-42' } });
 
     // Signal should now be aborted
-    expect(passedCtx.signal!.aborted).toBe(true);
+    expect(passedCtx.signal?.aborted).toBe(true);
 
     // Resolve the blocked call to clean up
     resolveCall({ content: [] });
@@ -341,7 +341,7 @@ describe('registerHandlers', () => {
 
     const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
     expect(passedCtx.signal).toBeDefined();
-    expect(passedCtx.signal!.aborted).toBe(false);
+    expect(passedCtx.signal?.aborted).toBe(false);
   });
 
   it('resource cancellation aborts in-flight call', async () => {
@@ -363,12 +363,12 @@ describe('registerHandlers', () => {
     const callPromise = callback(new URL('data://slow'), mockExtra);
 
     const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
-    expect(passedCtx.signal!.aborted).toBe(false);
+    expect(passedCtx.signal?.aborted).toBe(false);
 
     const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
     await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-r3' } });
 
-    expect(passedCtx.signal!.aborted).toBe(true);
+    expect(passedCtx.signal?.aborted).toBe(true);
 
     resolveCall({ contents: [] });
     await callPromise;
@@ -388,7 +388,7 @@ describe('registerHandlers', () => {
 
     const passedCtx = mockPipeline.getPrompt.mock.calls[0][2] as McpExecutionContext;
     expect(passedCtx.signal).toBeDefined();
-    expect(passedCtx.signal!.aborted).toBe(false);
+    expect(passedCtx.signal?.aborted).toBe(false);
   });
 
   // --- Pagination ---
@@ -903,7 +903,7 @@ describe('registerToolOnServer', () => {
     await callback({}, { signal: controller.signal, requestId: 'req-a1' });
 
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
-    expect(passedCtx.signal!.aborted).toBe(true);
+    expect(passedCtx.signal?.aborted).toBe(true);
   });
 
   // --- elicit ---
@@ -1008,7 +1008,7 @@ describe('registerResourceTemplateOnServer', () => {
 
     const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
     expect(passedCtx.signal).toBeDefined();
-    expect(passedCtx.signal!.aborted).toBe(false);
+    expect(passedCtx.signal?.aborted).toBe(false);
   });
 });
 
