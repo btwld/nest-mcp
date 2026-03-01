@@ -126,4 +126,21 @@ describe('SessionManager', () => {
     // getSession should update lastActivityAt
     expect(manager.getActiveSessions()).toBe(1);
   });
+
+  it('cleanup interval automatically evicts timed-out sessions', () => {
+    manager.configure({ timeout: 3000, cleanupInterval: 1000, maxConcurrent: 100 });
+    manager.createSession('auto-sess');
+    expect(manager.getActiveSessions()).toBe(1);
+
+    // Advance past the session timeout — cleanup interval will fire and evict
+    vi.advanceTimersByTime(4000);
+
+    expect(manager.getActiveSessions()).toBe(0);
+  });
+
+  it('onModuleDestroy is safe when configure was never called (no interval set)', () => {
+    manager.createSession('sess-1');
+    expect(() => manager.onModuleDestroy()).not.toThrow();
+    expect(manager.getActiveSessions()).toBe(0);
+  });
 });
