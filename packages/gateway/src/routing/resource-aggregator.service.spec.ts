@@ -180,6 +180,28 @@ describe('ResourceAggregatorService', () => {
 
       expect(service.getCachedResources()).toHaveLength(1);
     });
+
+    it('should paginate through all resources when nextCursor is present', async () => {
+      const listResources = vi
+        .fn()
+        .mockResolvedValueOnce({
+          resources: [{ uri: 'file:///page1.txt', name: 'page1' }],
+          nextCursor: 'page2',
+        })
+        .mockResolvedValueOnce({
+          resources: [{ uri: 'file:///page2.txt', name: 'page2' }],
+        });
+
+      upstreamManager.getAllNames.mockReturnValue(['store']);
+      upstreamManager.getClient.mockReturnValue({ listResources });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const resources = await service.aggregateAll();
+
+      expect(resources).toHaveLength(2);
+      expect(listResources).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getCachedResources', () => {

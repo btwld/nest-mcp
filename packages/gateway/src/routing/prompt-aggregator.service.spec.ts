@@ -173,6 +173,30 @@ describe('PromptAggregatorService', () => {
 
       expect(service.getCachedPrompts()).toHaveLength(1);
     });
+
+    it('should paginate through all prompts when nextCursor is present', async () => {
+      const listPrompts = vi
+        .fn()
+        .mockResolvedValueOnce({
+          prompts: [{ name: 'first' }],
+          nextCursor: 'page2',
+        })
+        .mockResolvedValueOnce({
+          prompts: [{ name: 'second' }],
+        });
+
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({ listPrompts });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const prompts = await service.aggregateAll();
+
+      expect(prompts).toHaveLength(2);
+      expect(listPrompts).toHaveBeenCalledTimes(2);
+      expect(listPrompts).toHaveBeenNthCalledWith(1, undefined);
+      expect(listPrompts).toHaveBeenNthCalledWith(2, { cursor: 'page2' });
+    });
   });
 
   describe('getCachedPrompts', () => {
