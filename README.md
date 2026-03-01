@@ -20,7 +20,7 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
 
 ```
 ┌─────────────────────────────────────────────┐
-│              AI Client (LLM host)            │
+│             AI Client (LLM host)            │
 └──────────────────────┬──────────────────────┘
                        │ MCP (Streamable HTTP / SSE / STDIO)
           ┌────────────▼────────────┐
@@ -41,14 +41,14 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
          │
          ▼
   ┌─────────────────────────────────────────────────────────┐
-  │                    Transport Layer                       │
-  │        (StreamableHttpService / SseService /             │
+  │                    Transport Layer                      │
+  │        (StreamableHttpService / SseService /            │
   │                 StdioService)                           │
   └──────────────────────┬──────────────────────────────────┘
                          │ MCP request (tool/resource/prompt)
                          ▼
   ┌─────────────────────────────────────────────────────────┐
-  │                  Execution Pipeline                      │
+  │                  Execution Pipeline                     │
   │                                                         │
   │  ContextFactory → McpExecutionContext                   │
   │         │                                               │
@@ -56,7 +56,7 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
   │  Auth Guards (@Public / @Scopes / @Roles / @Guards)     │
   │         │                                               │
   │         ▼                                               │
-  │  Middleware (@UseMiddleware → McpMiddleware chain)       │
+  │  Middleware (@UseMiddleware → McpMiddleware chain)      │
   │         │                                               │
   │         ▼                                               │
   │  Resilience (@RateLimit → @CircuitBreaker → @Retry      │
@@ -64,15 +64,15 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
   │         │                                               │
   │         ▼                                               │
   │  ExecutorService → @Tool / @Resource / @Prompt /        │
-  │                    @ResourceTemplate / @Completion       │
+  │                    @ResourceTemplate / @Completion      │
   └─────────────────────────────────────────────────────────┘
          │                         │
          ▼                         ▼
   ┌─────────────┐         ┌────────────────────┐
-  │  Session /  │         │   Dynamic Builders  │
-  │ Subscription│         │  McpToolBuilder /   │
-  │   / Task    │         │  McpResourceBuilder │
-  │  Managers   │         │  McpPromptBuilder   │
+  │  Session /  │         │  Dynamic Builders  │
+  │ Subscription│         │  McpToolBuilder /  │
+  │   / Task    │         │ McpResourceBuilder │
+  │  Managers   │         │  McpPromptBuilder  │
   └─────────────┘         └────────────────────┘
 ```
 
@@ -83,9 +83,9 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
          │
          ▼
   ┌─────────────────────────────────────────────────────────┐
-  │                  McpClientsService                       │
+  │                  McpClientsService                      │
   │         (registry of named McpClient instances)         │
-  └──────┬─────────────────────┬───────────────────────────┘
+  └──────┬─────────────────────┬────────────────────────────┘
          │                     │
          ▼                     ▼
   ┌─────────────┐      ┌───────────────┐
@@ -115,7 +115,7 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
      │ MCP request
      ▼
   ┌──────────────────────────────────────────────────────────┐
-  │                   McpGatewayModule                        │
+  │                   McpGatewayModule                       │
   │                                                          │
   │  RouterService (aggregated tool/resource/prompt list)    │
   │    ├── ToolAggregatorService      prefix: weather_*      │
@@ -131,13 +131,13 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
   │    ResponseCacheService (TTL cache check)                │
   │         │  cache miss                                    │
   │         ▼                                                │
-  │    UpstreamManagerService ──────────────────────────┐   │
-  │    (resolves prefix → upstream connection)          │   │
-  │         │                                           │   │
-  │    ResponseTransformService (custom hooks)          │   │
-  │         │                                           │   │
-  │    ResponseCacheService (store result)              │   │
-  └─────────────────────────────────────────────────────┼───┘
+  │    UpstreamManagerService ──────────────────────────┐    │
+  │    (resolves prefix → upstream connection)          │    │
+  │         │                                           │    │
+  │    ResponseTransformService (custom hooks)          │    │
+  │         │                                           │    │
+  │    ResponseCacheService (store result)              │    │
+  └─────────────────────────────────────────────────────┼────┘
                                                         │
          ┌──────────────────────┬─────────────────────┐ │
          ▼                      ▼                      ▼ │
