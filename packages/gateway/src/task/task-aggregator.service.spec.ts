@@ -198,6 +198,11 @@ describe('TaskAggregatorService', () => {
       expect(await service.cancelTask('upstream1::task-abc')).toBeUndefined();
     });
 
+    it('returns undefined when client is not connected', async () => {
+      upstreamManager.getClient.mockReturnValue(undefined);
+      expect(await service.cancelTask('upstream1::task-abc')).toBeUndefined();
+    });
+
     it('returns undefined when upstream call throws', async () => {
       upstreamManager.getClient.mockReturnValue({
         experimental: { tasks: { cancelTask: vi.fn().mockRejectedValue(new Error('error')) } },
