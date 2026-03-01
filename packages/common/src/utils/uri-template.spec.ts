@@ -94,3 +94,26 @@ describe('getTemplateParams', () => {
     expect(getTemplateParams('/static/path')).toEqual([]);
   });
 });
+
+describe('edge cases', () => {
+  it('matchUriTemplate matches static template (no params)', () => {
+    const result = matchUriTemplate('/static/path', '/static/path');
+    expect(result).toEqual({ params: {} });
+  });
+
+  it('matchUriTemplate returns null for partial path match', () => {
+    const result = matchUriTemplate('/users/{id}', '/users/42/extra');
+    expect(result).toBeNull();
+  });
+
+  it('expandUriTemplate with no template variables returns literal string', () => {
+    const result = expandUriTemplate('/static/path', {});
+    expect(result).toBe('/static/path');
+  });
+
+  it('parseUriTemplate handles template with no leading slash', () => {
+    const { paramNames, regex } = parseUriTemplate('users/{id}');
+    expect(paramNames).toEqual(['id']);
+    expect(regex.test('users/123')).toBe(true);
+  });
+});

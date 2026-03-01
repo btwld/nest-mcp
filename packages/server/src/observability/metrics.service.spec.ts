@@ -86,4 +86,24 @@ describe('MetricsService', () => {
     // Must end with newline
     expect(output.endsWith('\n')).toBe(true);
   });
+
+  it('toPrometheus returns metric headers with no data lines when no calls recorded', () => {
+    const output = service.toPrometheus();
+    expect(output).toContain('# HELP mcp_tool_calls_total');
+    expect(output).not.toContain('{tool=');
+    expect(output.endsWith('\n')).toBe(true);
+  });
+
+  it('toPrometheus includes all tools when multiple tools recorded', () => {
+    service.recordCall('tool-a', 100, true);
+    service.recordCall('tool-b', 200, false);
+    const output = service.toPrometheus();
+
+    expect(output).toContain('mcp_tool_calls_total{tool="tool-a"} 1');
+    expect(output).toContain('mcp_tool_calls_total{tool="tool-b"} 1');
+  });
+
+  it('getMetrics returns empty array initially', () => {
+    expect(service.getMetrics()).toEqual([]);
+  });
 });

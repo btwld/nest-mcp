@@ -196,4 +196,43 @@ describe('buildServerCapabilities', () => {
     });
     expect(result.experimental).toBeUndefined();
   });
+
+  it('should enable tools when options declares tools capability (even if registry is empty)', () => {
+    const options = makeOptions({
+      capabilities: { tools: { listChanged: true } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.tools).toBeDefined();
+  });
+
+  it('should enable resources when options declares resources capability (even if registry is empty)', () => {
+    const options = makeOptions({
+      capabilities: { resources: { subscribe: true, listChanged: true } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.resources).toBeDefined();
+  });
+
+  it('should enable completions when options declares resources capability', () => {
+    const options = makeOptions({
+      capabilities: { resources: { subscribe: true, listChanged: true } },
+    });
+    const result = buildServerCapabilities(options, {
+      hasTools: false,
+      hasResources: false,
+      hasResourceTemplates: false,
+      hasPrompts: false,
+    });
+    expect(result.completions).toEqual({});
+  });
 });
