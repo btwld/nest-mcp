@@ -629,5 +629,17 @@ describe('McpClient', () => {
     it('listAllTools throws when not connected', async () => {
       await expect(mcpClient.listAllTools()).rejects.toThrow('is not connected');
     });
+
+    it('listAllResources throws when not connected', async () => {
+      await expect(mcpClient.listAllResources()).rejects.toThrow('is not connected');
+    });
+
+    it('listAllResourceTemplates throws when not connected', async () => {
+      await expect(mcpClient.listAllResourceTemplates()).rejects.toThrow('is not connected');
+    });
+
+    it('listAllPrompts throws when not connected', async () => {
+      await expect(mcpClient.listAllPrompts()).rejects.toThrow('is not connected');
+    });
   });
 });
