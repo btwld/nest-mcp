@@ -1,6 +1,6 @@
 {
   "name": "@nest-mcp/example-gateway",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Example MCP gateway aggregating upstream MCP servers",
   "scripts": {
