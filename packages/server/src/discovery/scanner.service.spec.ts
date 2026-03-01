@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import type { McpModuleOptions } from '@btwld/mcp-common';
 import { MCP_OPTIONS, McpTransportType } from '@btwld/mcp-common';
-import { Tool } from '../decorators';
+import { Prompt, Resource, Tool } from '../decorators';
 import { MCP_FEATURE_REGISTRATION } from './feature-registration.constants';
 import { McpRegistryService } from './registry.service';
 import { McpScannerService } from './scanner.service';
@@ -26,6 +26,26 @@ class UntaggedTool {
   @Tool({ description: 'Untagged tool' })
   doSomething() {
     return 'ok';
+  }
+}
+
+class ConfigResource {
+  @Resource({ uri: 'file:///config.json', description: 'Config' })
+  getConfig() {
+    return '{}';
+  }
+}
+
+class GreetPrompt {
+  @Prompt({ description: 'Greet prompt' })
+  greet() {
+    return { messages: [] };
+  }
+}
+
+class PlainClass {
+  doSomething() {
+    return 'not an mcp provider';
   }
 }
 
@@ -194,6 +214,84 @@ describe('McpScannerService', () => {
 
       expect(() => scanner.onModuleInit()).not.toThrow();
       expect(registry.getAllTools()).toHaveLength(0);
+    });
+
+    it('skips plain classes without MCP decorators', () => {
+      const instance = new PlainClass();
+      const container = makeModulesContainer([
+        { providers: [{ key: PlainClass, instance }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllTools()).toHaveLength(0);
+      expect(registry.getAllResources()).toHaveLength(0);
+    });
+  });
+
+  describe('resource and prompt scanning', () => {
+    it('registers a resource provider', () => {
+      const instance = new ConfigResource();
+      const container = makeModulesContainer([
+        { providers: [{ key: ConfigResource, instance }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllResources()).toHaveLength(1);
+      expect(registry.getAllResources()[0].uri).toBe('file:///config.json');
+    });
+
+    it('registers a prompt provider', () => {
+      const instance = new GreetPrompt();
+      const container = makeModulesContainer([
+        { providers: [{ key: GreetPrompt, instance }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllPrompts()).toHaveLength(1);
+      expect(registry.getAllPrompts()[0].name).toBe('greet');
+    });
+
+    it('registers both tools and resources from a mixed container', () => {
+      const container = makeModulesContainer([
+        {
+          providers: [
+            { key: WeatherTool, instance: new WeatherTool() },
+            { key: ConfigResource, instance: new ConfigResource() },
+            { key: GreetPrompt, instance: new GreetPrompt() },
+          ],
+        },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'my-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllTools()).toHaveLength(1);
+      expect(registry.getAllResources()).toHaveLength(1);
+      expect(registry.getAllPrompts()).toHaveLength(1);
+    });
+
+    it('excludes resource provider tagged for different server', () => {
+      const instance = new ConfigResource();
+      const registration = { serverName: 'other-server', providerTokens: [ConfigResource] };
+      const container = makeModulesContainer([
+        {
+          providers: [
+            { key: ConfigResource, instance },
+            { key: `${MCP_FEATURE_REGISTRATION}_2`, instance: registration },
+          ],
+        },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'my-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllResources()).toHaveLength(0);
     });
   });
 });
