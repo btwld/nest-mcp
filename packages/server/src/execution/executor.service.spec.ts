@@ -154,6 +154,26 @@ describe('McpExecutorService', () => {
       const result = await executor.listTools();
       expect(result.nextCursor).toBeUndefined();
     });
+
+    it('includes title, icons, execution, and _meta when present', async () => {
+      registry.registerTool({
+        name: 'rich',
+        description: 'Rich tool',
+        methodName: 'rich',
+        target: Object,
+        instance: { rich: vi.fn() },
+        title: 'Rich Tool',
+        icons: { light: 'icon-light.png', dark: 'icon-dark.png' },
+        execution: { timeout: 5000 },
+        _meta: { category: 'advanced' },
+      } as unknown as RegisteredTool);
+
+      const result = await executor.listTools();
+      expect(result.items[0].title).toBe('Rich Tool');
+      expect(result.items[0].icons).toEqual({ light: 'icon-light.png', dark: 'icon-dark.png' });
+      expect(result.items[0].execution).toEqual({ timeout: 5000 });
+      expect(result.items[0]._meta).toEqual({ category: 'advanced' });
+    });
   });
 
   // --- callTool ---
@@ -361,6 +381,24 @@ describe('McpExecutorService', () => {
       const result = await executor.listResources();
       expect(result.nextCursor).toBeUndefined();
     });
+
+    it('includes title, icons, and _meta when present', async () => {
+      registry.registerResource({
+        uri: 'file:///rich.json',
+        name: 'rich',
+        methodName: 'get',
+        target: Object,
+        instance: { get: vi.fn() },
+        title: 'Rich Resource',
+        icons: { light: 'res-light.png' },
+        _meta: { version: 2 },
+      } as unknown as RegisteredResource);
+
+      const result = await executor.listResources();
+      expect(result.items[0].title).toBe('Rich Resource');
+      expect(result.items[0].icons).toEqual({ light: 'res-light.png' });
+      expect(result.items[0]._meta).toEqual({ version: 2 });
+    });
   });
 
   // --- listResourceTemplates ---
@@ -406,6 +444,24 @@ describe('McpExecutorService', () => {
     it('returns PaginatedResult with no nextCursor for small lists', async () => {
       const result = await executor.listResourceTemplates();
       expect(result.nextCursor).toBeUndefined();
+    });
+
+    it('includes title, icons, and _meta when present', async () => {
+      registry.registerResourceTemplate({
+        uriTemplate: 'file:///rich/{id}',
+        name: 'rich-template',
+        methodName: 'get',
+        target: Object,
+        instance: { get: vi.fn() },
+        title: 'Rich Template',
+        icons: { light: 'tmpl-light.png' },
+        _meta: { owner: 'system' },
+      } as unknown as RegisteredResourceTemplate);
+
+      const result = await executor.listResourceTemplates();
+      expect(result.items[0].title).toBe('Rich Template');
+      expect(result.items[0].icons).toEqual({ light: 'tmpl-light.png' });
+      expect(result.items[0]._meta).toEqual({ owner: 'system' });
     });
   });
 
@@ -539,6 +595,24 @@ describe('McpExecutorService', () => {
       const result = await executor.listPrompts();
       expect(result).toHaveProperty('items');
       expect(result).toHaveProperty('nextCursor', undefined);
+    });
+
+    it('includes title, icons, and _meta when present', async () => {
+      registry.registerPrompt({
+        name: 'rich-prompt',
+        description: 'Rich',
+        methodName: 'rich',
+        target: Object,
+        instance: { rich: vi.fn() },
+        title: 'Rich Prompt',
+        icons: { light: 'prompt-light.png' },
+        _meta: { tier: 'premium' },
+      } as unknown as RegisteredPrompt);
+
+      const result = await executor.listPrompts();
+      expect(result.items[0].title).toBe('Rich Prompt');
+      expect(result.items[0].icons).toEqual({ light: 'prompt-light.png' });
+      expect(result.items[0]._meta).toEqual({ tier: 'premium' });
     });
   });
 
@@ -725,6 +799,57 @@ describe('McpExecutorService', () => {
       });
 
       expect(result.values).toEqual([]);
+    });
+
+    it('returns empty for unknown ref type', async () => {
+      const result = await executor.complete({
+        ref: { type: 'ref/unknown' as 'ref/prompt', name: 'whatever' },
+        argument: { name: 'arg', value: 'val' },
+      });
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('sets hasMore when handler returns hasMore: true (no truncation)', async () => {
+      const handler = vi.fn().mockResolvedValue({ values: ['a', 'b'], hasMore: true });
+      (registry as unknown as { completionHandlers: Map<string, unknown> }).completionHandlers.set(
+        'prompt::paged',
+        {
+          refType: 'ref/prompt',
+          refName: 'paged',
+          methodName: 'complete',
+          instance: { complete: handler },
+        },
+      );
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'paged' },
+        argument: { name: 'arg', value: '' },
+      });
+
+      expect(result.values).toEqual(['a', 'b']);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('uses explicit total from handler when no truncation occurs', async () => {
+      const handler = vi.fn().mockResolvedValue({ values: ['x'], total: 42 });
+      (registry as unknown as { completionHandlers: Map<string, unknown> }).completionHandlers.set(
+        'prompt::totaled',
+        {
+          refType: 'ref/prompt',
+          refName: 'totaled',
+          methodName: 'complete',
+          instance: { complete: handler },
+        },
+      );
+
+      const result = await executor.complete({
+        ref: { type: 'ref/prompt', name: 'totaled' },
+        argument: { name: 'arg', value: '' },
+      });
+
+      expect(result.values).toEqual(['x']);
+      expect(result.total).toBe(42);
     });
   });
 
