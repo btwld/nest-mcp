@@ -54,13 +54,12 @@ export class StdioService implements OnModuleDestroy {
     const transport = new StdioServerTransport();
     const server = createMcpServer(this.registry, this.options, this.taskManager);
 
+    const subMgr = this.subscriptionManager;
     const ctx = this.contextFactory.createContext({
       sessionId: 'stdio',
       transport: McpTransportType.STDIO,
       mcpServer: server,
-      notifyResourceUpdated: this.subscriptionManager
-        ? (uri) => this.subscriptionManager?.notifyResourceUpdated(uri)
-        : undefined,
+      notifyResourceUpdated: subMgr ? (uri) => subMgr.notifyResourceUpdated(uri) : undefined,
     });
 
     registerHandlers(

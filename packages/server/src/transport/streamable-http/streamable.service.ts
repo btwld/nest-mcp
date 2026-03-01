@@ -194,14 +194,13 @@ export class StreamableHttpService implements OnModuleDestroy {
     req?: unknown,
   ): McpServer {
     const server = createMcpServer(this.registry, this.options, this.taskManager);
+    const subMgr = this.subscriptionManager;
     const ctx = this.contextFactory.createContext({
       sessionId: label,
       transport: McpTransportType.STREAMABLE_HTTP,
       request: req,
       mcpServer: server,
-      notifyResourceUpdated: this.subscriptionManager
-        ? (uri) => this.subscriptionManager?.notifyResourceUpdated(uri)
-        : undefined,
+      notifyResourceUpdated: subMgr ? (uri) => subMgr.notifyResourceUpdated(uri) : undefined,
     });
 
     registerHandlers(

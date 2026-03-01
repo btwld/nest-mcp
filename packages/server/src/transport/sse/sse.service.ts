@@ -66,14 +66,13 @@ export class SseService implements OnModuleDestroy {
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options, this.taskManager);
+    const subMgr = this.subscriptionManager;
     const ctx = this.contextFactory.createContext({
       sessionId,
       transport: McpTransportType.SSE,
       request: req,
       mcpServer: server,
-      notifyResourceUpdated: this.subscriptionManager
-        ? (uri) => this.subscriptionManager?.notifyResourceUpdated(uri)
-        : undefined,
+      notifyResourceUpdated: subMgr ? (uri) => subMgr.notifyResourceUpdated(uri) : undefined,
     });
 
     registerHandlers(

@@ -203,9 +203,9 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
             continue;
           }
 
-          const boundHandler = (instance as Record<string, (...args: unknown[]) => unknown>)[
-            methodName
-          ].bind(instance);
+          const boundHandler = (
+            instance as Record<string, (...args: unknown[]) => void | Promise<void>>
+          )[methodName].bind(instance);
           client.onNotification(metadata.method, boundHandler);
           wiredCount++;
         }
