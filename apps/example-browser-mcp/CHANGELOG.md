@@ -1,5 +1,13 @@
 # @nest-mcp/example-browser-mcp
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [3dc43bd]
+  - @nest-mcp/common@0.1.2
+  - @nest-mcp/server@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
