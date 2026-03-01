@@ -19,6 +19,7 @@
     "dist",
     "!dist/**/*.js.map"
   ],
+  "homepage": "https://github.com/btwld/nest-mcp#server",
   "repository": {
     "type": "git",
     "url": "https://github.com/btwld/nest-mcp",

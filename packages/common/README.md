@@ -1,5 +1,9 @@
 # @nest-mcp/common
 
+[![npm version](https://img.shields.io/npm/v/@nest-mcp/common.svg)](https://www.npmjs.com/package/@nest-mcp/common)
+[![License](https://img.shields.io/npm/l/@nest-mcp/common)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
+
 Shared types, utilities, and constants for the `nest-mcp` toolkit. This package is a peer dependency of `@nest-mcp/server`, `@nest-mcp/client`, and `@nest-mcp/gateway` — you rarely need to install it directly.
 
 ## Installation

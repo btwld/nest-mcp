@@ -1,6 +1,10 @@
 # nest-mcp
 
-NestJS toolkit for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) applications. Three independent packages cover the full MCP stack — expose tools from a NestJS service, consume remote MCP servers, or aggregate multiple servers behind a single endpoint.
+[![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@nest-mcp/server.svg?label=npm)](https://www.npmjs.com/package/@nest-mcp/server)
+[![License](https://img.shields.io/github/license/btwld/nest-mcp)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+
+Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, clients, and gateways using the NestJS ecosystem you already know — decorators, dependency injection, modules, and guards, without learning a new framework.
 
 ## Packages
 
@@ -150,13 +154,13 @@ NestJS toolkit for building [Model Context Protocol (MCP)](https://modelcontextp
 
 ```bash
 # Server — expose tools/resources to AI clients
-npm install @nest-mcp/server @nest-mcp/common @modelcontextprotocol/sdk
+npm install @nest-mcp/server @modelcontextprotocol/sdk
 
 # Client — call tools on a remote MCP server
 npm install @nest-mcp/client @modelcontextprotocol/sdk
 
 # Gateway — aggregate multiple servers into one
-npm install @nest-mcp/gateway @nest-mcp/server @nest-mcp/client @nest-mcp/common @modelcontextprotocol/sdk
+npm install @nest-mcp/gateway @modelcontextprotocol/sdk
 ```
 
 Peer dependencies (all packages):
@@ -193,8 +197,7 @@ export class ToolsService {
 ```typescript
 // app.module.ts
 import { Module } from '@nestjs/common';
-import { McpModule } from '@nest-mcp/server';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpModule, McpTransportType } from '@nest-mcp/server';
 import { ToolsService } from './tools.service';
 
 @Module({
@@ -217,8 +220,7 @@ Connect to a server and inject the client:
 ```typescript
 // app.module.ts
 import { Module } from '@nestjs/common';
-import { McpClientModule } from '@nest-mcp/client';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpClientModule, McpTransportType } from '@nest-mcp/client';
 
 @Module({
   imports: [
@@ -260,8 +262,7 @@ Aggregate two upstream servers behind one endpoint:
 ```typescript
 // app.module.ts
 import { Module } from '@nestjs/common';
-import { McpGatewayModule } from '@nest-mcp/gateway';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpGatewayModule, McpTransportType } from '@nest-mcp/gateway';
 
 @Module({
   imports: [

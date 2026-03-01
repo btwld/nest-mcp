@@ -1,5 +1,10 @@
 # @nest-mcp/gateway
 
+[![npm version](https://img.shields.io/npm/v/@nest-mcp/gateway.svg)](https://www.npmjs.com/package/@nest-mcp/gateway)
+[![npm downloads](https://img.shields.io/npm/dm/@nest-mcp/gateway.svg)](https://www.npmjs.com/package/@nest-mcp/gateway)
+[![License](https://img.shields.io/npm/l/@nest-mcp/gateway)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
+
 NestJS module for aggregating multiple upstream [MCP](https://modelcontextprotocol.io/) servers behind a single unified endpoint, with routing, caching, policies, and transforms.
 
 ## Installation

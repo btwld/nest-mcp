@@ -1,5 +1,10 @@
 # @nest-mcp/client
 
+[![npm version](https://img.shields.io/npm/v/@nest-mcp/client.svg)](https://www.npmjs.com/package/@nest-mcp/client)
+[![npm downloads](https://img.shields.io/npm/dm/@nest-mcp/client.svg)](https://www.npmjs.com/package/@nest-mcp/client)
+[![License](https://img.shields.io/npm/l/@nest-mcp/client)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
+
 NestJS module for connecting to and consuming [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers with typed injection, notifications, health checks, and reconnection support.
 
 ## Installation

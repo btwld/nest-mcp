@@ -1,5 +1,10 @@
 # @nest-mcp/server
 
+[![npm version](https://img.shields.io/npm/v/@nest-mcp/server.svg)](https://www.npmjs.com/package/@nest-mcp/server)
+[![npm downloads](https://img.shields.io/npm/dm/@nest-mcp/server.svg)](https://www.npmjs.com/package/@nest-mcp/server)
+[![License](https://img.shields.io/npm/l/@nest-mcp/server)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
+
 NestJS module for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers with decorators, auth, resilience, and multi-transport support.
 
 ## Installation
