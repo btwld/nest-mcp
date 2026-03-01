@@ -124,6 +124,48 @@ describe('ResourceAggregatorService', () => {
       expect(resources).toEqual([]);
     });
 
+    it('should collect multiple resources from a single upstream', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['files']);
+      upstreamManager.getClient.mockReturnValue({
+        listResources: vi.fn().mockResolvedValue({
+          resources: [
+            { uri: 'file:///a.txt', name: 'a' },
+            { uri: 'file:///b.txt', name: 'b' },
+          ],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const resources = await service.aggregateAll();
+
+      expect(resources).toHaveLength(2);
+      expect(resources.map((r) => r.originalUri)).toEqual(['file:///a.txt', 'file:///b.txt']);
+    });
+
+    it('should combine resources from multiple upstreams', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['fs', 'db']);
+      upstreamManager.getClient
+        .mockReturnValueOnce({
+          listResources: vi.fn().mockResolvedValue({
+            resources: [{ uri: 'file:///doc.txt', name: 'doc' }],
+          }),
+        })
+        .mockReturnValueOnce({
+          listResources: vi.fn().mockResolvedValue({
+            resources: [{ uri: 'db:///users', name: 'users' }],
+          }),
+        });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const resources = await service.aggregateAll();
+
+      expect(resources).toHaveLength(2);
+      expect(resources[0].upstreamName).toBe('fs');
+      expect(resources[1].upstreamName).toBe('db');
+    });
+
     it('should update cached resources after aggregation', async () => {
       upstreamManager.getAllNames.mockReturnValue(['up']);
       upstreamManager.getClient.mockReturnValue({

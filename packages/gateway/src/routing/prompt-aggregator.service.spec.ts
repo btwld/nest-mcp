@@ -124,6 +124,41 @@ describe('PromptAggregatorService', () => {
       expect(prompts).toEqual([]);
     });
 
+    it('should collect multiple prompts from a single upstream', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['assistant']);
+      upstreamManager.getClient.mockReturnValue({
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [{ name: 'summarize' }, { name: 'translate' }, { name: 'rewrite' }],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const prompts = await service.aggregateAll();
+
+      expect(prompts).toHaveLength(3);
+      expect(prompts.map((p) => p.originalName)).toEqual(['summarize', 'translate', 'rewrite']);
+    });
+
+    it('should combine prompts from multiple upstreams', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['ai', 'nlp']);
+      upstreamManager.getClient
+        .mockReturnValueOnce({
+          listPrompts: vi.fn().mockResolvedValue({ prompts: [{ name: 'summarize' }] }),
+        })
+        .mockReturnValueOnce({
+          listPrompts: vi.fn().mockResolvedValue({ prompts: [{ name: 'tokenize' }] }),
+        });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const prompts = await service.aggregateAll();
+
+      expect(prompts).toHaveLength(2);
+      expect(prompts[0].upstreamName).toBe('ai');
+      expect(prompts[1].upstreamName).toBe('nlp');
+    });
+
     it('should update cached prompts after aggregation', async () => {
       upstreamManager.getAllNames.mockReturnValue(['up']);
       upstreamManager.getClient.mockReturnValue({

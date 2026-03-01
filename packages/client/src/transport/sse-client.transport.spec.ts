@@ -82,4 +82,20 @@ describe('createSseTransport', () => {
     const [, options] = vi.mocked(SSEClientTransport).mock.calls[0];
     expect(options?.authProvider).toBe(mockAuthProvider);
   });
+
+  it('should return the created transport', () => {
+    const transport = createSseTransport({
+      name: 'test',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+    });
+
+    expect(transport).toEqual({ type: 'sse' });
+  });
+
+  it('should call SSEClientTransport constructor exactly once', () => {
+    createSseTransport({ name: 'a', transport: 'sse', url: 'http://a.com/sse' });
+    createSseTransport({ name: 'b', transport: 'sse', url: 'http://b.com/sse' });
+    expect(SSEClientTransport).toHaveBeenCalledTimes(2);
+  });
 });

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { extractZodDescriptions, zodToJsonSchema } from './schema-converter';
+import { extractZodDescriptions, warnMissingDescriptions, zodToJsonSchema } from './schema-converter';
 
 describe('zodToJsonSchema', () => {
   it('should convert ZodString to JSON Schema', () => {
@@ -184,6 +184,27 @@ describe('zodToJsonSchema', () => {
       additionalProperties: { type: 'string' },
     });
   });
+
+  it('should convert ZodObject with all optional fields (no required key)', () => {
+    const schema = z.object({
+      a: z.string().optional(),
+      b: z.number().optional(),
+    });
+    const result = zodToJsonSchema(schema);
+    expect(result).not.toHaveProperty('required');
+    expect(result).toMatchObject({ type: 'object', properties: { a: {}, b: {} } });
+  });
+
+  it('should convert ZodOptional directly to inner type schema', () => {
+    const schema = z.string().optional();
+    expect(zodToJsonSchema(schema)).toEqual({ type: 'string' });
+  });
+
+  it('should return empty object for unknown Zod types', () => {
+    // Craft a fake schema with an unknown typeName to hit the default case
+    const fakeSchema = { _def: { typeName: 'ZodUnknownType' } } as unknown as z.ZodType;
+    expect(zodToJsonSchema(fakeSchema)).toEqual({});
+  });
 });
 
 describe('extractZodDescriptions', () => {
@@ -212,5 +233,63 @@ describe('extractZodDescriptions', () => {
     });
     const result = extractZodDescriptions(schema);
     expect(result).toEqual([{ name: 'role', description: undefined, required: false }]);
+  });
+});
+
+describe('warnMissingDescriptions', () => {
+  it('warns when schema has no top-level description', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warnMissingDescriptions(z.string(), 'myTool');
+    expect(warn).toHaveBeenCalledWith(
+      '[nest-mcp] myTool: schema is missing a top-level .describe() call',
+    );
+    warn.mockRestore();
+  });
+
+  it('does not warn for top-level when description is present', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warnMissingDescriptions(z.string().describe('A string'), 'myTool');
+    expect(warn).not.toHaveBeenCalledWith(
+      '[nest-mcp] myTool: schema is missing a top-level .describe() call',
+    );
+    warn.mockRestore();
+  });
+
+  it('warns for each ZodObject field missing .describe()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const schema = z
+      .object({
+        name: z.string().describe('The name'),
+        age: z.number(),
+      })
+      .describe('A user');
+    warnMissingDescriptions(schema, 'userTool');
+    expect(warn).toHaveBeenCalledWith("[nest-mcp] userTool: field 'age' is missing a .describe() call");
+    expect(warn).not.toHaveBeenCalledWith(
+      "[nest-mcp] userTool: field 'name' is missing a .describe() call",
+    );
+    warn.mockRestore();
+  });
+
+  it('does not warn for fields that have .describe()', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const schema = z
+      .object({
+        name: z.string().describe('The name'),
+      })
+      .describe('A user');
+    warnMissingDescriptions(schema, 'userTool');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('only warns about top-level for non-object schemas (no field iteration)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warnMissingDescriptions(z.array(z.string()), 'arrayTool');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[nest-mcp] arrayTool: schema is missing a top-level .describe() call',
+    );
+    warn.mockRestore();
   });
 });

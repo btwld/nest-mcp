@@ -24,4 +24,13 @@ describe('extractErrorMessage', () => {
   it('should convert objects to string', () => {
     expect(extractErrorMessage({ code: 500 })).toBe('[object Object]');
   });
+
+  it('should convert boolean true to string', () => {
+    expect(extractErrorMessage(true)).toBe('true');
+  });
+
+  it('should use message property from Error subclasses', () => {
+    const err = new TypeError('type mismatch');
+    expect(extractErrorMessage(err)).toBe('type mismatch');
+  });
 });

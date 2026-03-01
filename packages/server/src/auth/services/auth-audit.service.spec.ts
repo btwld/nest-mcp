@@ -70,4 +70,24 @@ describe('AuthAuditService', () => {
     expect(entry.ip).toBe('192.168.1.1');
     expect(entry.outcome).toBe('failure');
   });
+
+  it('timestamp is a valid ISO 8601 string', () => {
+    service.logTokenIssued('c', 'u');
+    const entry = getLoggedEntry();
+    expect(typeof entry.timestamp).toBe('string');
+    expect(new Date(entry.timestamp as string).toISOString()).toBe(entry.timestamp);
+  });
+
+  it('logTokenRevoked without ip leaves ip undefined', () => {
+    service.logTokenRevoked('jti-xyz');
+    const entry = getLoggedEntry();
+    expect(entry.ip).toBeUndefined();
+  });
+
+  it('logClientRegistered includes ip when provided', () => {
+    service.logClientRegistered('client-3', 'App Name', '10.0.0.2');
+    const entry = getLoggedEntry();
+    expect(entry.ip).toBe('10.0.0.2');
+    expect(entry.outcome).toBe('success');
+  });
 });
