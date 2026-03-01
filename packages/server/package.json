@@ -17,7 +17,8 @@
   },
   "files": [
     "dist",
-    "!dist/**/*.js.map"
+    "!dist/**/*.js.map",
+    "!dist/**/*.d.ts.map"
   ],
   "homepage": "https://github.com/btwld/nest-mcp#server",
   "repository": {
