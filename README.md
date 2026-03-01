@@ -140,7 +140,7 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
   └─────────────────────────────────────────────────────┼────┘
                                                         │
          ┌──────────────────────┬─────────────────────┐ │
-         ▼                      ▼                      ▼ │
+         ▼                      ▼                     ▼ │
   ┌─────────────┐      ┌──────────────┐      ┌──────────────┐
   │  Upstream A │      │  Upstream B  │      │  Upstream C  │
   │  (weather)  │      │  (search)    │      │   (...)      │
