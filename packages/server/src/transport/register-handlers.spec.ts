@@ -622,6 +622,28 @@ describe('registerHandlers', () => {
       'Task "missing-task" not found',
     );
   });
+
+  it('task proxy cancelTask handler throws when task not found', async () => {
+    mockRegistry.taskHandlerConfig = {
+      listTasks: vi.fn(),
+      getTask: vi.fn(),
+      cancelTask: vi.fn().mockResolvedValue(undefined),
+      getTaskPayload: vi.fn(),
+    };
+    mockOptions.capabilities = { ...mockOptions.capabilities, tasks: { enabled: true } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const cancelTaskCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'tasks/cancel',
+    );
+    expect(cancelTaskCall).toBeDefined();
+
+    const handler = cancelTaskCall![1];
+    await expect(handler({ method: 'tasks/cancel', params: { taskId: 'missing-task' } })).rejects.toThrow(
+      'Task "missing-task" not found',
+    );
+  });
 });
 
 // --- Per-item helper tests ---
