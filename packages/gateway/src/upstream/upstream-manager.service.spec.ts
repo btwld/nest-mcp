@@ -310,6 +310,26 @@ describe('UpstreamManagerService', () => {
         ),
       ).toBe(false);
     });
+
+    it('throws when upstream requests sampling but no forwarder is active', async () => {
+      const config: UpstreamConfig = {
+        name: 'sampling-upstream',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+      await service.connect(config);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      // First setRequestHandler call is for sampling (CreateMessageRequestSchema)
+      const [, samplingHandler] = instance.setRequestHandler.mock.calls[0] as [
+        unknown,
+        (req: unknown) => Promise<unknown>,
+      ];
+
+      await expect(samplingHandler({})).rejects.toThrow(
+        'Upstream "sampling-upstream" requested sampling but no downstream client context is active',
+      );
+    });
   });
 
   describe('elicitation forwarder', () => {
@@ -329,6 +349,26 @@ describe('UpstreamManagerService', () => {
           'my-upstream',
         ),
       ).toBe(false);
+    });
+
+    it('throws when upstream requests elicitation but no forwarder is active', async () => {
+      const config: UpstreamConfig = {
+        name: 'elicit-upstream',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+      await service.connect(config);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      // Second setRequestHandler call is for elicitation (ElicitRequestSchema)
+      const [, elicitHandler] = instance.setRequestHandler.mock.calls[1] as [
+        unknown,
+        (req: unknown) => Promise<unknown>,
+      ];
+
+      await expect(elicitHandler({})).rejects.toThrow(
+        'Upstream "elicit-upstream" requested elicitation but no downstream client context is active',
+      );
     });
   });
 
