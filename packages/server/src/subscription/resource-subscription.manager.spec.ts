@@ -117,6 +117,20 @@ describe('ResourceSubscriptionManager', () => {
     expect(server.server.sendResourceUpdated).toHaveBeenCalledTimes(1);
   });
 
+  it('unsubscribe retains URI entry when other sessions are still subscribed', async () => {
+    const server1 = createMockServer();
+    const server2 = createMockServer();
+    manager.subscribe('session-1', 'file:///a.txt', server1);
+    manager.subscribe('session-2', 'file:///a.txt', server2);
+
+    manager.unsubscribe('session-1', 'file:///a.txt');
+
+    // URI entry should still exist since session-2 remains subscribed
+    await manager.notifyResourceUpdated('file:///a.txt');
+    expect(server1.server.sendResourceUpdated).not.toHaveBeenCalled();
+    expect(server2.server.sendResourceUpdated).toHaveBeenCalledWith({ uri: 'file:///a.txt' });
+  });
+
   it('unsubscribes only specific URI leaving other URIs intact', async () => {
     const server = createMockServer();
     manager.subscribe('session-1', 'file:///a.txt', server);
