@@ -52,4 +52,26 @@ describe('createStdioTransport', () => {
 
     expect(transport).toEqual({ type: 'stdio' });
   });
+
+  it('should pass empty args array when provided', () => {
+    createStdioTransport({
+      name: 'test',
+      transport: 'stdio',
+      command: 'node',
+      args: [],
+    });
+
+    expect(StdioClientTransport).toHaveBeenCalledWith({
+      command: 'node',
+      args: [],
+      env: undefined,
+      cwd: undefined,
+    });
+  });
+
+  it('should call StdioClientTransport constructor once per call', () => {
+    createStdioTransport({ name: 'test', transport: 'stdio', command: 'node' });
+    createStdioTransport({ name: 'test', transport: 'stdio', command: 'python' });
+    expect(StdioClientTransport).toHaveBeenCalledTimes(2);
+  });
 });

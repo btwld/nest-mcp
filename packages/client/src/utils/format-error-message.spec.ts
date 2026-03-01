@@ -20,4 +20,18 @@ describe('formatErrorMessage', () => {
   it('should convert undefined to string', () => {
     expect(formatErrorMessage(undefined)).toBe('undefined');
   });
+
+  it('should convert objects to [object Object]', () => {
+    expect(formatErrorMessage({ code: 500 })).toBe('[object Object]');
+  });
+
+  it('should use Error message property, not toString', () => {
+    const err = new TypeError('type mismatch');
+    expect(formatErrorMessage(err)).toBe('type mismatch');
+  });
+
+  it('should convert boolean to string', () => {
+    expect(formatErrorMessage(false)).toBe('false');
+    expect(formatErrorMessage(true)).toBe('true');
+  });
 });

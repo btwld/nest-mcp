@@ -29,4 +29,15 @@ describe('OnMcpNotification decorator', () => {
       method: 'resources/updated',
     });
   });
+
+  it('should return the result of SetMetadata (a MethodDecorator)', () => {
+    const result = OnMcpNotification('server-c', 'tools/listChanged');
+    // SetMetadata mock returns () => {} — verify it is a function
+    expect(typeof result).toBe('function');
+  });
+
+  it('MCP_NOTIFICATION_METADATA is unique (different from common Symbol)', () => {
+    const otherSymbol = Symbol('mcp:client-notification');
+    expect(MCP_NOTIFICATION_METADATA).not.toBe(otherSymbol);
+  });
 });

@@ -27,5 +27,20 @@ describe('InjectMcpClient decorator', () => {
       InjectMcpClient('github');
       expect(Inject).toHaveBeenCalledWith('MCP_CLIENT_github');
     });
+
+    it('should return the result of Inject (a ParameterDecorator)', () => {
+      const result = InjectMcpClient('server');
+      expect(typeof result).toBe('function');
+    });
+  });
+
+  describe('getMcpClientToken edge cases', () => {
+    it('should handle empty string name', () => {
+      expect(getMcpClientToken('')).toBe('MCP_CLIENT_');
+    });
+
+    it('should return a string type', () => {
+      expect(typeof getMcpClientToken('my-server')).toBe('string');
+    });
   });
 });
