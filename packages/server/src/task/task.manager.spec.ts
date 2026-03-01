@@ -74,7 +74,7 @@ describe('TaskManager', () => {
     expect(updated2!.status).toBe('working');
   });
 
-  it('removeSession skips tasks already in terminal state', async () => {
+  it('removeSession skips tasks already in terminal state (completed)', async () => {
     const task = await manager.store.createTask(
       { ttl: null },
       'req-1',
@@ -89,6 +89,23 @@ describe('TaskManager', () => {
 
     const updated = await manager.store.getTask(task.taskId);
     expect(updated!.status).toBe('completed');
+  });
+
+  it('removeSession skips tasks already in terminal state (failed)', async () => {
+    const task = await manager.store.createTask(
+      { ttl: null },
+      'req-1',
+      { method: 'tools/call', params: { name: 'test' } },
+    );
+
+    // Mark task as failed before session cleanup
+    await manager.store.storeTaskResult(task.taskId, 'failed', { content: [] });
+
+    manager.trackTask(task.taskId, 'session-1');
+    await manager.removeSession('session-1');
+
+    const updated = await manager.store.getTask(task.taskId);
+    expect(updated!.status).toBe('failed');
   });
 
   it('removeSession is safe for unknown sessions', async () => {
