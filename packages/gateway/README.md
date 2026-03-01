@@ -5,7 +5,7 @@ NestJS module for aggregating multiple upstream [MCP](https://modelcontextprotoc
 ## Installation
 
 ```bash
-npm install @nest-mcp/gateway @nest-mcp/server @nest-mcp/client @nest-mcp/common @modelcontextprotocol/sdk
+npm install @nest-mcp/gateway @modelcontextprotocol/sdk
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
@@ -15,7 +15,7 @@ npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { McpGatewayModule } from '@nest-mcp/gateway';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/gateway';
 
 @Module({
   imports: [

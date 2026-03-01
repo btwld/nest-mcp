@@ -74,3 +74,7 @@ export { TaskAggregatorService } from './task/task-aggregator.service';
 // Utils
 export { matchGlobPattern } from './utils/pattern-matcher';
 export { collectFulfilled } from './utils/settled-results';
+
+// Re-export everything from @nest-mcp/common for convenience —
+// users only need to install @nest-mcp/gateway
+export * from '@nest-mcp/common';

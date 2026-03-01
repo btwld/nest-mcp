@@ -106,32 +106,6 @@ export type { ToolMetrics } from './observability/metrics.service';
 // Server factory
 export { createMcpServer } from './server/server.factory';
 
-// Re-export common types for convenience
-export type {
-  McpModuleOptions,
-  McpModuleAsyncOptions,
-  McpExecutionContext,
-  McpMiddleware,
-  ToolOptions,
-  ToolMetadata,
-  ToolCallResult,
-  ResourceOptions,
-  ResourceMetadata,
-  ResourceTemplateOptions,
-  ResourceTemplateMetadata,
-  PromptOptions,
-  PromptMetadata,
-  PromptGetResult,
-  RateLimitConfig,
-  RetryConfig,
-  CircuitBreakerConfig,
-  McpGuard,
-  McpGuardClass,
-  McpGuardContext,
-  AuthenticatedUser,
-  CompletionRequest,
-  CompletionResult,
-  CompletionHandler,
-} from '@nest-mcp/common';
-
-export { McpTransportType } from '@nest-mcp/common';
+// Re-export everything from @nest-mcp/common for convenience —
+// users only need to install @nest-mcp/server
+export * from '@nest-mcp/common';

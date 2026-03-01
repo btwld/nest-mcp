@@ -52,6 +52,10 @@ export type {
 // Testing
 export { MockMcpClient } from './testing/mock-client';
 
+// Re-export everything from @nest-mcp/common for convenience —
+// users only need to install @nest-mcp/client
+export * from '@nest-mcp/common';
+
 // OAuth
 export {
   auth,

@@ -15,7 +15,7 @@ npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { McpClientModule } from '@nest-mcp/client';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/client';
 
 @Module({
   imports: [

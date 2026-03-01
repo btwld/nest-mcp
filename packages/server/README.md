@@ -5,7 +5,7 @@ NestJS module for building [Model Context Protocol (MCP)](https://modelcontextpr
 ## Installation
 
 ```bash
-npm install @nest-mcp/server @nest-mcp/common @modelcontextprotocol/sdk
+npm install @nest-mcp/server @modelcontextprotocol/sdk
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
@@ -34,7 +34,7 @@ export class ToolsService {
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { McpModule } from '@nest-mcp/server';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/server';
 
 @Module({
   imports: [
