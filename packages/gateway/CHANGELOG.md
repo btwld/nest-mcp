@@ -1,5 +1,15 @@
 # @nest-mcp/gateway
 
+## 0.1.2
+
+### Patch Changes
+
+- 3dc43bd: Change license from MIT to BSD-3-Clause
+- Updated dependencies [3dc43bd]
+  - @nest-mcp/client@0.1.2
+  - @nest-mcp/common@0.1.2
+  - @nest-mcp/server@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
