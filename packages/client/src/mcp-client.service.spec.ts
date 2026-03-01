@@ -370,6 +370,19 @@ describe('McpClient', () => {
 
       expect(mcpClient.isConnected()).toBe(false);
     });
+
+    it('is a no-op when transport fires onclose while already disconnected', async () => {
+      await mcpClient.connect();
+      const transport = mockedCreateTransport.mock.results[0].value;
+
+      // First close: sets connected = false
+      await transport.onclose();
+      expect(mcpClient.isConnected()).toBe(false);
+
+      // Second close: guard exits early — no throw, state unchanged
+      await expect(transport.onclose()).resolves.toBeUndefined();
+      expect(mcpClient.isConnected()).toBe(false);
+    });
   });
 
   describe('attemptReconnect', () => {
@@ -420,6 +433,33 @@ describe('McpClient', () => {
       await transport.onclose();
 
       expect(mcpClient.isConnected()).toBe(false);
+    });
+
+    it('re-applies sampling handler to new Client instance on reconnect', async () => {
+      const connWithReconnect = createConnection({ reconnect: { maxAttempts: 2, delay: 1 } });
+      mcpClient = new McpClient('test-server', connWithReconnect);
+
+      mcpClient.setSamplingHandler(
+        vi.fn().mockResolvedValue({
+          model: 'm',
+          stopReason: 'endTurn',
+          role: 'assistant',
+          content: { type: 'text', text: '' },
+        }),
+      );
+
+      await mcpClient.connect();
+
+      // Trigger disconnect to initiate reconnect
+      const transport = mockedCreateTransport.mock.results[0].value;
+      await transport.onclose();
+
+      // Reconnect should have created a second Client instance
+      expect(MockedClient.mock.results.length).toBeGreaterThan(1);
+      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+
+      // _reapplyRequestHandlers wires up setRequestHandler on the new client
+      expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
     });
   });
 
