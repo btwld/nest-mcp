@@ -222,6 +222,75 @@ describe('UpstreamManagerService', () => {
     });
   });
 
+  describe('accessors', () => {
+    it('getAllNames returns names of all connected upstreams', async () => {
+      await service.connect({ name: 'alpha', transport: 'sse', url: 'http://alpha' });
+      await service.connect({ name: 'beta', transport: 'sse', url: 'http://beta' });
+
+      expect(service.getAllNames()).toEqual(['alpha', 'beta']);
+    });
+
+    it('getConfig returns the config for a connected upstream', async () => {
+      const config: UpstreamConfig = { name: 'cfg-server', transport: 'sse', url: 'http://x' };
+      await service.connect(config);
+
+      expect(service.getConfig('cfg-server')).toBe(config);
+    });
+
+    it('getConfig returns undefined for unknown upstream', () => {
+      expect(service.getConfig('nonexistent')).toBeUndefined();
+    });
+
+    it('getAllConfigs returns configs of all upstreams', async () => {
+      const c1: UpstreamConfig = { name: 'a', transport: 'sse', url: 'http://a' };
+      const c2: UpstreamConfig = { name: 'b', transport: 'sse', url: 'http://b' };
+      await service.connect(c1);
+      await service.connect(c2);
+
+      const configs = service.getAllConfigs();
+      expect(configs).toHaveLength(2);
+      expect(configs).toContain(c1);
+      expect(configs).toContain(c2);
+    });
+
+    it('getManaged returns the managed upstream', async () => {
+      await service.connect({ name: 'managed-server', transport: 'sse', url: 'http://m' });
+
+      const managed = service.getManaged('managed-server');
+      expect(managed).toBeDefined();
+      expect(managed?.config.name).toBe('managed-server');
+      expect(managed?.connected).toBe(true);
+    });
+
+    it('getManaged returns undefined for unknown upstream', () => {
+      expect(service.getManaged('nonexistent')).toBeUndefined();
+    });
+
+    it('setHealthy is a no-op for unknown upstream', () => {
+      expect(() => service.setHealthy('nonexistent', false, 'err')).not.toThrow();
+    });
+  });
+
+  describe('disconnectAll', () => {
+    it('disconnects all connected upstreams', async () => {
+      await service.connect({ name: 'x', transport: 'sse', url: 'http://x' });
+      await service.connect({ name: 'y', transport: 'sse', url: 'http://y' });
+
+      await service.disconnectAll();
+
+      expect(service.getClient('x')).toBeUndefined();
+      expect(service.getClient('y')).toBeUndefined();
+    });
+
+    it('onModuleDestroy calls disconnectAll', async () => {
+      await service.connect({ name: 'z', transport: 'sse', url: 'http://z' });
+
+      await service.onModuleDestroy();
+
+      expect(service.getClient('z')).toBeUndefined();
+    });
+  });
+
   describe('sampling forwarder', () => {
     it('activateSampling stores forwarder and deactivateSampling removes it', () => {
       const forwarder = vi.fn();

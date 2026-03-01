@@ -15,7 +15,13 @@ import {
   Tool,
 } from '../decorators';
 import { McpRegistryService } from './registry.service';
-import type { RegisteredPrompt, RegisteredResource, RegisteredTool } from './registry.service';
+import type {
+  RegisteredCompletion,
+  RegisteredPrompt,
+  RegisteredResource,
+  RegisteredResourceTemplate,
+  RegisteredTool,
+} from './registry.service';
 
 // --- Test fixture classes ---
 
@@ -280,6 +286,15 @@ describe('McpRegistryService', () => {
 
     it('getPrompt returns undefined for unknown prompt', () => {
       expect(registry.getPrompt('nonexistent')).toBeUndefined();
+    });
+
+    it('getResourceTemplate returns undefined for unknown resource template', () => {
+      expect(registry.getResourceTemplate('nonexistent')).toBeUndefined();
+    });
+
+    it('getAllResourceTemplates returns all registered templates', () => {
+      registry.registerProvider(new TestResourceTemplates());
+      expect(registry.getAllResourceTemplates()).toHaveLength(1);
     });
   });
 
@@ -554,6 +569,121 @@ describe('McpRegistryService', () => {
       registry.unregisterPrompt('nonexistent');
 
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dynamic registerResourceTemplate/unregisterResourceTemplate', () => {
+    it('registers and retrieves a resource template dynamically', () => {
+      const template: RegisteredResourceTemplate = {
+        uriTemplate: 'file:///reports/{id}',
+        name: 'report',
+        description: 'Report template',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+
+      registry.registerResourceTemplate(template);
+
+      expect(registry.hasResourceTemplates).toBe(true);
+      expect(registry.getResourceTemplate('file:///reports/{id}')).toBe(template);
+    });
+
+    it('unregisters a resource template by uriTemplate', () => {
+      const template: RegisteredResourceTemplate = {
+        uriTemplate: 'file:///temp/{id}',
+        name: 'temp',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+
+      registry.registerResourceTemplate(template);
+      expect(registry.hasResourceTemplates).toBe(true);
+
+      const result = registry.unregisterResourceTemplate('file:///temp/{id}');
+      expect(result).toBe(true);
+      expect(registry.getResourceTemplate('file:///temp/{id}')).toBeUndefined();
+      expect(registry.hasResourceTemplates).toBe(false);
+    });
+
+    it('returns false when unregistering nonexistent resource template', () => {
+      const result = registry.unregisterResourceTemplate('nonexistent');
+      expect(result).toBe(false);
+    });
+
+    it('emits resourceTemplate.registered event on registerResourceTemplate', () => {
+      const spy = vi.fn();
+      registry.events.on('resourceTemplate.registered', spy);
+
+      const template: RegisteredResourceTemplate = {
+        uriTemplate: 'file:///dyn/{id}',
+        name: 'dyn',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResourceTemplate(template);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(template);
+    });
+
+    it('emits resourceTemplate.unregistered event on unregisterResourceTemplate', () => {
+      const spy = vi.fn();
+      registry.events.on('resourceTemplate.unregistered', spy);
+
+      const template: RegisteredResourceTemplate = {
+        uriTemplate: 'file:///dyn/{id}',
+        name: 'dyn',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      };
+      registry.registerResourceTemplate(template);
+      registry.unregisterResourceTemplate('file:///dyn/{id}');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('file:///dyn/{id}');
+    });
+
+    it('does not emit resourceTemplate.unregistered when template does not exist', () => {
+      const spy = vi.fn();
+      registry.events.on('resourceTemplate.unregistered', spy);
+
+      registry.unregisterResourceTemplate('nonexistent');
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dynamic registerCompletionHandler', () => {
+    it('registers and retrieves a prompt completion handler dynamically', () => {
+      const handler: RegisteredCompletion = {
+        refType: 'ref/prompt',
+        refName: 'summarize',
+        methodName: 'complete',
+        instance: {},
+      };
+
+      registry.registerCompletionHandler(handler);
+
+      const retrieved = registry.getCompletionHandler('ref/prompt', 'summarize');
+      expect(retrieved).toBe(handler);
+    });
+
+    it('registers and retrieves a resource completion handler dynamically', () => {
+      const handler: RegisteredCompletion = {
+        refType: 'ref/resource',
+        refName: 'file:///{path}',
+        methodName: 'complete',
+        instance: {},
+      };
+
+      registry.registerCompletionHandler(handler);
+
+      const retrieved = registry.getCompletionHandler('ref/resource', 'file:///{path}');
+      expect(retrieved).toBe(handler);
     });
   });
 

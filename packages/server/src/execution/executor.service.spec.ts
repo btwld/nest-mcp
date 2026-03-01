@@ -317,6 +317,98 @@ describe('McpExecutorService', () => {
     });
   });
 
+  // --- listResources ---
+
+  describe('listResources', () => {
+    it('formats resources with required and optional fields', async () => {
+      registry.registerResource({
+        uri: 'file:///config.json',
+        name: 'config',
+        description: 'App config',
+        mimeType: 'application/json',
+        methodName: 'getConfig',
+        target: Object,
+        instance: { getConfig: vi.fn() },
+      } as RegisteredResource);
+
+      const result = await executor.listResources();
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          uri: 'file:///config.json',
+          name: 'config',
+          description: 'App config',
+          mimeType: 'application/json',
+        }),
+      );
+    });
+
+    it('omits description and mimeType when not present', async () => {
+      registry.registerResource({
+        uri: 'file:///bare.txt',
+        name: 'bare',
+        methodName: 'get',
+        target: Object,
+        instance: { get: vi.fn() },
+      } as RegisteredResource);
+
+      const result = await executor.listResources();
+      expect(result.items[0]).not.toHaveProperty('description');
+      expect(result.items[0]).not.toHaveProperty('mimeType');
+    });
+
+    it('returns PaginatedResult with no nextCursor for small lists', async () => {
+      const result = await executor.listResources();
+      expect(result.nextCursor).toBeUndefined();
+    });
+  });
+
+  // --- listResourceTemplates ---
+
+  describe('listResourceTemplates', () => {
+    it('formats resource templates with required and optional fields', async () => {
+      registry.registerResourceTemplate({
+        uriTemplate: 'file:///users/{userId}',
+        name: 'user',
+        description: 'User resource',
+        mimeType: 'application/json',
+        methodName: 'getUser',
+        target: Object,
+        instance: { getUser: vi.fn() },
+      } as RegisteredResourceTemplate);
+
+      const result = await executor.listResourceTemplates();
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          uriTemplate: 'file:///users/{userId}',
+          name: 'user',
+          description: 'User resource',
+          mimeType: 'application/json',
+        }),
+      );
+    });
+
+    it('omits description and mimeType when not present', async () => {
+      registry.registerResourceTemplate({
+        uriTemplate: 'file:///docs/{name}',
+        name: 'doc',
+        methodName: 'getDoc',
+        target: Object,
+        instance: { getDoc: vi.fn() },
+      } as RegisteredResourceTemplate);
+
+      const result = await executor.listResourceTemplates();
+      expect(result.items[0]).not.toHaveProperty('description');
+      expect(result.items[0]).not.toHaveProperty('mimeType');
+    });
+
+    it('returns PaginatedResult with no nextCursor for small lists', async () => {
+      const result = await executor.listResourceTemplates();
+      expect(result.nextCursor).toBeUndefined();
+    });
+  });
+
   // --- readResource ---
 
   describe('readResource', () => {
