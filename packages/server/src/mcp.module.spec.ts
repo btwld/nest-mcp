@@ -220,5 +220,74 @@ describe('McpModule', () => {
       expect(mod.providers).toContain(FakeProvider);
       expect(mod.exports).toContain(FakeProvider);
     });
+
+    it('uses McpModule when serverName is not provided', () => {
+      class FakeProvider {}
+      const mod = McpModule.forFeature([FakeProvider]);
+      expect(mod.module).toBe(McpModule);
+    });
+
+    describe('with serverName (named-server targeting)', () => {
+      it('uses McpFeatureModule instead of McpModule', async () => {
+        const { McpFeatureModule } = await import('./discovery/mcp-feature.module');
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'my-server');
+        expect(mod.module).toBe(McpFeatureModule);
+      });
+
+      it('registers providers', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'my-server');
+        expect(mod.providers).toEqual(expect.arrayContaining([FakeProvider]));
+      });
+
+      it('exports providers', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'my-server');
+        expect(mod.exports).toEqual(expect.arrayContaining([FakeProvider]));
+      });
+
+      it('adds a registration token provider with serverName and providerTokens', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'target-server');
+        const registrationProvider = (mod.providers as { provide: string; useValue: unknown }[]).find(
+          (p) => typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
+        );
+        expect(registrationProvider).toBeDefined();
+        expect(registrationProvider?.useValue).toMatchObject({
+          serverName: 'target-server',
+          providerTokens: [FakeProvider],
+        });
+      });
+
+      it('exports the registration token', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'target-server');
+        const hasRegistrationToken = (mod.exports as string[]).some(
+          (e) => typeof e === 'string' && e.startsWith('MCP_FEATURE_REGISTRATION_'),
+        );
+        expect(hasRegistrationToken).toBe(true);
+      });
+
+      it('sets global to true', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], 'my-server');
+        expect(mod.global).toBe(true);
+      });
+
+      it('each call produces a unique registration token', () => {
+        class A {}
+        class B {}
+        const mod1 = McpModule.forFeature([A], 'server-a');
+        const mod2 = McpModule.forFeature([B], 'server-b');
+
+        const getToken = (mod: ReturnType<typeof McpModule.forFeature>) =>
+          (mod.providers as { provide: string }[]).find(
+            (p) => typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
+          )?.provide;
+
+        expect(getToken(mod1)).not.toBe(getToken(mod2));
+      });
+    });
   });
 });
