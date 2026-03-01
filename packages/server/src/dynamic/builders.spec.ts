@@ -72,6 +72,60 @@ describe('Dynamic Builders', () => {
       expect(handler).toHaveBeenCalledWith({ key: 'val' }, expect.any(Object));
       expect(result).toBe('tool-result');
     });
+
+    it('propagates optional fields: inputSchema, rawOutputSchema, annotations, scopes, roles, isPublic', () => {
+      const inputSchema = { type: 'object', properties: { q: { type: 'string' } } };
+      const rawOutputSchema = { type: 'object' };
+      const annotations = { title: 'My Tool' };
+
+      builder.register({
+        name: 'full-tool',
+        description: 'full',
+        inputSchema,
+        rawOutputSchema,
+        annotations,
+        scopes: ['read'],
+        roles: ['admin'],
+        isPublic: true,
+        handler: async () => 'ok',
+      });
+
+      const tool = registry.getTool('full-tool');
+      expect(tool?.inputSchema).toBe(inputSchema);
+      expect(tool?.rawOutputSchema).toBe(rawOutputSchema);
+      expect(tool?.annotations).toBe(annotations);
+      expect(tool?.requiredScopes).toEqual(['read']);
+      expect(tool?.requiredRoles).toEqual(['admin']);
+      expect(tool?.isPublic).toBe(true);
+    });
+
+    it('emits tool.registered event on register', () => {
+      const listener = vi.fn();
+      registry.events.on('tool.registered', listener);
+
+      builder.register({ name: 'evt-tool', description: 'test', handler: async () => 'ok' });
+
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({ name: 'evt-tool' }));
+    });
+
+    it('emits tool.unregistered event on unregister', () => {
+      const listener = vi.fn();
+      builder.register({ name: 'evt-tool2', description: 'test', handler: async () => 'ok' });
+      registry.events.on('tool.unregistered', listener);
+
+      builder.unregister('evt-tool2');
+
+      expect(listener).toHaveBeenCalledWith('evt-tool2');
+    });
+
+    it('does not emit tool.unregistered when tool does not exist', () => {
+      const listener = vi.fn();
+      registry.events.on('tool.unregistered', listener);
+
+      builder.unregister('no-such-tool');
+
+      expect(listener).not.toHaveBeenCalled();
+    });
   });
 
   describe('McpResourceBuilder', () => {
@@ -128,6 +182,48 @@ describe('Dynamic Builders', () => {
       const result = await resource?.instance[resource.methodName](testUri, mockMcpContext());
       expect(handler).toHaveBeenCalledWith(testUri, expect.any(Object));
       expect(result).toBe('resource-data');
+    });
+
+    it('propagates optional description and mimeType', () => {
+      builder.register({
+        uri: 'file:///typed.json',
+        name: 'typed',
+        description: 'A typed resource',
+        mimeType: 'application/json',
+        handler: async () => '{}',
+      });
+
+      const resource = registry.getResource('file:///typed.json');
+      expect(resource?.description).toBe('A typed resource');
+      expect(resource?.mimeType).toBe('application/json');
+    });
+
+    it('emits resource.registered event on register', () => {
+      const listener = vi.fn();
+      registry.events.on('resource.registered', listener);
+
+      builder.register({ uri: 'file:///evt.txt', name: 'evt-res', handler: async () => '' });
+
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({ uri: 'file:///evt.txt' }));
+    });
+
+    it('emits resource.unregistered event on unregister', () => {
+      const listener = vi.fn();
+      builder.register({ uri: 'file:///del.txt', name: 'del-res', handler: async () => '' });
+      registry.events.on('resource.unregistered', listener);
+
+      builder.unregister('file:///del.txt');
+
+      expect(listener).toHaveBeenCalledWith('file:///del.txt');
+    });
+
+    it('does not emit resource.unregistered when resource does not exist', () => {
+      const listener = vi.fn();
+      registry.events.on('resource.unregistered', listener);
+
+      builder.unregister('file:///ghost.txt');
+
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 
@@ -188,6 +284,42 @@ describe('Dynamic Builders', () => {
       const result = await prompt?.instance[prompt.methodName]({ arg: 'val' }, mockMcpContext());
       expect(handler).toHaveBeenCalledWith({ arg: 'val' }, expect.any(Object));
       expect(result).toEqual(promptResult);
+    });
+
+    it('emits prompt.registered event on register', () => {
+      const listener = vi.fn();
+      registry.events.on('prompt.registered', listener);
+
+      builder.register({
+        name: 'evt-prompt',
+        description: 'test',
+        handler: async () => ({ messages: [] }),
+      });
+
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining({ name: 'evt-prompt' }));
+    });
+
+    it('emits prompt.unregistered event on unregister', () => {
+      const listener = vi.fn();
+      builder.register({
+        name: 'del-prompt',
+        description: 'test',
+        handler: async () => ({ messages: [] }),
+      });
+      registry.events.on('prompt.unregistered', listener);
+
+      builder.unregister('del-prompt');
+
+      expect(listener).toHaveBeenCalledWith('del-prompt');
+    });
+
+    it('does not emit prompt.unregistered when prompt does not exist', () => {
+      const listener = vi.fn();
+      registry.events.on('prompt.unregistered', listener);
+
+      builder.unregister('ghost-prompt');
+
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 
