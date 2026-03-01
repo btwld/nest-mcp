@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { McpAuthModule } from './auth.module';
 import type { OAuthProviderAdapter, OAuthProviderUser } from './interfaces/oauth-provider.interface';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
+import { OAuthClientService, MCP_OAUTH_STORE } from './services/client.service';
+import { MemoryOAuthStore } from './stores/memory-store.service';
 
 const TEST_SECRET = 'a'.repeat(32);
 
@@ -13,6 +17,100 @@ class FakeProvider implements OAuthProviderAdapter {
 }
 
 describe('McpAuthModule', () => {
+  describe('forRoot', () => {
+    it('returns McpAuthModule as the module class', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.module).toBe(McpAuthModule);
+    });
+
+    it('throws when jwtSecret is absent', () => {
+      expect(() =>
+        McpAuthModule.forRoot({ jwtSecret: '', validateUser: async () => null }),
+      ).toThrow('jwtSecret must be at least 32 characters');
+    });
+
+    it('throws when jwtSecret is shorter than 32 characters', () => {
+      expect(() =>
+        McpAuthModule.forRoot({ jwtSecret: 'short', validateUser: async () => null }),
+      ).toThrow('jwtSecret must be at least 32 characters');
+    });
+
+    it('has two controllers (OAuthController + WellKnownController)', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.controllers).toHaveLength(2);
+    });
+
+    it('includes JwtTokenService in providers', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.providers).toContain(JwtTokenService);
+    });
+
+    it('includes OAuthClientService in providers', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.providers).toContain(OAuthClientService);
+    });
+
+    it('exports JwtTokenService', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.exports).toContain(JwtTokenService);
+    });
+
+    it('exports MCP_AUTH_OPTIONS', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.exports).toContain(MCP_AUTH_OPTIONS);
+    });
+
+    it('exports MCP_OAUTH_STORE', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.exports).toContain(MCP_OAUTH_STORE);
+    });
+
+    it('uses MemoryOAuthStore by default', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      const storeProvider = (result.providers as { provide: unknown; useValue: unknown }[]).find(
+        (p) => p.provide === MCP_OAUTH_STORE,
+      );
+      expect(storeProvider?.useValue).toBeInstanceOf(MemoryOAuthStore);
+    });
+
+    it('uses provided custom store instead of MemoryOAuthStore', () => {
+      const customStore = { get: () => undefined, set: () => {}, delete: () => {} } as never;
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        store: customStore,
+        validateUser: async () => null,
+      });
+      const storeProvider = (result.providers as { provide: unknown; useValue: unknown }[]).find(
+        (p) => p.provide === MCP_OAUTH_STORE,
+      );
+      expect(storeProvider?.useValue).toBe(customStore);
+    });
+  });
+
   describe('forProvider', () => {
     it('creates a valid DynamicModule with the adapter wired in', () => {
       const adapter = new FakeProvider();
