@@ -459,7 +459,7 @@ describe('McpClient', () => {
   });
 
   describe('setSamplingHandler', () => {
-    it('registers sampling capability and setRequestHandler on the client', () => {
+    it('registers sampling capability and setRequestHandler when called before connect', () => {
       const clientInstance = MockedClient.mock.results[0].value;
       const handler = vi.fn().mockResolvedValue({});
 
@@ -468,10 +468,22 @@ describe('McpClient', () => {
       expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ sampling: {} });
       expect(clientInstance.setRequestHandler).toHaveBeenCalled();
     });
+
+    it('does not call registerCapabilities when already connected (capabilities sent at handshake)', async () => {
+      await mcpClient.connect();
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.registerCapabilities.mockClear();
+
+      mcpClient.setSamplingHandler(vi.fn().mockResolvedValue({}));
+
+      // Capability registration is skipped post-connect; handler is still wired up
+      expect(clientInstance.registerCapabilities).not.toHaveBeenCalled();
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
   });
 
   describe('setElicitationHandler', () => {
-    it('registers elicitation capability and setRequestHandler on the client', () => {
+    it('registers elicitation capability and setRequestHandler when called before connect', () => {
       const clientInstance = MockedClient.mock.results[0].value;
       const handler = vi.fn().mockResolvedValue({});
 
@@ -480,10 +492,21 @@ describe('McpClient', () => {
       expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ elicitation: {} });
       expect(clientInstance.setRequestHandler).toHaveBeenCalled();
     });
+
+    it('does not call registerCapabilities when already connected', async () => {
+      await mcpClient.connect();
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.registerCapabilities.mockClear();
+
+      mcpClient.setElicitationHandler(vi.fn().mockResolvedValue({ action: 'cancel' }));
+
+      expect(clientInstance.registerCapabilities).not.toHaveBeenCalled();
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
   });
 
   describe('setRootsHandler', () => {
-    it('registers roots capability and setRequestHandler on the client', () => {
+    it('registers roots capability and setRequestHandler when called before connect', () => {
       const clientInstance = MockedClient.mock.results[0].value;
       const handler = vi.fn().mockResolvedValue({ roots: [] } as { roots: [] });
 
@@ -492,6 +515,17 @@ describe('McpClient', () => {
       expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({
         roots: { listChanged: true },
       });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+
+    it('does not call registerCapabilities when already connected', async () => {
+      await mcpClient.connect();
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.registerCapabilities.mockClear();
+
+      mcpClient.setRootsHandler(vi.fn().mockResolvedValue({ roots: [] }));
+
+      expect(clientInstance.registerCapabilities).not.toHaveBeenCalled();
       expect(clientInstance.setRequestHandler).toHaveBeenCalled();
     });
   });
