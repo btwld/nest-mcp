@@ -83,4 +83,22 @@ describe('createMcpServer', () => {
     const server = createMcpServer(makeRegistry({ hasResources: true }), baseOptions);
     expect(server).toBeInstanceOf(McpServer);
   });
+
+  it('reflects resource template capability when registry has resource templates', () => {
+    const server = createMcpServer(makeRegistry({ hasResourceTemplates: true }), baseOptions);
+    expect(server).toBeInstanceOf(McpServer);
+  });
+
+  it('reflects prompt capability when registry has prompts', () => {
+    const server = createMcpServer(makeRegistry({ hasPrompts: true }), baseOptions);
+    expect(server).toBeInstanceOf(McpServer);
+  });
+
+  it('returns McpServer with all capabilities when registry has all', () => {
+    const server = createMcpServer(
+      makeRegistry({ hasTools: true, hasResources: true, hasResourceTemplates: true, hasPrompts: true }),
+      baseOptions,
+    );
+    expect(server).toBeInstanceOf(McpServer);
+  });
 });
