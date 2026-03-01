@@ -16,6 +16,20 @@
     "!dist/**/*.js.map",
     "!dist/**/*.d.ts.map"
   ],
+  "keywords": [
+    "nestjs",
+    "nest",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "mcp-client",
+    "client",
+    "typescript",
+    "anthropic",
+    "openai",
+    "claude"
+  ],
   "homepage": "https://github.com/btwld/nest-mcp#client",
   "repository": {
     "type": "git",
