@@ -810,7 +810,7 @@ describe('GatewayService', () => {
       expect(result).toEqual({ values: [] });
     });
 
-    it('should return empty values when client not available', async () => {
+    it('should return empty values when client not available (prompt)', async () => {
       promptAggregator.getCachedPrompts.mockReturnValue([
         { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
       ]);
@@ -819,6 +819,25 @@ describe('GatewayService', () => {
       const result = await service.complete(
         { type: 'ref/prompt', name: 'ai_summarize' },
         { name: 'arg', value: 'val' },
+      );
+
+      expect(result).toEqual({ values: [] });
+    });
+
+    it('should return empty values when client not available (resource template)', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///{path}',
+          name: 'file',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///{path}',
+        },
+      ]);
+      upstreamManager.getClient.mockReturnValue(undefined);
+
+      const result = await service.complete(
+        { type: 'ref/resource', uri: 'fs://file:///{path}' },
+        { name: 'path', value: 'val' },
       );
 
       expect(result).toEqual({ values: [] });
