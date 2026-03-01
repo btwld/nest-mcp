@@ -469,6 +469,17 @@ describe('ExecutionPipelineService', () => {
 
       await expect(pipeline.getPrompt('slow-prompt', {}, ctx)).rejects.toThrow(McpTimeoutError);
     });
+
+    it('immediately rejects with cancelled error when signal is already aborted', async () => {
+      options.resilience = { timeout: 5000 };
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      const controller = new AbortController();
+      controller.abort();
+      const abortedCtx = mockMcpContext({ signal: controller.signal });
+
+      await expect(pipeline.callTool('test', {}, abortedCtx)).rejects.toThrow('Request cancelled');
+    });
   });
 
   // --- list methods ---
