@@ -644,6 +644,67 @@ describe('registerHandlers', () => {
       'Task "missing-task" not found',
     );
   });
+
+  // --- Subscription handlers ---
+
+  it('registers subscribe and unsubscribe handlers when subscriptionManager is provided', () => {
+    const subscriptionManager = {
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions, subscriptionManager as never);
+
+    // 5 base handlers + 2 subscription handlers = 7 total
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(7);
+  });
+
+  it('does not register subscription handlers when subscriptionManager is absent', () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    // 5 base handlers only
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(5);
+  });
+
+  it('subscribe handler delegates to subscriptionManager.subscribe', async () => {
+    const subscriptionManager = {
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions, subscriptionManager as never);
+
+    const subscribeCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'resources/subscribe',
+    );
+    expect(subscribeCall).toBeDefined();
+
+    const handler = subscribeCall![1];
+    const result = await handler({ method: 'resources/subscribe', params: { uri: 'file:///test.txt' } });
+
+    expect(subscriptionManager.subscribe).toHaveBeenCalledWith('test-session', 'file:///test.txt', mockServer);
+    expect(result).toEqual({});
+  });
+
+  it('unsubscribe handler delegates to subscriptionManager.unsubscribe', async () => {
+    const subscriptionManager = {
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions, subscriptionManager as never);
+
+    const unsubscribeCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) => (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === 'resources/unsubscribe',
+    );
+    expect(unsubscribeCall).toBeDefined();
+
+    const handler = unsubscribeCall![1];
+    const result = await handler({ method: 'resources/unsubscribe', params: { uri: 'file:///test.txt' } });
+
+    expect(subscriptionManager.unsubscribe).toHaveBeenCalledWith('test-session', 'file:///test.txt');
+    expect(result).toEqual({});
+  });
 });
 
 // --- Per-item helper tests ---
