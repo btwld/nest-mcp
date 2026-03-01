@@ -18,6 +18,9 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
     sendRootsListChanged: vi.fn().mockResolvedValue(undefined),
     getServerCapabilities: vi.fn().mockReturnValue({}),
     getServerVersion: vi.fn().mockReturnValue({ name: 'test', version: '1.0' }),
+    getInstructions: vi.fn().mockReturnValue(undefined),
+    registerCapabilities: vi.fn(),
+    setRequestHandler: vi.fn(),
     _notificationHandlers: new Map(),
   }));
   return { Client: MockClient };
@@ -54,6 +57,31 @@ describe('McpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Restore the full Client mock — the reconnect test overrides mockImplementation with a
+    // sparse object, and vi.clearAllMocks() only clears call history, not the implementation.
+    MockedClient.mockImplementation(() => ({
+      connect: vi.fn().mockResolvedValue(undefined),
+      callTool: vi.fn().mockResolvedValue({ content: [] }),
+      readResource: vi.fn().mockResolvedValue({ contents: [] }),
+      listTools: vi.fn().mockResolvedValue({ tools: [] }),
+      listResources: vi.fn().mockResolvedValue({ resources: [] }),
+      listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
+      getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
+      listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+      ping: vi.fn().mockResolvedValue({}),
+      subscribeResource: vi.fn().mockResolvedValue({}),
+      unsubscribeResource: vi.fn().mockResolvedValue({}),
+      setLoggingLevel: vi.fn().mockResolvedValue({}),
+      complete: vi.fn().mockResolvedValue({ completion: { values: [] } }),
+      sendRootsListChanged: vi.fn().mockResolvedValue(undefined),
+      getServerCapabilities: vi.fn().mockReturnValue({}),
+      getServerVersion: vi.fn().mockReturnValue({ name: 'test', version: '1.0' }),
+      getInstructions: vi.fn().mockReturnValue(undefined),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      _notificationHandlers: new Map(),
+    }));
 
     // Reset the transport mock to return a fresh object each call
     mockedCreateTransport.mockReturnValue({
@@ -406,6 +434,126 @@ describe('McpClient', () => {
       const result = mcpClient.getServerVersion();
       const clientInstance = MockedClient.mock.results[0].value;
       expect(clientInstance.getServerVersion).toHaveBeenCalled();
+    });
+  });
+
+  describe('getInstructions', () => {
+    it('returns undefined when server has no instructions', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.getInstructions.mockReturnValue(undefined);
+      expect(mcpClient.getInstructions()).toBeUndefined();
+    });
+
+    it('returns instructions string from server', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.getInstructions.mockReturnValue('This server helps with coding.');
+      expect(mcpClient.getInstructions()).toBe('This server helps with coding.');
+    });
+  });
+
+  describe('getClient', () => {
+    it('returns the internal SDK Client instance', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      expect(mcpClient.getClient()).toBe(clientInstance);
+    });
+  });
+
+  describe('setSamplingHandler', () => {
+    it('registers sampling capability and setRequestHandler on the client', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      const handler = vi.fn().mockResolvedValue({});
+
+      mcpClient.setSamplingHandler(handler);
+
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ sampling: {} });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe('setElicitationHandler', () => {
+    it('registers elicitation capability and setRequestHandler on the client', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      const handler = vi.fn().mockResolvedValue({});
+
+      mcpClient.setElicitationHandler(handler);
+
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({ elicitation: {} });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe('setRootsHandler', () => {
+    it('registers roots capability and setRequestHandler on the client', () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      const handler = vi.fn().mockResolvedValue({ roots: [] } as { roots: [] });
+
+      mcpClient.setRootsHandler(handler);
+
+      expect(clientInstance.registerCapabilities).toHaveBeenCalledWith({
+        roots: { listChanged: true },
+      });
+      expect(clientInstance.setRequestHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe('listAll methods', () => {
+    beforeEach(async () => {
+      await mcpClient.connect();
+    });
+
+    it('listAllTools drains pages and returns all tools', async () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.listTools
+        .mockResolvedValueOnce({ tools: [{ name: 'tool1' }], nextCursor: 'c1' })
+        .mockResolvedValueOnce({ tools: [{ name: 'tool2' }] });
+
+      const tools = await mcpClient.listAllTools();
+
+      expect(tools).toHaveLength(2);
+      expect(tools[0].name).toBe('tool1');
+      expect(tools[1].name).toBe('tool2');
+    });
+
+    it('listAllResources drains pages and returns all resources', async () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.listResources
+        .mockResolvedValueOnce({ resources: [{ uri: 'file:///a', name: 'a' }], nextCursor: 'c1' })
+        .mockResolvedValueOnce({ resources: [{ uri: 'file:///b', name: 'b' }] });
+
+      const resources = await mcpClient.listAllResources();
+
+      expect(resources).toHaveLength(2);
+    });
+
+    it('listAllResourceTemplates drains pages and returns all templates', async () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.listResourceTemplates
+        .mockResolvedValueOnce({
+          resourceTemplates: [{ uriTemplate: 'file:///{id}', name: 'item' }],
+          nextCursor: 'c1',
+        })
+        .mockResolvedValueOnce({ resourceTemplates: [] });
+
+      const templates = await mcpClient.listAllResourceTemplates();
+
+      expect(templates).toHaveLength(1);
+    });
+
+    it('listAllPrompts drains pages and returns all prompts', async () => {
+      const clientInstance = MockedClient.mock.results[0].value;
+      clientInstance.listPrompts
+        .mockResolvedValueOnce({ prompts: [{ name: 'p1' }], nextCursor: 'c1' })
+        .mockResolvedValueOnce({ prompts: [{ name: 'p2' }] });
+
+      const prompts = await mcpClient.listAllPrompts();
+
+      expect(prompts).toHaveLength(2);
+    });
+  });
+
+  describe('throws when not connected (listAll)', () => {
+    it('listAllTools throws when not connected', async () => {
+      await expect(mcpClient.listAllTools()).rejects.toThrow('is not connected');
     });
   });
 });
