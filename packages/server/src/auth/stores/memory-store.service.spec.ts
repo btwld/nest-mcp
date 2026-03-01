@@ -218,6 +218,11 @@ describe('MemoryOAuthStore', () => {
       // Should not throw
     });
 
+    it('onModuleDestroy is safe when onModuleInit was never called', () => {
+      // cleanupTimer is undefined — onModuleDestroy should not throw
+      expect(() => store.onModuleDestroy()).not.toThrow();
+    });
+
     it('cleanup removes expired auth codes', async () => {
       const expiredCode: AuthorizationCode = {
         code: 'expired-code',
@@ -239,6 +244,22 @@ describe('MemoryOAuthStore', () => {
       // Expired code should be cleaned up
       const result = await store.getAuthCode('expired-code');
       expect(result).toBeUndefined();
+    });
+
+    it('cleanup removes revoked tokens older than TTL', async () => {
+      await store.revokeToken('jti-stale');
+      expect(await store.isTokenRevoked('jti-stale')).toBe(true);
+
+      // Backdate the revocation timestamp past the 24-hour TTL
+      const REVOKED_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+      // biome-ignore lint/suspicious/noExplicitAny: test access to private field
+      (store as any).revokedTokens.set('jti-stale', Date.now() - REVOKED_TOKEN_TTL_MS - 1);
+
+      // biome-ignore lint/suspicious/noExplicitAny: test access to private method
+      (store as any).cleanup();
+
+      // Stale token should be purged
+      expect(await store.isTokenRevoked('jti-stale')).toBe(false);
     });
   });
 });
