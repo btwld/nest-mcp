@@ -1,5 +1,15 @@
 # @nest-mcp/gateway
 
+## 0.2.3
+
+### Patch Changes
+
+- 0e1b932: Add npm keywords to all packages for improved discoverability
+- Updated dependencies [0e1b932]
+  - @nest-mcp/client@0.2.3
+  - @nest-mcp/common@0.1.7
+  - @nest-mcp/server@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes

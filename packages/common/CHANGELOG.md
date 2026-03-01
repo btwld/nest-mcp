@@ -1,5 +1,11 @@
 # @nest-mcp/common
 
+## 0.1.7
+
+### Patch Changes
+
+- 0e1b932: Add npm keywords to all packages for improved discoverability
+
 ## 0.1.6
 
 ### Patch Changes
