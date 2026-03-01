@@ -90,9 +90,7 @@ describe('McpScannerService', () => {
   describe('server-targeting via forFeature', () => {
     it('registers a provider without any server targeting (backward-compatible)', () => {
       const instance = new UntaggedTool();
-      const container = makeModulesContainer([
-        { providers: [{ key: UntaggedTool, instance }] },
-      ]);
+      const container = makeModulesContainer([{ providers: [{ key: UntaggedTool, instance }] }]);
       const registry = new McpRegistryService();
       const scanner = makeScanner(container, 'any-server', registry);
       scanner.onModuleInit();
@@ -218,9 +216,7 @@ describe('McpScannerService', () => {
 
     it('skips plain classes without MCP decorators', () => {
       const instance = new PlainClass();
-      const container = makeModulesContainer([
-        { providers: [{ key: PlainClass, instance }] },
-      ]);
+      const container = makeModulesContainer([{ providers: [{ key: PlainClass, instance }] }]);
       const registry = new McpRegistryService();
       const scanner = makeScanner(container, 'any-server', registry);
       scanner.onModuleInit();
@@ -233,9 +229,7 @@ describe('McpScannerService', () => {
   describe('resource and prompt scanning', () => {
     it('registers a resource provider', () => {
       const instance = new ConfigResource();
-      const container = makeModulesContainer([
-        { providers: [{ key: ConfigResource, instance }] },
-      ]);
+      const container = makeModulesContainer([{ providers: [{ key: ConfigResource, instance }] }]);
       const registry = new McpRegistryService();
       const scanner = makeScanner(container, 'any-server', registry);
       scanner.onModuleInit();
@@ -246,9 +240,7 @@ describe('McpScannerService', () => {
 
     it('registers a prompt provider', () => {
       const instance = new GreetPrompt();
-      const container = makeModulesContainer([
-        { providers: [{ key: GreetPrompt, instance }] },
-      ]);
+      const container = makeModulesContainer([{ providers: [{ key: GreetPrompt, instance }] }]);
       const registry = new McpRegistryService();
       const scanner = makeScanner(container, 'any-server', registry);
       scanner.onModuleInit();

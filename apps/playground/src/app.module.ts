@@ -1,4 +1,10 @@
-import { JwtAuthGuard, McpAuthModule, McpModule, McpTransportType, type McpGuardClass } from '@nest-mcp/server';
+import {
+  JwtAuthGuard,
+  McpAuthModule,
+  type McpGuardClass,
+  McpModule,
+  McpTransportType,
+} from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
 import { AuthDemoController } from './auth-demo.controller';

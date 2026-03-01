@@ -35,7 +35,9 @@ export class TaskAggregatorService {
    * Task IDs are prefixed with the upstream name so they can be routed back.
    */
   async listTasks(cursor?: string): Promise<{ tasks: Task[]; nextCursor?: string }> {
-    const names = this.upstreamManager.getAllNames().filter((n) => this.upstreamManager.isHealthy(n));
+    const names = this.upstreamManager
+      .getAllNames()
+      .filter((n) => this.upstreamManager.isHealthy(n));
     const settled = await Promise.allSettled(
       names.map(async (name) => {
         const client = this.upstreamManager.getClient(name);

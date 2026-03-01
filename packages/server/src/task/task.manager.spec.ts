@@ -31,11 +31,10 @@ describe('TaskManager', () => {
 
   it('removeSession cancels working tasks', async () => {
     // Create a real task via the store
-    const task = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'test' } },
-    );
+    const task = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'test' },
+    });
     expect(task.status).toBe('working');
 
     // Track it to a session
@@ -51,16 +50,14 @@ describe('TaskManager', () => {
   });
 
   it('removeSession does not affect tasks in other sessions', async () => {
-    const task1 = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'a' } },
-    );
-    const task2 = await manager.store.createTask(
-      { ttl: null },
-      'req-2',
-      { method: 'tools/call', params: { name: 'b' } },
-    );
+    const task1 = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'a' },
+    });
+    const task2 = await manager.store.createTask({ ttl: null }, 'req-2', {
+      method: 'tools/call',
+      params: { name: 'b' },
+    });
 
     manager.trackTask(task1.taskId, 'session-1');
     manager.trackTask(task2.taskId, 'session-2');
@@ -75,11 +72,10 @@ describe('TaskManager', () => {
   });
 
   it('removeSession skips tasks already in terminal state (completed)', async () => {
-    const task = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'test' } },
-    );
+    const task = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'test' },
+    });
 
     // Complete the task before session cleanup
     await manager.store.storeTaskResult(task.taskId, 'completed', { content: [] });
@@ -92,11 +88,10 @@ describe('TaskManager', () => {
   });
 
   it('removeSession skips tasks already in terminal state (failed)', async () => {
-    const task = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'test' } },
-    );
+    const task = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'test' },
+    });
 
     // Mark task as failed before session cleanup
     await manager.store.storeTaskResult(task.taskId, 'failed', { content: [] });
@@ -121,11 +116,10 @@ describe('TaskManager', () => {
   });
 
   it('removeSession skips tasks already in terminal state (cancelled)', async () => {
-    const task = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'test' } },
-    );
+    const task = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'test' },
+    });
 
     // Pre-cancel the task before session cleanup
     await manager.store.storeTaskResult(task.taskId, 'cancelled', { content: [] });
@@ -141,9 +135,9 @@ describe('TaskManager', () => {
 
   it('removeSession gracefully handles tasks that throw during getTask lookup', async () => {
     // Simulate a task that exists in tracking but throws on getTask (TTL expired etc.)
-    const storeGetTask = vi.spyOn(manager.store, 'getTask').mockRejectedValueOnce(
-      new Error('Task not found'),
-    );
+    const storeGetTask = vi
+      .spyOn(manager.store, 'getTask')
+      .mockRejectedValueOnce(new Error('Task not found'));
 
     manager.trackTask('ghost-task-id', 'session-err');
     await expect(manager.removeSession('session-err')).resolves.not.toThrow();
@@ -152,11 +146,10 @@ describe('TaskManager', () => {
   });
 
   it('onModuleDestroy cleans up internal state', async () => {
-    const task = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'test' } },
-    );
+    const task = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'test' },
+    });
     manager.trackTask(task.taskId, 'session-1');
 
     manager.onModuleDestroy();
@@ -167,16 +160,14 @@ describe('TaskManager', () => {
   });
 
   it('handles multiple tasks per session', async () => {
-    const task1 = await manager.store.createTask(
-      { ttl: null },
-      'req-1',
-      { method: 'tools/call', params: { name: 'a' } },
-    );
-    const task2 = await manager.store.createTask(
-      { ttl: null },
-      'req-2',
-      { method: 'tools/call', params: { name: 'b' } },
-    );
+    const task1 = await manager.store.createTask({ ttl: null }, 'req-1', {
+      method: 'tools/call',
+      params: { name: 'a' },
+    });
+    const task2 = await manager.store.createTask({ ttl: null }, 'req-2', {
+      method: 'tools/call',
+      params: { name: 'b' },
+    });
 
     manager.trackTask(task1.taskId, 'session-1');
     manager.trackTask(task2.taskId, 'session-1');

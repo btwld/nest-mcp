@@ -3,9 +3,7 @@ import { McpClient } from './mcp-client.service';
 
 @Injectable()
 export class McpClientsService {
-  constructor(
-    @Inject('MCP_CLIENT_CONNECTIONS') private readonly clients: McpClient[],
-  ) {}
+  constructor(@Inject('MCP_CLIENT_CONNECTIONS') private readonly clients: McpClient[]) {}
 
   getClient(name: string): McpClient {
     const client = this.clients.find((c) => c.name === name);

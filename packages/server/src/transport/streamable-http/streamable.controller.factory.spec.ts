@@ -32,9 +32,7 @@ describe('createStreamableHttpController', () => {
     });
 
     it('handleGet is bound to GET', () => {
-      expect(Reflect.getMetadata('method', Controller.prototype.handleGet)).toBe(
-        RequestMethod.GET,
-      );
+      expect(Reflect.getMetadata('method', Controller.prototype.handleGet)).toBe(RequestMethod.GET);
     });
 
     it('handleDelete is bound to DELETE', () => {

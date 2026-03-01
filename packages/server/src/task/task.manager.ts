@@ -1,7 +1,10 @@
-import type { TaskStore, TaskMessageQueue } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
+import type {
+  TaskMessageQueue,
+  TaskStore,
+} from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import {
-  InMemoryTaskStore,
   InMemoryTaskMessageQueue,
+  InMemoryTaskStore,
 } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 
@@ -57,11 +60,7 @@ export class TaskManager implements OnModuleDestroy {
       try {
         const task = await this.taskStore.getTask(taskId);
         if (task && !isTerminalStatus(task.status)) {
-          await this.taskStore.updateTaskStatus(
-            taskId,
-            'cancelled',
-            'Session closed',
-          );
+          await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Session closed');
         }
       } catch {
         // Task may already be cleaned up by TTL

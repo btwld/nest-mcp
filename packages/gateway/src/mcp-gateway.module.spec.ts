@@ -3,18 +3,18 @@ import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpRegistryService } from '../../server/src/discovery/registry.service';
 import { McpToolBuilder } from '../../server/src/dynamic/tool-builder.service';
-import { McpGatewayModule } from './mcp-gateway.module';
+import { ResponseCacheService } from './cache/response-cache.service';
 import { GatewayService } from './gateway.service';
-import { UpstreamManagerService } from './upstream/upstream-manager.service';
-import { HealthCheckerService } from './upstream/health-checker.service';
+import { McpGatewayModule } from './mcp-gateway.module';
+import { PolicyEngineService } from './policies/policy-engine.service';
+import { PromptAggregatorService } from './routing/prompt-aggregator.service';
+import { ResourceAggregatorService } from './routing/resource-aggregator.service';
+import { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 import { RouterService } from './routing/router.service';
 import { ToolAggregatorService } from './routing/tool-aggregator.service';
-import { PolicyEngineService } from './policies/policy-engine.service';
-import { ResponseCacheService } from './cache/response-cache.service';
-import { ResourceAggregatorService } from './routing/resource-aggregator.service';
-import { PromptAggregatorService } from './routing/prompt-aggregator.service';
-import { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 import { TaskAggregatorService } from './task/task-aggregator.service';
+import { HealthCheckerService } from './upstream/health-checker.service';
+import { UpstreamManagerService } from './upstream/upstream-manager.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

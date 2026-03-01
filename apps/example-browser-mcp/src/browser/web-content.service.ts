@@ -1,6 +1,6 @@
+import { Readability } from '@mozilla/readability';
 import { Injectable, Logger } from '@nestjs/common';
 import { JSDOM, VirtualConsole } from 'jsdom';
-import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 // @ts-ignore
 import { gfm } from 'turndown-plugin-gfm';
@@ -41,17 +41,24 @@ export class WebContentService {
         this.logger.log('Waiting for possible navigation/redirection…');
         try {
           await Promise.race([
-            page.waitForNavigation({ timeout: options.navigationTimeout, waitUntil: options.waitUntil }),
+            page.waitForNavigation({
+              timeout: options.navigationTimeout,
+              waitUntil: options.waitUntil,
+            }),
             new Promise<void>((_, reject) =>
               setTimeout(() => reject(new Error('Navigation timeout')), options.navigationTimeout),
             ),
           ])
             .then(() => this.logger.log('Page navigated successfully'))
             .catch((e: unknown) =>
-              this.logger.warn(`No navigation or timeout: ${e instanceof Error ? e.message : String(e)}`),
+              this.logger.warn(
+                `No navigation or timeout: ${e instanceof Error ? e.message : String(e)}`,
+              ),
             );
         } catch (e: unknown) {
-          this.logger.error(`Error waiting for navigation: ${e instanceof Error ? e.message : String(e)}`);
+          this.logger.error(
+            `Error waiting for navigation: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
 
@@ -95,7 +102,9 @@ export class WebContentService {
       await page.waitForTimeout(500);
       this.logger.debug('Page has stabilized');
     } catch (e: unknown) {
-      this.logger.warn(`Error ensuring page stability: ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(
+        `Error ensuring page stability: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 

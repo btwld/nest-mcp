@@ -69,9 +69,7 @@ import {
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from './constants/module.constants';
 
-function normalizeTransports(
-  transport: McpTransportType | McpTransportType[],
-): McpTransportType[] {
+function normalizeTransports(transport: McpTransportType | McpTransportType[]): McpTransportType[] {
   return Array.isArray(transport) ? transport : [transport];
 }
 

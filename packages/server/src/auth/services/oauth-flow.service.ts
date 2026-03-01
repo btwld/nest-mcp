@@ -37,8 +37,16 @@ export class OAuthFlowService {
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: OAuth authorize flow requires sequential validation
   async authorize(query: AuthorizeQueryDto, req: unknown): Promise<AuthFlowOutcome> {
-    const { response_type, client_id, redirect_uri, code_challenge, code_challenge_method, scope, state, resource } =
-      query;
+    const {
+      response_type,
+      client_id,
+      redirect_uri,
+      code_challenge,
+      code_challenge_method,
+      scope,
+      state,
+      resource,
+    } = query;
 
     // Validate required params before redirect_uri is trusted
     if (response_type !== 'code') {
@@ -64,7 +72,10 @@ export class OAuthFlowService {
 
     if (!code_challenge) {
       throw new HttpException(
-        { error: 'invalid_request', error_description: 'code_challenge is required (PKCE is mandatory)' },
+        {
+          error: 'invalid_request',
+          error_description: 'code_challenge is required (PKCE is mandatory)',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -88,7 +99,10 @@ export class OAuthFlowService {
     // Validate redirect_uri matches registered URIs — never redirect to unvalidated URI
     if (!client.redirect_uris.includes(redirect_uri)) {
       throw new HttpException(
-        { error: 'invalid_request', error_description: 'redirect_uri does not match any registered URI' },
+        {
+          error: 'invalid_request',
+          error_description: 'redirect_uri does not match any registered URI',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -293,7 +307,11 @@ export class OAuthFlowService {
       throw new HttpException('client_name and redirect_uris are required', HttpStatus.BAD_REQUEST);
     }
 
-    const registeredClient = await this.clientService.registerClient(client_name, redirect_uris, grant_types);
+    const registeredClient = await this.clientService.registerClient(
+      client_name,
+      redirect_uris,
+      grant_types,
+    );
     this.auditService?.logClientRegistered(registeredClient.client_id, client_name);
     return registeredClient;
   }

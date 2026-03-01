@@ -100,7 +100,10 @@ describe('createWellKnownController', () => {
     }
 
     it('uses resourceUrl from options when provided', () => {
-      const meta = invokeResourceMeta({ ...baseOptions, resourceUrl: 'https://api.example.com/mcp' });
+      const meta = invokeResourceMeta({
+        ...baseOptions,
+        resourceUrl: 'https://api.example.com/mcp',
+      });
       expect(meta.resource).toBe('https://api.example.com/mcp');
     });
 

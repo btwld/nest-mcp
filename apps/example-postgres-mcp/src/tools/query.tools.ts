@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { DatabaseService } from '../database/database.service';
 
 const READ_ONLY_PATTERN = /^\s*(SELECT|WITH|EXPLAIN|SHOW|TABLE|VALUES)/i;
-const WRITE_PATTERN = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|REPLACE|MERGE|CALL|EXEC|EXECUTE)\b/i;
+const WRITE_PATTERN =
+  /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|REPLACE|MERGE|CALL|EXEC|EXECUTE)\b/i;
 
 function isSafeReadOnlyQuery(sql: string): boolean {
   return READ_ONLY_PATTERN.test(sql) && !WRITE_PATTERN.test(sql.toUpperCase());
@@ -93,14 +94,20 @@ export class QueryTools {
         .enum(['text', 'json'])
         .optional()
         .default('text')
-        .describe("Output format — 'text' for human-readable, 'json' for structured (default: text)"),
+        .describe(
+          "Output format — 'text' for human-readable, 'json' for structured (default: text)",
+        ),
     }),
     annotations: { readOnlyHint: true },
   })
   @Public()
   async explainQuery(args: { sql: string; analyze?: boolean; buffers?: boolean; format?: string }) {
     const { sql, analyze = true, buffers = true, format = 'text' } = args;
-    const options = [`ANALYZE ${analyze}`, `BUFFERS ${buffers}`, `FORMAT ${format.toUpperCase()}`].join(', ');
+    const options = [
+      `ANALYZE ${analyze}`,
+      `BUFFERS ${buffers}`,
+      `FORMAT ${format.toUpperCase()}`,
+    ].join(', ');
     const explainSql = `EXPLAIN (${options}) ${sql}`;
 
     try {

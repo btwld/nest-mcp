@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import type { GetTaskPayloadResult, Task } from '@modelcontextprotocol/sdk/types.js';
 import type {
   CircuitBreakerConfig,
   McpMiddleware,
@@ -25,9 +26,8 @@ import {
   MCP_TIMEOUT_METADATA,
   MCP_TOOL_METADATA,
 } from '@nest-mcp/common';
-import type { CompletionMetadata } from '../decorators/completion.decorator';
 import { Injectable, Logger } from '@nestjs/common';
-import type { GetTaskPayloadResult, Task } from '@modelcontextprotocol/sdk/types.js';
+import type { CompletionMetadata } from '../decorators/completion.decorator';
 
 /**
  * Configuration for proxying MCP task protocol requests to upstream servers.
@@ -282,7 +282,10 @@ export class McpRegistryService {
     return Array.from(this.prompts.values());
   }
 
-  getCompletionHandler(refType: 'ref/prompt' | 'ref/resource', refName: string): RegisteredCompletion | undefined {
+  getCompletionHandler(
+    refType: 'ref/prompt' | 'ref/resource',
+    refName: string,
+  ): RegisteredCompletion | undefined {
     const key = `${refType === 'ref/prompt' ? 'prompt' : 'resource'}::${refName}`;
     return this.completionHandlers.get(key);
   }

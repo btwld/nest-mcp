@@ -10,10 +10,10 @@ import type {
   Implementation,
   ListPromptsRequest,
   ListPromptsResult,
-  ListResourcesRequest,
-  ListResourcesResult,
   ListResourceTemplatesRequest,
   ListResourceTemplatesResult,
+  ListResourcesRequest,
+  ListResourcesResult,
   ListToolsRequest,
   ListToolsResult,
   LoggingLevel,
@@ -187,7 +187,10 @@ export class MockMcpClient {
 
   onNotification(
     method: string,
-    handler: (notification: { method: string; params?: Record<string, unknown> }) => void | Promise<void>,
+    handler: (notification: {
+      method: string;
+      params?: Record<string, unknown>;
+    }) => void | Promise<void>,
   ): void {
     this._notificationHandlers.set(method, handler);
   }

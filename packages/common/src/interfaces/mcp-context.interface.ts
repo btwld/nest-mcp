@@ -1,7 +1,7 @@
-import type { McpTransportType } from './mcp-transport.interface';
-import type { ToolContent } from './mcp-tool.interface';
 import type { ElicitRequest, ElicitResult } from './mcp-elicitation.interface';
 import type { McpSamplingParams, McpSamplingResult } from './mcp-sampling.interface';
+import type { ToolContent } from './mcp-tool.interface';
+import type { McpTransportType } from './mcp-transport.interface';
 
 export interface McpProgress {
   progress: number;

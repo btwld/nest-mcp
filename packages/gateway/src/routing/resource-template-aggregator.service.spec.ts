@@ -95,9 +95,7 @@ describe('ResourceTemplateAggregatorService', () => {
           }),
         });
       upstreamManager.isHealthy.mockReturnValue(true);
-      router.getPrefixForUpstream
-        .mockReturnValueOnce('fs')
-        .mockReturnValueOnce('data');
+      router.getPrefixForUpstream.mockReturnValueOnce('fs').mockReturnValueOnce('data');
 
       const templates = await service.aggregateAll();
 

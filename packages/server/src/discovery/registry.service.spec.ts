@@ -743,8 +743,18 @@ describe('McpRegistryService', () => {
     });
 
     it('registerTaskHandlers overwrites a previous config', () => {
-      const first = { listTasks: vi.fn(), getTask: vi.fn(), cancelTask: vi.fn(), getTaskPayload: vi.fn() };
-      const second = { listTasks: vi.fn(), getTask: vi.fn(), cancelTask: vi.fn(), getTaskPayload: vi.fn() };
+      const first = {
+        listTasks: vi.fn(),
+        getTask: vi.fn(),
+        cancelTask: vi.fn(),
+        getTaskPayload: vi.fn(),
+      };
+      const second = {
+        listTasks: vi.fn(),
+        getTask: vi.fn(),
+        cancelTask: vi.fn(),
+        getTaskPayload: vi.fn(),
+      };
 
       registry.registerTaskHandlers(first);
       registry.registerTaskHandlers(second);
@@ -758,10 +768,16 @@ describe('McpRegistryService', () => {
       const spy = vi.fn();
       registry.events.on('notification.outbound', spy);
 
-      registry.broadcastNotification('notifications/tasks/status', { taskId: 'abc', status: 'completed' });
+      registry.broadcastNotification('notifications/tasks/status', {
+        taskId: 'abc',
+        status: 'completed',
+      });
 
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith({ method: 'notifications/tasks/status', params: { taskId: 'abc', status: 'completed' } });
+      expect(spy).toHaveBeenCalledWith({
+        method: 'notifications/tasks/status',
+        params: { taskId: 'abc', status: 'completed' },
+      });
     });
 
     it('emits notification.outbound with arbitrary params', () => {
@@ -770,7 +786,10 @@ describe('McpRegistryService', () => {
 
       registry.broadcastNotification('custom/method', { foo: 'bar', count: 42 });
 
-      expect(spy).toHaveBeenCalledWith({ method: 'custom/method', params: { foo: 'bar', count: 42 } });
+      expect(spy).toHaveBeenCalledWith({
+        method: 'custom/method',
+        params: { foo: 'bar', count: 42 },
+      });
     });
   });
 

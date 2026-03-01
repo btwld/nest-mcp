@@ -89,14 +89,8 @@ describe('OAuthController - authorize', () => {
     // biome-ignore lint/suspicious/noExplicitAny: test access to method
     await (controller as any).authorize(baseQuery, {}, res);
 
-    expect(res.redirect).toHaveBeenCalledWith(
-      302,
-      expect.stringContaining('error=access_denied'),
-    );
-    expect(res.redirect).toHaveBeenCalledWith(
-      302,
-      expect.stringContaining('state=random-state'),
-    );
+    expect(res.redirect).toHaveBeenCalledWith(302, expect.stringContaining('error=access_denied'));
+    expect(res.redirect).toHaveBeenCalledWith(302, expect.stringContaining('state=random-state'));
   });
 
   it('propagates HttpException thrown by flowService (pre-redirect-uri validation)', async () => {
@@ -106,7 +100,9 @@ describe('OAuthController - authorize', () => {
     );
 
     // biome-ignore lint/suspicious/noExplicitAny: test access to method
-    await expect((controller as any).authorize(baseQuery, {}, res)).rejects.toBeInstanceOf(HttpException);
+    await expect((controller as any).authorize(baseQuery, {}, res)).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('passes query object and req to flowService.authorize', async () => {
@@ -136,13 +132,26 @@ describe('OAuthController - token', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('delegates to flowService.handleGrant and returns result', async () => {
-    const tokenResponse = { access_token: 'at', refresh_token: 'rt', token_type: 'Bearer', expires_in: 3600 };
+    const tokenResponse = {
+      access_token: 'at',
+      refresh_token: 'rt',
+      token_type: 'Bearer',
+      expires_in: 3600,
+    };
     flowService.handleGrant.mockResolvedValue(tokenResponse);
 
     // biome-ignore lint/suspicious/noExplicitAny: test access to method
-    const result = await (controller as any).token({ grant_type: 'authorization_code', code: 'c', code_verifier: 'v' });
+    const result = await (controller as any).token({
+      grant_type: 'authorization_code',
+      code: 'c',
+      code_verifier: 'v',
+    });
 
-    expect(flowService.handleGrant).toHaveBeenCalledWith({ grant_type: 'authorization_code', code: 'c', code_verifier: 'v' });
+    expect(flowService.handleGrant).toHaveBeenCalledWith({
+      grant_type: 'authorization_code',
+      code: 'c',
+      code_verifier: 'v',
+    });
     expect(result).toEqual(tokenResponse);
   });
 });
@@ -205,9 +214,15 @@ describe('OAuthController - register', () => {
     flowService.registerClient.mockResolvedValue(fakeClient);
 
     // biome-ignore lint/suspicious/noExplicitAny: test access to method
-    const result = await (controller as any).register({ client_name: 'app', redirect_uris: ['https://app/cb'] });
+    const result = await (controller as any).register({
+      client_name: 'app',
+      redirect_uris: ['https://app/cb'],
+    });
 
-    expect(flowService.registerClient).toHaveBeenCalledWith({ client_name: 'app', redirect_uris: ['https://app/cb'] });
+    expect(flowService.registerClient).toHaveBeenCalledWith({
+      client_name: 'app',
+      redirect_uris: ['https://app/cb'],
+    });
     expect(result).toEqual(fakeClient);
   });
 });

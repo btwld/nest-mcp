@@ -121,7 +121,12 @@ describe('MockMcpClient', () => {
     });
 
     it('complete returns empty completion', async () => {
-      expect(await mock.complete({ ref: { type: 'ref/prompt', name: 'p' }, argument: { name: 'a', value: '' } })).toEqual({
+      expect(
+        await mock.complete({
+          ref: { type: 'ref/prompt', name: 'p' },
+          argument: { name: 'a', value: '' },
+        }),
+      ).toEqual({
         completion: { values: [] },
       });
     });
@@ -174,7 +179,12 @@ describe('MockMcpClient', () => {
   describe('set* methods (extended)', () => {
     it('setCompleteResult changes complete() return value', async () => {
       mock.setCompleteResult({ completion: { values: ['a', 'b'] } });
-      expect(await mock.complete({ ref: { type: 'ref/prompt', name: 'p' }, argument: { name: 'a', value: '' } })).toEqual({
+      expect(
+        await mock.complete({
+          ref: { type: 'ref/prompt', name: 'p' },
+          argument: { name: 'a', value: '' },
+        }),
+      ).toEqual({
         completion: { values: ['a', 'b'] },
       });
     });
@@ -189,7 +199,9 @@ describe('MockMcpClient', () => {
     });
 
     it('setGetPromptResult changes getPrompt() return value', async () => {
-      mock.setGetPromptResult({ messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }] });
+      mock.setGetPromptResult({
+        messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
+      });
       const result = await mock.getPrompt({ name: 'p' });
       expect(result.messages).toHaveLength(1);
     });
@@ -222,7 +234,14 @@ describe('MockMcpClient', () => {
 
   describe('handler methods (no-ops)', () => {
     it('setSamplingHandler does not throw', () => {
-      expect(() => mock.setSamplingHandler(async () => ({ model: 'm', stopReason: 'endTurn', role: 'assistant', content: { type: 'text', text: '' } }))).not.toThrow();
+      expect(() =>
+        mock.setSamplingHandler(async () => ({
+          model: 'm',
+          stopReason: 'endTurn',
+          role: 'assistant',
+          content: { type: 'text', text: '' },
+        })),
+      ).not.toThrow();
     });
 
     it('setElicitationHandler does not throw', () => {

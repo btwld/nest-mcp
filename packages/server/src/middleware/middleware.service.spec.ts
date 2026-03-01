@@ -118,12 +118,14 @@ describe('MiddlewareService', () => {
 
   it('three middleware chain executes in correct onion order', async () => {
     const order: string[] = [];
-    const make = (name: string): McpMiddleware => async (_ctx, _args, next) => {
-      order.push(`${name}-before`);
-      const r = await next();
-      order.push(`${name}-after`);
-      return r;
-    };
+    const make =
+      (name: string): McpMiddleware =>
+      async (_ctx, _args, next) => {
+        order.push(`${name}-before`);
+        const r = await next();
+        order.push(`${name}-after`);
+        return r;
+      };
 
     const handler = vi.fn().mockImplementation(async () => {
       order.push('handler');
@@ -132,9 +134,13 @@ describe('MiddlewareService', () => {
 
     await service.executeChain([make('a'), make('b'), make('c')], ctx, {}, handler);
     expect(order).toEqual([
-      'a-before', 'b-before', 'c-before',
+      'a-before',
+      'b-before',
+      'c-before',
       'handler',
-      'c-after', 'b-after', 'a-after',
+      'c-after',
+      'b-after',
+      'a-after',
     ]);
   });
 });

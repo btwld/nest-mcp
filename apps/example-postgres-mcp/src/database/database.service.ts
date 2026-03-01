@@ -16,13 +16,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     const connectionString =
-      process.env['DATABASE_URL'] ||
-      process.env['POSTGRES_URL'] ||
-      this.buildConnectionString();
+      process.env['DATABASE_URL'] || process.env['POSTGRES_URL'] || this.buildConnectionString();
 
     this.pool = new Pool({
       connectionString,
-      max: parseInt(process.env['POSTGRES_MAX_CONNECTIONS'] ?? '10', 10),
+      max: Number.parseInt(process.env['POSTGRES_MAX_CONNECTIONS'] ?? '10', 10),
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
     });

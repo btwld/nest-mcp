@@ -314,18 +314,18 @@ describe('GatewayService', () => {
     it('should pass signal to upstream client.callTool', async () => {
       router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
       const mockClient = {
-        callTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }], isError: false }),
+        callTool: vi
+          .fn()
+          .mockResolvedValue({ content: [{ type: 'text', text: 'ok' }], isError: false }),
       };
       upstreamManager.getClient.mockReturnValue(mockClient);
       const controller = new AbortController();
 
       await service.callTool('gh_listRepos', { org: 'acme' }, undefined, controller.signal);
 
-      expect(mockClient.callTool).toHaveBeenCalledWith(
-        expect.any(Object),
-        undefined,
-        { signal: controller.signal },
-      );
+      expect(mockClient.callTool).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        signal: controller.signal,
+      });
     });
   });
 
@@ -860,10 +860,7 @@ describe('GatewayService', () => {
     });
 
     it('should return empty values for unknown ref type', async () => {
-      const result = await service.complete(
-        { type: 'ref/unknown' },
-        { name: 'arg', value: 'val' },
-      );
+      const result = await service.complete({ type: 'ref/unknown' }, { name: 'arg', value: 'val' });
 
       expect(result).toEqual({ values: [] });
     });
@@ -885,7 +882,9 @@ describe('GatewayService', () => {
       const result = await resultPromise;
 
       expect(result.isError).toBe(true);
-      expect((result.content[0] as { text: string }).text).toContain('Error forwarding to upstream');
+      expect((result.content[0] as { text: string }).text).toContain(
+        'Error forwarding to upstream',
+      );
     });
 
     it('should return error when readResource exceeds configured timeout', async () => {
@@ -925,7 +924,9 @@ describe('GatewayService', () => {
 
       expect(result.messages[0]).toEqual(
         expect.objectContaining({
-          content: expect.objectContaining({ text: expect.stringContaining('Error getting prompt') }),
+          content: expect.objectContaining({
+            text: expect.stringContaining('Error getting prompt'),
+          }),
         }),
       );
     });
@@ -950,7 +951,9 @@ describe('GatewayService', () => {
       const result = await resultPromise;
 
       expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('Error reading resource template') }),
+        expect.objectContaining({
+          text: expect.stringContaining('Error reading resource template'),
+        }),
       );
     });
   });

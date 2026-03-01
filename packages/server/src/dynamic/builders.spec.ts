@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { McpTransportType } from '@nest-mcp/common';
-import { z } from 'zod';
 import type { McpModuleOptions } from '@nest-mcp/common';
+import { z } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import { McpExecutorService } from '../execution/executor.service';
 import { mockMcpContext } from '../testing/mock-context';

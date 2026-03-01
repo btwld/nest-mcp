@@ -166,7 +166,9 @@ describe('CircuitBreakerService', () => {
     // Open circuit for tool-a with 5 failures
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-a', defaultConfig, async () => { throw new Error('fail'); }),
+        service.execute('tool-a', defaultConfig, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
 
@@ -186,7 +188,9 @@ describe('CircuitBreakerService', () => {
     // Open the circuit
     for (let i = 0; i < 5; i++) {
       await expect(
-        service.execute('tool-x', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-x', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
     expect(service.getState('tool-x')).toBe(CircuitBreakerState.OPEN);
@@ -201,7 +205,9 @@ describe('CircuitBreakerService', () => {
     // Need 5 fresh failures to re-open (counters reset)
     for (let i = 0; i < 4; i++) {
       await expect(
-        service.execute('tool-x', config, async () => { throw new Error('fail'); }),
+        service.execute('tool-x', config, async () => {
+          throw new Error('fail');
+        }),
       ).rejects.toThrow('fail');
     }
     // Only 4 failures with minRequests=5 should not open circuit

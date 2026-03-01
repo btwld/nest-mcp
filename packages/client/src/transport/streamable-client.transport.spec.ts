@@ -62,8 +62,12 @@ describe('createStreamableHttpTransport', () => {
 
   it('should pass authProvider to the SDK transport constructor', () => {
     const mockAuthProvider = {
-      get redirectUrl() { return 'http://localhost/callback'; },
-      get clientId() { return 'test-client'; },
+      get redirectUrl() {
+        return 'http://localhost/callback';
+      },
+      get clientId() {
+        return 'test-client';
+      },
       clientMetadata: { redirect_uris: ['http://localhost/callback'] },
       tokens: vi.fn().mockResolvedValue(undefined),
       saveTokens: vi.fn().mockResolvedValue(undefined),
@@ -94,8 +98,16 @@ describe('createStreamableHttpTransport', () => {
   });
 
   it('should call StreamableHTTPClientTransport constructor exactly once per call', () => {
-    createStreamableHttpTransport({ name: 'a', transport: 'streamable-http', url: 'http://a.com/mcp' });
-    createStreamableHttpTransport({ name: 'b', transport: 'streamable-http', url: 'http://b.com/mcp' });
+    createStreamableHttpTransport({
+      name: 'a',
+      transport: 'streamable-http',
+      url: 'http://a.com/mcp',
+    });
+    createStreamableHttpTransport({
+      name: 'b',
+      transport: 'streamable-http',
+      url: 'http://b.com/mcp',
+    });
     expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(2);
   });
 });

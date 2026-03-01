@@ -1,6 +1,11 @@
-import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
-import type { McpExecutionContext, McpModuleOptions, ToolContent, TransportOptions } from '@nest-mcp/common';
 import type { Root } from '@modelcontextprotocol/sdk/types.js';
+import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
+import type {
+  McpExecutionContext,
+  McpModuleOptions,
+  ToolContent,
+  TransportOptions,
+} from '@nest-mcp/common';
 import {
   McpModule,
   McpPromptBuilder,
@@ -254,7 +259,14 @@ export class McpGatewayModule implements OnApplicationBootstrap {
         rawOutputSchema: tool.outputSchema,
         annotations: tool.annotations,
         handler: async (args: Record<string, unknown>, ctx: McpExecutionContext) => {
-          const result = await this.gatewayService.callTool(tool.name, args, undefined, ctx.signal, ctx.createMessage, ctx.elicit);
+          const result = await this.gatewayService.callTool(
+            tool.name,
+            args,
+            undefined,
+            ctx.signal,
+            ctx.createMessage,
+            ctx.elicit,
+          );
           return {
             content: result.content as ToolContent[],
             isError: result.isError,
@@ -318,7 +330,11 @@ export class McpGatewayModule implements OnApplicationBootstrap {
 
     for (const template of templates) {
       const handlerWrapper = {
-        [template.name]: async (uri: URL, _params: Record<string, string>, ctx: McpExecutionContext) => {
+        [template.name]: async (
+          uri: URL,
+          _params: Record<string, string>,
+          ctx: McpExecutionContext,
+        ) => {
           return this.gatewayService.readResourceTemplate(uri.href, ctx.signal);
         },
       };

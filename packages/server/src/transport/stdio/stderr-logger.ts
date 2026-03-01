@@ -31,7 +31,9 @@ export class StderrLogger implements LoggerService {
   private readonly levels: Set<LogLevel>;
 
   constructor(options?: { logLevels?: LogLevel[] }) {
-    this.levels = new Set(options?.logLevels ?? ['log', 'error', 'warn', 'debug', 'verbose', 'fatal']);
+    this.levels = new Set(
+      options?.logLevels ?? ['log', 'error', 'warn', 'debug', 'verbose', 'fatal'],
+    );
   }
 
   private write(level: LogLevel, message: unknown, context?: string): void {

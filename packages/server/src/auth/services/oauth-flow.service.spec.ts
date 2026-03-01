@@ -9,7 +9,10 @@ import { OAuthFlowService } from './oauth-flow.service';
 
 function makeService(
   optionOverrides: Partial<McpAuthModuleOptions> = {},
-  clientServiceOverrides: Partial<{ getClient: ReturnType<typeof vi.fn>; registerClient: ReturnType<typeof vi.fn> }> = {},
+  clientServiceOverrides: Partial<{
+    getClient: ReturnType<typeof vi.fn>;
+    registerClient: ReturnType<typeof vi.fn>;
+  }> = {},
 ) {
   const options: McpAuthModuleOptions = {
     jwtSecret: 'x'.repeat(32),
@@ -42,7 +45,12 @@ function makeService(
     ...clientServiceOverrides,
   };
 
-  const service = new OAuthFlowService(options, jwtService as never, clientService as never, store as never);
+  const service = new OAuthFlowService(
+    options,
+    jwtService as never,
+    clientService as never,
+    store as never,
+  );
   return { service, jwtService, store, clientService };
 }
 
@@ -65,13 +73,16 @@ describe('OAuthFlowService - authorize', () => {
   let clientService: ReturnType<typeof makeService>['clientService'];
 
   beforeEach(() => {
-    ({ service, store, clientService } = makeService({}, {
-      getClient: vi.fn().mockResolvedValue({
-        client_id: 'client-1',
-        redirect_uris: [baseQuery.redirect_uri],
-      }),
-      registerClient: vi.fn(),
-    }));
+    ({ service, store, clientService } = makeService(
+      {},
+      {
+        getClient: vi.fn().mockResolvedValue({
+          client_id: 'client-1',
+          redirect_uris: [baseQuery.redirect_uri],
+        }),
+        registerClient: vi.fn(),
+      },
+    ));
   });
 
   afterEach(() => vi.clearAllMocks());
@@ -83,15 +94,15 @@ describe('OAuthFlowService - authorize', () => {
   });
 
   it('throws 400 when client_id is missing', async () => {
-    await expect(
-      service.authorize({ ...baseQuery, client_id: '' }, {}),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.authorize({ ...baseQuery, client_id: '' }, {})).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 400 when redirect_uri is missing', async () => {
-    await expect(
-      service.authorize({ ...baseQuery, redirect_uri: '' }, {}),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.authorize({ ...baseQuery, redirect_uri: '' }, {})).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 400 when code_challenge is missing', async () => {
@@ -101,9 +112,9 @@ describe('OAuthFlowService - authorize', () => {
   });
 
   it('throws 400 when state is missing', async () => {
-    await expect(
-      service.authorize({ ...baseQuery, state: '' }, {}),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.authorize({ ...baseQuery, state: '' }, {})).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 400 when client is unknown', async () => {
@@ -120,10 +131,11 @@ describe('OAuthFlowService - authorize', () => {
   });
 
   it('returns denied outcome when validateUser is not configured', async () => {
-    const { service: svc } = makeService(
-      { validateUser: undefined } as McpAuthModuleOptions,
-      { getClient: vi.fn().mockResolvedValue({ client_id: 'client-1', redirect_uris: [baseQuery.redirect_uri] }) },
-    );
+    const { service: svc } = makeService({ validateUser: undefined } as McpAuthModuleOptions, {
+      getClient: vi
+        .fn()
+        .mockResolvedValue({ client_id: 'client-1', redirect_uris: [baseQuery.redirect_uri] }),
+    });
 
     const result = await svc.authorize(baseQuery, {});
 
@@ -134,7 +146,11 @@ describe('OAuthFlowService - authorize', () => {
   it('returns denied outcome when user validation fails', async () => {
     const { service: svc } = makeService(
       { validateUser: async () => null },
-      { getClient: vi.fn().mockResolvedValue({ client_id: 'client-1', redirect_uris: [baseQuery.redirect_uri] }) },
+      {
+        getClient: vi
+          .fn()
+          .mockResolvedValue({ client_id: 'client-1', redirect_uris: [baseQuery.redirect_uri] }),
+      },
     );
 
     const result = await svc.authorize(baseQuery, {});
@@ -183,15 +199,13 @@ describe('OAuthFlowService - handleGrant', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('throws 400 for unsupported grant_type', async () => {
-    await expect(
-      service.handleGrant({ grant_type: 'implicit' }),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.handleGrant({ grant_type: 'implicit' })).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 400 for missing grant_type', async () => {
-    await expect(
-      service.handleGrant({}),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.handleGrant({})).rejects.toBeInstanceOf(HttpException);
   });
 });
 
@@ -206,15 +220,13 @@ describe('OAuthFlowService - exchangeCode (authorization_code grant)', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('throws 400 when code is missing', async () => {
-    await expect(
-      service.exchangeCode({ code_verifier: 'v' }),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.exchangeCode({ code_verifier: 'v' })).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 400 when code_verifier is missing', async () => {
-    await expect(
-      service.exchangeCode({ code: 'c' }),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.exchangeCode({ code: 'c' })).rejects.toBeInstanceOf(HttpException);
   });
 
   it('throws 400 for invalid/expired authorization code', async () => {
@@ -317,25 +329,27 @@ describe('OAuthFlowService - refreshToken (refresh_token grant)', () => {
   });
 
   it('throws 401 for invalid refresh token', async () => {
-    jwtService.validateToken.mockImplementation(() => { throw new Error('invalid'); });
-    await expect(
-      service.refreshToken({ refresh_token: 'bad' }),
-    ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+    jwtService.validateToken.mockImplementation(() => {
+      throw new Error('invalid');
+    });
+    await expect(service.refreshToken({ refresh_token: 'bad' })).rejects.toMatchObject({
+      status: HttpStatus.UNAUTHORIZED,
+    });
   });
 
   it('throws 400 when token is not a refresh token', async () => {
     jwtService.validateToken.mockReturnValue({ type: 'access', sub: 'u' });
-    await expect(
-      service.refreshToken({ refresh_token: 'access-jwt' }),
-    ).rejects.toBeInstanceOf(HttpException);
+    await expect(service.refreshToken({ refresh_token: 'access-jwt' })).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('throws 401 when refresh token is revoked', async () => {
     jwtService.validateToken.mockReturnValue({ type: 'refresh', jti: 'jti-1', sub: 'u' });
     store.isTokenRevoked.mockResolvedValue(true);
-    await expect(
-      service.refreshToken({ refresh_token: 'revoked-rt' }),
-    ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+    await expect(service.refreshToken({ refresh_token: 'revoked-rt' })).rejects.toMatchObject({
+      status: HttpStatus.UNAUTHORIZED,
+    });
   });
 
   it('issues new token pair and revokes old refresh token', async () => {
@@ -396,7 +410,9 @@ describe('OAuthFlowService - revokeToken', () => {
   });
 
   it('returns { success: true } even for invalid token (RFC 7009)', async () => {
-    jwtService.validateToken.mockImplementation(() => { throw new Error('invalid'); });
+    jwtService.validateToken.mockImplementation(() => {
+      throw new Error('invalid');
+    });
     const result = await service.revokeToken({ token: 'bad-jwt' });
     expect(result).toEqual({ success: true });
   });
@@ -441,7 +457,9 @@ describe('OAuthFlowService - introspectToken', () => {
   });
 
   it('returns active: false for invalid token', async () => {
-    jwtService.validateToken.mockImplementation(() => { throw new Error('invalid'); });
+    jwtService.validateToken.mockImplementation(() => {
+      throw new Error('invalid');
+    });
     const result = await service.introspectToken({ token: 'bad-jwt' });
     expect(result.active).toBe(false);
   });
@@ -503,9 +521,15 @@ describe('OAuthFlowService - registerClient', () => {
 
   it('registers and returns client on success', async () => {
     const fakeClient = { client_id: 'c-1', client_name: 'app', redirect_uris: ['https://app/cb'] };
-    ({ service, clientService } = makeService({}, { registerClient: vi.fn().mockResolvedValue(fakeClient) }));
+    ({ service, clientService } = makeService(
+      {},
+      { registerClient: vi.fn().mockResolvedValue(fakeClient) },
+    ));
 
-    const result = await service.registerClient({ client_name: 'app', redirect_uris: ['https://app/cb'] });
+    const result = await service.registerClient({
+      client_name: 'app',
+      redirect_uris: ['https://app/cb'],
+    });
 
     expect(result).toEqual(fakeClient);
     expect(clientService.registerClient).toHaveBeenCalledWith('app', ['https://app/cb'], undefined);

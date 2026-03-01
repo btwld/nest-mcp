@@ -62,7 +62,9 @@ Provide a structured analysis covering:
   })
   @Public()
   async writeQuery(args: { description: string; schema?: string; constraints?: string }) {
-    const schemaSection = args.schema ? `\n\nAvailable schema:\n\`\`\`json\n${args.schema}\n\`\`\`` : '';
+    const schemaSection = args.schema
+      ? `\n\nAvailable schema:\n\`\`\`json\n${args.schema}\n\`\`\``
+      : '';
     const constraintsSection = args.constraints ? `\n\nConstraints:\n${args.constraints}` : '';
     return {
       messages: [

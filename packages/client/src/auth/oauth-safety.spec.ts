@@ -76,9 +76,7 @@ describe('OAuth re-exports smoke tests', () => {
     });
 
     it('fetches and returns protected resource metadata', async () => {
-      const metadata = await discoverOAuthProtectedResourceMetadata(
-        'https://example.com',
-      );
+      const metadata = await discoverOAuthProtectedResourceMetadata('https://example.com');
 
       expect(metadata).toBeDefined();
       expect(metadata.resource).toBe('https://example.com');
@@ -110,9 +108,7 @@ describe('OAuth re-exports smoke tests', () => {
     });
 
     it('fetches and returns authorization server metadata', async () => {
-      const metadata = await discoverAuthorizationServerMetadata(
-        'https://auth.example.com',
-      );
+      const metadata = await discoverAuthorizationServerMetadata('https://auth.example.com');
 
       expect(metadata).toBeDefined();
       expect(metadata.issuer).toBe('https://auth.example.com');

@@ -1,4 +1,3 @@
-import { drainAllPages } from '@nest-mcp/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -13,8 +12,8 @@ import type {
   ElicitResult,
   GetPromptRequest,
   ListPromptsRequest,
-  ListResourcesRequest,
   ListResourceTemplatesRequest,
+  ListResourcesRequest,
   ListRootsResult,
   ListToolsRequest,
   LoggingLevel,
@@ -31,6 +30,7 @@ import {
   ElicitRequestSchema,
   ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { drainAllPages } from '@nest-mcp/common';
 import { Logger } from '@nestjs/common';
 import type {
   McpClientConnection,
@@ -250,9 +250,7 @@ export class McpClient {
       this.client.registerCapabilities({ elicitation: {} });
     }
     this.client.setRequestHandler(ElicitRequestSchema, (req) =>
-      handler(
-        req.params as ElicitRequestFormParams | ElicitRequestURLParams,
-      ),
+      handler(req.params as ElicitRequestFormParams | ElicitRequestURLParams),
     );
   }
 
@@ -274,7 +272,10 @@ export class McpClient {
 
   onNotification(
     method: string,
-    handler: (notification: { method: string; params?: Record<string, unknown> }) => void | Promise<void>,
+    handler: (notification: {
+      method: string;
+      params?: Record<string, unknown>;
+    }) => void | Promise<void>,
   ): void {
     // Store the wrapped handler persistently so it survives reconnects.
     // Access the internal notification handlers map directly because the SDK's
@@ -288,10 +289,7 @@ export class McpClient {
     }
   }
 
-  private _applyNotificationHandler(
-    method: string,
-    wrapped: (n: unknown) => Promise<void>,
-  ): void {
+  private _applyNotificationHandler(method: string, wrapped: (n: unknown) => Promise<void>): void {
     (
       this.client as unknown as {
         _notificationHandlers: Map<string, (n: unknown) => Promise<void>>;

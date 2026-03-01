@@ -56,10 +56,14 @@ describe('TaskAggregatorService', () => {
     it('fans out to all healthy upstreams and merges results', async () => {
       upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
       const clientA = {
-        experimental: { tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t1')] }) } },
+        experimental: {
+          tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t1')] }) },
+        },
       };
       const clientB = {
-        experimental: { tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t2')] }) } },
+        experimental: {
+          tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t2')] }) },
+        },
       };
       upstreamManager.getClient.mockImplementation((name: string) =>
         name === 'a' ? clientA : clientB,
@@ -76,7 +80,9 @@ describe('TaskAggregatorService', () => {
       upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
       upstreamManager.isHealthy.mockImplementation((name: string) => name === 'a');
       const clientA = {
-        experimental: { tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t1')] }) } },
+        experimental: {
+          tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t1')] }) },
+        },
       };
       upstreamManager.getClient.mockReturnValue(clientA);
 
@@ -98,10 +104,14 @@ describe('TaskAggregatorService', () => {
     it('gracefully ignores failed upstreams', async () => {
       upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
       const clientA = {
-        experimental: { tasks: { listTasks: vi.fn().mockRejectedValue(new Error('network error')) } },
+        experimental: {
+          tasks: { listTasks: vi.fn().mockRejectedValue(new Error('network error')) },
+        },
       };
       const clientB = {
-        experimental: { tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t2')] }) } },
+        experimental: {
+          tasks: { listTasks: vi.fn().mockResolvedValue({ tasks: [makeTask('t2')] }) },
+        },
       };
       upstreamManager.getClient.mockImplementation((name: string) =>
         name === 'a' ? clientA : clientB,

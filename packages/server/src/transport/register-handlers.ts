@@ -1,4 +1,3 @@
-import type { ElicitRequest, ElicitResult, McpExecutionContext, McpModuleOptions, McpProgress, ToolContent } from '@nest-mcp/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -15,6 +14,14 @@ import {
   SubscribeRequestSchema,
   UnsubscribeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  ElicitRequest,
+  ElicitResult,
+  McpExecutionContext,
+  McpModuleOptions,
+  McpProgress,
+  ToolContent,
+} from '@nest-mcp/common';
 import { z } from 'zod';
 import type {
   McpRegistryService,
@@ -250,7 +257,11 @@ export function registerResourceTemplateOnServer(
     template.name,
     resourceTemplate,
     template.mimeType ? { mimeType: template.mimeType } : {},
-    async (uri: URL, _variables: Record<string, string>, extra: { signal: AbortSignal; requestId: string | number }) => {
+    async (
+      uri: URL,
+      _variables: Record<string, string>,
+      extra: { signal: AbortSignal; requestId: string | number },
+    ) => {
       const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
       try {
         return await pipeline.readResource(uri.href, ctxWithSignal);
@@ -281,7 +292,10 @@ export function registerPromptOnServer(
       description: prompt.description,
       argsSchema: prompt.parameters?.shape,
     },
-    async (args: Record<string, unknown>, extra: { signal: AbortSignal; requestId: string | number }) => {
+    async (
+      args: Record<string, unknown>,
+      extra: { signal: AbortSignal; requestId: string | number },
+    ) => {
       const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
       try {
         return await pipeline.getPrompt(prompt.name, args, ctxWithSignal);

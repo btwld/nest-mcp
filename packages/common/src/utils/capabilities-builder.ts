@@ -37,7 +37,12 @@ export function buildServerCapabilities(
   }
 
   // Enable completions when there are prompts or resource templates to complete
-  if (registry.hasPrompts || registry.hasResourceTemplates || options.capabilities?.prompts || options.capabilities?.resources) {
+  if (
+    registry.hasPrompts ||
+    registry.hasResourceTemplates ||
+    options.capabilities?.prompts ||
+    options.capabilities?.resources
+  ) {
     capabilities.completions = {};
   }
 

@@ -29,8 +29,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { UpstreamConfig } from './upstream.interface';
 import { UpstreamManagerService } from './upstream-manager.service';
+import type { UpstreamConfig } from './upstream.interface';
 
 const MockedClient = vi.mocked(Client);
 const MockedSSE = vi.mocked(SSEClientTransport);
@@ -197,7 +197,11 @@ describe('UpstreamManagerService', () => {
     });
 
     it('logs a warning and still removes upstream when client.close() throws', async () => {
-      const config: UpstreamConfig = { name: 'err-server', transport: 'sse', url: 'http://localhost/sse' };
+      const config: UpstreamConfig = {
+        name: 'err-server',
+        transport: 'sse',
+        url: 'http://localhost/sse',
+      };
       await service.connect(config);
 
       // Make the mock client's close() reject
@@ -369,7 +373,10 @@ describe('UpstreamManagerService', () => {
         (req: { params: unknown }) => Promise<unknown>,
       ];
 
-      const params = { messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }], maxTokens: 100 };
+      const params = {
+        messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
+        maxTokens: 100,
+      };
       const result = await samplingHandler({ params });
 
       expect(forwarder).toHaveBeenCalledWith(params);
@@ -439,7 +446,10 @@ describe('UpstreamManagerService', () => {
         (req: { params: unknown }) => Promise<unknown>,
       ];
 
-      const params = { method: 'elicitation/create', params: { message: 'test', requestedSchema: { type: 'object', properties: {} } } };
+      const params = {
+        method: 'elicitation/create',
+        params: { message: 'test', requestedSchema: { type: 'object', properties: {} } },
+      };
       const result = await elicitHandler({ params });
 
       expect(forwarder).toHaveBeenCalledWith(params);
@@ -524,7 +534,10 @@ describe('UpstreamManagerService', () => {
 
       const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
       // Extract the registered notification handler
-      const [, handler] = instance.setNotificationHandler.mock.calls[0] as [unknown, (n: unknown) => void];
+      const [, handler] = instance.setNotificationHandler.mock.calls[0] as [
+        unknown,
+        (n: unknown) => void,
+      ];
 
       // Simulate the upstream emitting a task status notification
       handler({ params: { taskId: 't1', status: 'completed', progress: 1 } });

@@ -1,16 +1,18 @@
 import 'reflect-metadata';
-import { McpTransportType } from '@nest-mcp/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpTransportType } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { McpRegistryService } from '../discovery/registry.service';
 import { createMcpServer } from './server.factory';
 
-function makeRegistry(flags: {
-  hasTools?: boolean;
-  hasResources?: boolean;
-  hasResourceTemplates?: boolean;
-  hasPrompts?: boolean;
-} = {}): McpRegistryService {
+function makeRegistry(
+  flags: {
+    hasTools?: boolean;
+    hasResources?: boolean;
+    hasResourceTemplates?: boolean;
+    hasPrompts?: boolean;
+  } = {},
+): McpRegistryService {
   const registry = new McpRegistryService();
   // Expose the flags via a partial object cast — registry getters are read-only,
   // so we override the prototype properties via Object.defineProperty.
@@ -19,7 +21,9 @@ function makeRegistry(flags: {
   if (flags.hasResources !== undefined)
     Object.defineProperty(registry, 'hasResources', { get: () => flags.hasResources });
   if (flags.hasResourceTemplates !== undefined)
-    Object.defineProperty(registry, 'hasResourceTemplates', { get: () => flags.hasResourceTemplates });
+    Object.defineProperty(registry, 'hasResourceTemplates', {
+      get: () => flags.hasResourceTemplates,
+    });
   if (flags.hasPrompts !== undefined)
     Object.defineProperty(registry, 'hasPrompts', { get: () => flags.hasPrompts });
   return registry;
@@ -65,9 +69,7 @@ describe('createMcpServer', () => {
       store: { get: () => undefined },
       queue: { push: () => {} },
     };
-    expect(() =>
-      createMcpServer(makeRegistry(), baseOptions, taskManager as never),
-    ).not.toThrow();
+    expect(() => createMcpServer(makeRegistry(), baseOptions, taskManager as never)).not.toThrow();
   });
 
   it('does not throw when taskManager is absent', () => {
@@ -96,7 +98,12 @@ describe('createMcpServer', () => {
 
   it('returns McpServer with all capabilities when registry has all', () => {
     const server = createMcpServer(
-      makeRegistry({ hasTools: true, hasResources: true, hasResourceTemplates: true, hasPrompts: true }),
+      makeRegistry({
+        hasTools: true,
+        hasResources: true,
+        hasResourceTemplates: true,
+        hasPrompts: true,
+      }),
       baseOptions,
     );
     expect(server).toBeInstanceOf(McpServer);

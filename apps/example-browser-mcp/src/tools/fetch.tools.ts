@@ -11,12 +11,18 @@ import type { FetchOptions, FetchResult } from '../interfaces/fetch-options.inte
 import { validateUrlProtocol, validateUrlsProtocol } from '../utils/url-validator';
 
 const fetchOptionsSchema = {
-  timeout: z.number().optional().default(30000).describe('Page load timeout in ms (default: 30000)'),
+  timeout: z
+    .number()
+    .optional()
+    .default(30000)
+    .describe('Page load timeout in ms (default: 30000)'),
   waitUntil: z
     .enum(['load', 'domcontentloaded', 'networkidle', 'commit'])
     .optional()
     .default('load')
-    .describe("When navigation is considered complete: 'load' | 'domcontentloaded' | 'networkidle' | 'commit'"),
+    .describe(
+      "When navigation is considered complete: 'load' | 'domcontentloaded' | 'networkidle' | 'commit'",
+    ),
   extractContent: z
     .boolean()
     .optional()
@@ -27,12 +33,18 @@ const fetchOptionsSchema = {
     .optional()
     .default(0)
     .describe('Maximum length of returned content in characters (default: no limit)'),
-  returnHtml: z.boolean().optional().default(false).describe('Return HTML instead of Markdown (default: false)'),
+  returnHtml: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Return HTML instead of Markdown (default: false)'),
   waitForNavigation: z
     .boolean()
     .optional()
     .default(false)
-    .describe('Wait for additional navigation after load, useful for anti-bot redirects (default: false)'),
+    .describe(
+      'Wait for additional navigation after load, useful for anti-bot redirects (default: false)',
+    ),
   navigationTimeout: z
     .number()
     .optional()
@@ -43,7 +55,10 @@ const fetchOptionsSchema = {
     .optional()
     .default(true)
     .describe('Disable loading of images, stylesheets, fonts and media (default: true)'),
-  debug: z.boolean().optional().describe('Show browser window for debugging (overrides --debug flag)'),
+  debug: z
+    .boolean()
+    .optional()
+    .describe('Show browser window for debugging (overrides --debug flag)'),
 };
 
 function buildFetchOptions(args: Record<string, unknown>): FetchOptions {
@@ -71,7 +86,8 @@ export class FetchTools {
 
   @Tool({
     name: 'fetch_url',
-    description: 'Retrieve web page content from a specified URL using a headless Chromium browser.',
+    description:
+      'Retrieve web page content from a specified URL using a headless Chromium browser.',
     parameters: z.object({
       url: z
         .string()
@@ -152,7 +168,9 @@ export class FetchTools {
               await page
                 .close()
                 .catch((e: unknown) =>
-                  this.logger.error(`Failed to close page: ${e instanceof Error ? e.message : String(e)}`),
+                  this.logger.error(
+                    `Failed to close page: ${e instanceof Error ? e.message : String(e)}`,
+                  ),
                 );
             }
           }
@@ -171,7 +189,9 @@ export class FetchTools {
         await context
           .close()
           .catch((e: unknown) =>
-            this.logger.error(`Failed to close context: ${e instanceof Error ? e.message : String(e)}`),
+            this.logger.error(
+              `Failed to close context: ${e instanceof Error ? e.message : String(e)}`,
+            ),
           );
       }
     }
@@ -187,7 +207,11 @@ export class FetchTools {
         .optional()
         .default('A4')
         .describe('Paper format (default: A4)'),
-      landscape: z.boolean().optional().default(false).describe('Landscape orientation (default: false)'),
+      landscape: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Landscape orientation (default: false)'),
       printBackground: z
         .boolean()
         .optional()
@@ -197,7 +221,11 @@ export class FetchTools {
         .string()
         .optional()
         .describe('Absolute path where the PDF will be saved. Defaults to a temp file.'),
-      timeout: z.number().optional().default(30000).describe('Page load timeout in ms (default: 30000)'),
+      timeout: z
+        .number()
+        .optional()
+        .default(30000)
+        .describe('Page load timeout in ms (default: 30000)'),
       waitUntil: z
         .enum(['load', 'domcontentloaded', 'networkidle', 'commit'])
         .optional()
@@ -255,18 +283,27 @@ export class FetchTools {
 
       return {
         path: outputPath,
-        sizeKb: parseFloat((pdfBuffer.length / 1024).toFixed(1)),
+        sizeKb: Number.parseFloat((pdfBuffer.length / 1024).toFixed(1)),
         url: args.url,
       };
     } finally {
-      await this.browserService.cleanup(context, page, { disableMedia: false, extractContent: false, maxLength: 0, returnHtml: false, waitForNavigation: false, navigationTimeout: 10000, timeout: 30000, waitUntil: 'load' });
+      await this.browserService.cleanup(context, page, {
+        disableMedia: false,
+        extractContent: false,
+        maxLength: 0,
+        returnHtml: false,
+        waitForNavigation: false,
+        navigationTimeout: 10000,
+        timeout: 30000,
+        waitUntil: 'load',
+      });
     }
   }
 
   @Tool({
     name: 'browser_install',
     description:
-      "Install Playwright Chromium browser binary. Call this if you get an error about the browser not being installed.",
+      'Install Playwright Chromium browser binary. Call this if you get an error about the browser not being installed.',
     parameters: z.object({
       withDeps: z
         .boolean()
@@ -346,8 +383,12 @@ export class FetchTools {
       let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
-      child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+      child.stdout?.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+      child.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
 
       child.on('close', (code: number | null) => {
         resolve({ success: code === 0, output: stdout, error: stderr });

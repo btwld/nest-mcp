@@ -250,7 +250,9 @@ describe('McpModule', () => {
       it('adds a registration token provider with serverName and providerTokens', () => {
         class FakeProvider {}
         const mod = McpModule.forFeature([FakeProvider], 'target-server');
-        const registrationProvider = (mod.providers as { provide: string; useValue: unknown }[]).find(
+        const registrationProvider = (
+          mod.providers as { provide: string; useValue: unknown }[]
+        ).find(
           (p) => typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
         );
         expect(registrationProvider).toBeDefined();
@@ -283,7 +285,8 @@ describe('McpModule', () => {
 
         const getToken = (mod: ReturnType<typeof McpModule.forFeature>) =>
           (mod.providers as { provide: string }[]).find(
-            (p) => typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
+            (p) =>
+              typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
           )?.provide;
 
         expect(getToken(mod1)).not.toBe(getToken(mod2));

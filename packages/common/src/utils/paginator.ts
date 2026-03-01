@@ -7,11 +7,7 @@ export interface PaginatedResult<T> {
  * Paginate an array of items using cursor-based pagination.
  * Cursor is a base64url-encoded index into the array.
  */
-export function paginate<T>(
-  items: T[],
-  cursor?: string,
-  pageSize = 100,
-): PaginatedResult<T> {
+export function paginate<T>(items: T[], cursor?: string, pageSize = 100): PaginatedResult<T> {
   const startIndex = cursor ? decodeCursor(cursor) : 0;
   const page = items.slice(startIndex, startIndex + pageSize);
   const nextIndex = startIndex + pageSize;

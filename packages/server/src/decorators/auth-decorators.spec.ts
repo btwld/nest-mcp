@@ -96,11 +96,7 @@ describe('Auth decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_GUARDS_METADATA,
-        TestService.prototype,
-        'emptyGuards',
-      );
+      const value = Reflect.getMetadata(MCP_GUARDS_METADATA, TestService.prototype, 'emptyGuards');
       expect(value).toEqual([]);
     });
   });
@@ -131,11 +127,7 @@ describe('Auth decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_SCOPES_METADATA,
-        TestService.prototype,
-        'emptyScopes',
-      );
+      const value = Reflect.getMetadata(MCP_SCOPES_METADATA, TestService.prototype, 'emptyScopes');
       expect(value).toEqual([]);
     });
 
@@ -147,11 +139,7 @@ describe('Auth decorators', () => {
         }
       }
 
-      const value = Reflect.getMetadata(
-        MCP_ROLES_METADATA,
-        TestService.prototype,
-        'emptyRoles',
-      );
+      const value = Reflect.getMetadata(MCP_ROLES_METADATA, TestService.prototype, 'emptyRoles');
       expect(value).toEqual([]);
     });
 

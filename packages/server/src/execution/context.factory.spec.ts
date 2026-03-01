@@ -101,7 +101,7 @@ describe('McpContextFactory', () => {
     });
 
     expect(ctx.notifyResourceUpdated).toBeDefined();
-    await ctx.notifyResourceUpdated!('file:///a.txt');
+    await ctx.notifyResourceUpdated?.('file:///a.txt');
     expect(notify).toHaveBeenCalledWith('file:///a.txt');
   });
 
@@ -141,7 +141,7 @@ describe('McpContextFactory', () => {
       });
 
       expect(ctx.createMessage).toBeDefined();
-      const result = await ctx.createMessage!({
+      const result = await ctx.createMessage?.({
         messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
         maxTokens: 100,
       });
@@ -171,7 +171,7 @@ describe('McpContextFactory', () => {
       });
 
       await expect(
-        ctx.createMessage!({
+        ctx.createMessage?.({
           messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }],
           maxTokens: 100,
         }),

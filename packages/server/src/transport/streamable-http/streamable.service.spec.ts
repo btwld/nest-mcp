@@ -108,7 +108,9 @@ function makeRegistryHandlerStub() {
 }
 
 // Minimal mock for McpServer – only the `server.notification` method is exercised here.
-function makeMockMcpServer(notification: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined)) {
+function makeMockMcpServer(
+  notification: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined),
+) {
   return {
     server: { notification },
     connect: vi.fn().mockResolvedValue(undefined),
@@ -125,7 +127,10 @@ function makeStreamableServiceStub() {
   const registryListeners: Array<{ event: string; listener: (...args: unknown[]) => void }> = [];
 
   // Wire up notification.outbound exactly as in streamable.service.ts
-  const onOutboundNotification = ({ method, params }: { method: string; params: Record<string, unknown> }) => {
+  const onOutboundNotification = ({
+    method,
+    params,
+  }: { method: string; params: Record<string, unknown> }) => {
     for (const server of servers.values()) {
       (server.server as unknown as { notification: (n: unknown) => Promise<void> })
         .notification({ method, params })
@@ -134,7 +139,10 @@ function makeStreamableServiceStub() {
   };
 
   registryEvents.on('notification.outbound', onOutboundNotification);
-  registryListeners.push({ event: 'notification.outbound', listener: onOutboundNotification as (...args: unknown[]) => void });
+  registryListeners.push({
+    event: 'notification.outbound',
+    listener: onOutboundNotification as (...args: unknown[]) => void,
+  });
 
   return { registryEvents, servers, registryListeners, logger };
 }
@@ -157,8 +165,14 @@ describe('StreamableHttpService notification.outbound forwarding', () => {
       params: { taskId: 'upstream::t1', status: 'completed' },
     });
 
-    expect(notifA).toHaveBeenCalledWith({ method: 'notifications/tasks/status', params: { taskId: 'upstream::t1', status: 'completed' } });
-    expect(notifB).toHaveBeenCalledWith({ method: 'notifications/tasks/status', params: { taskId: 'upstream::t1', status: 'completed' } });
+    expect(notifA).toHaveBeenCalledWith({
+      method: 'notifications/tasks/status',
+      params: { taskId: 'upstream::t1', status: 'completed' },
+    });
+    expect(notifB).toHaveBeenCalledWith({
+      method: 'notifications/tasks/status',
+      params: { taskId: 'upstream::t1', status: 'completed' },
+    });
   });
 
   it('does nothing when there are no active sessions', () => {

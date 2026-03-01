@@ -34,7 +34,11 @@ describe('createSseController', () => {
     it('delegates handleSse to sseService.createConnection', async () => {
       const createConnection = vi.fn().mockResolvedValue(undefined);
       const mockService = { createConnection };
-      const ctrl = new (SseController as new (s: unknown) => { handleSse: (req: unknown, res: unknown) => Promise<void> })(mockService);
+      const ctrl = new (
+        SseController as new (
+          s: unknown,
+        ) => { handleSse: (req: unknown, res: unknown) => Promise<void> }
+      )(mockService);
       const req = {};
       const res = {};
       await ctrl.handleSse(req, res);
@@ -52,15 +56,19 @@ describe('createSseController', () => {
     });
 
     it('handleMessage is bound to POST method', () => {
-      expect(
-        Reflect.getMetadata('method', SseMessagesController.prototype.handleMessage),
-      ).toBe(RequestMethod.POST);
+      expect(Reflect.getMetadata('method', SseMessagesController.prototype.handleMessage)).toBe(
+        RequestMethod.POST,
+      );
     });
 
     it('delegates handleMessage to sseService.handleMessage', async () => {
       const handleMessage = vi.fn().mockResolvedValue(undefined);
       const mockService = { handleMessage };
-      const ctrl = new (SseMessagesController as new (s: unknown) => { handleMessage: (req: unknown, res: unknown) => Promise<void> })(mockService);
+      const ctrl = new (
+        SseMessagesController as new (
+          s: unknown,
+        ) => { handleMessage: (req: unknown, res: unknown) => Promise<void> }
+      )(mockService);
       const req = {};
       const res = {};
       await ctrl.handleMessage(req, res);

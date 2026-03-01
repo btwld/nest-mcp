@@ -30,7 +30,9 @@ describe('McpRequestContextService', () => {
     const service = new McpRequestContextService();
     const ctx = makeCtx('session-2');
 
-    service.run(ctx, () => {/* no-op */});
+    service.run(ctx, () => {
+      /* no-op */
+    });
 
     expect(service.getContext()).toBeUndefined();
   });

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { McpAuthModule } from './auth.module';
-import type { OAuthProviderAdapter, OAuthProviderUser } from './interfaces/oauth-provider.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import type {
+  OAuthProviderAdapter,
+  OAuthProviderUser,
+} from './interfaces/oauth-provider.interface';
+import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
 import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
-import { OAuthClientService, MCP_OAUTH_STORE } from './services/client.service';
 import { MemoryOAuthStore } from './stores/memory-store.service';
 
 const TEST_SECRET = 'a'.repeat(32);
@@ -135,9 +138,16 @@ describe('McpAuthModule', () => {
       });
 
       // Extract the options provider to verify validateUser is wired
-      const optionsProvider = (result.providers as Array<{ provide: unknown; useValue: unknown }>)?.find(
-        (p) => typeof p === 'object' && 'useValue' in p && typeof (p.useValue as Record<string, unknown>)?.validateUser === 'function',
-      ) as { useValue: { validateUser: (req: unknown) => Promise<OAuthProviderUser | null> } } | undefined;
+      const optionsProvider = (
+        result.providers as Array<{ provide: unknown; useValue: unknown }>
+      )?.find(
+        (p) =>
+          typeof p === 'object' &&
+          'useValue' in p &&
+          typeof (p.useValue as Record<string, unknown>)?.validateUser === 'function',
+      ) as
+        | { useValue: { validateUser: (req: unknown) => Promise<OAuthProviderUser | null> } }
+        | undefined;
 
       expect(optionsProvider).toBeDefined();
 
@@ -148,9 +158,9 @@ describe('McpAuthModule', () => {
 
     it('throws when jwtSecret is too short', () => {
       const adapter = new FakeProvider();
-      expect(() =>
-        McpAuthModule.forProvider(adapter, { jwtSecret: 'short' }),
-      ).toThrow('jwtSecret must be at least 32 characters');
+      expect(() => McpAuthModule.forProvider(adapter, { jwtSecret: 'short' })).toThrow(
+        'jwtSecret must be at least 32 characters',
+      );
     });
   });
 });

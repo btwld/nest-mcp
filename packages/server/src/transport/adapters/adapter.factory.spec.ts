@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { getHttpAdapter } from './adapter.factory';
 import { ExpressAdapter } from './express.adapter';
 import { FastifyAdapter } from './fastify.adapter';
-import { getHttpAdapter } from './adapter.factory';
 
 describe('getHttpAdapter', () => {
   it('returns a FastifyAdapter when request has routeOptions', () => {

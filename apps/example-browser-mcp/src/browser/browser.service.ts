@@ -1,6 +1,6 @@
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { chromium } from 'playwright';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { FetchOptions } from '../interfaces/fetch-options.interface';
 
 const USER_AGENTS = [
@@ -53,11 +53,12 @@ export class BrowserService implements OnModuleDestroy {
 
       Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
       Object.defineProperty(navigator, 'plugins', {
-        get: () => Array.from({ length: 5 + Math.floor(Math.random() * 5) }, (_, i) => ({
-          name: `Plugin ${i}`,
-          description: `Description ${i}`,
-          filename: `plugin${i}.dll`,
-        })),
+        get: () =>
+          Array.from({ length: 5 + Math.floor(Math.random() * 5) }, (_, i) => ({
+            name: `Plugin ${i}`,
+            description: `Description ${i}`,
+            filename: `plugin${i}.dll`,
+          })),
       });
     });
   }
@@ -153,7 +154,8 @@ export class BrowserService implements OnModuleDestroy {
       colorScheme: 'light',
       acceptDownloads: true,
       extraHTTPHeaders: {
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         DNT: '1',

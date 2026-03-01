@@ -87,7 +87,12 @@ export interface ResourceLink {
   annotations?: ContentAnnotations;
 }
 
-export type ToolContent = TextContent | ImageContent | AudioContent | EmbeddedResource | ResourceLink;
+export type ToolContent =
+  | TextContent
+  | ImageContent
+  | AudioContent
+  | EmbeddedResource
+  | ResourceLink;
 
 export interface TextContent {
   type: 'text';

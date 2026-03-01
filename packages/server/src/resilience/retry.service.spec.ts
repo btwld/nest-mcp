@@ -145,7 +145,8 @@ describe('RetryService', () => {
   });
 
   it('succeeds on retry after first failure', async () => {
-    const fn = vi.fn()
+    const fn = vi
+      .fn()
       .mockRejectedValueOnce(new Error('transient failure'))
       .mockResolvedValue('success');
 
@@ -163,13 +164,17 @@ describe('RetryService', () => {
     ).rejects.toThrow('fail');
 
     expect(fn).toHaveBeenCalledTimes(1);
-    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
     expect(sleepSpy).not.toHaveBeenCalled();
   });
 
   it('uses default initialDelay of 100ms when not provided', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('fail'));
-    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<typeof vi.fn>;
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<
+      typeof vi.fn
+    >;
 
     await expect(
       service.execute('tool-a', { maxAttempts: 2, backoff: 'fixed' }, fn),

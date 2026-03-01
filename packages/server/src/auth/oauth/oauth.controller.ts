@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  Req,
-  Res,
-  type Type,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, Res, type Type, UseGuards } from '@nestjs/common';
 import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
 import type { AuthorizeQueryDto } from '../interfaces/oauth-types.interface';
 import { OAuthFlowService } from '../services/oauth-flow.service';

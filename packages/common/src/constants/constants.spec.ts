@@ -98,7 +98,9 @@ describe('protocol constants', () => {
 
   it('should define all notification methods', () => {
     expect(MCP_METHODS.NOTIFICATION_TASKS_STATUS).toBe('notifications/tasks/status');
-    expect(MCP_METHODS.NOTIFICATION_ELICITATION_COMPLETE).toBe('notifications/elicitation/complete');
+    expect(MCP_METHODS.NOTIFICATION_ELICITATION_COMPLETE).toBe(
+      'notifications/elicitation/complete',
+    );
     expect(MCP_METHODS.NOTIFICATION_ROOTS_LIST_CHANGED).toBe('notifications/roots/list_changed');
   });
 

@@ -105,9 +105,7 @@ describe('StdioService', () => {
   describe('before start()', () => {
     it('ignores tool.registered events when server is not yet connected', () => {
       const { registry } = makeService();
-      expect(() =>
-        registry.events.emit('tool.registered', { name: 'my-tool' }),
-      ).not.toThrow();
+      expect(() => registry.events.emit('tool.registered', { name: 'my-tool' })).not.toThrow();
       expect(registerToolOnServer).not.toHaveBeenCalled();
     });
 
@@ -121,9 +119,7 @@ describe('StdioService', () => {
 
     it('ignores prompt.registered events when server is not yet connected', () => {
       const { registry } = makeService();
-      expect(() =>
-        registry.events.emit('prompt.registered', { name: 'greet' }),
-      ).not.toThrow();
+      expect(() => registry.events.emit('prompt.registered', { name: 'greet' })).not.toThrow();
       expect(registerPromptOnServer).not.toHaveBeenCalled();
     });
 
@@ -278,9 +274,7 @@ describe('StdioService', () => {
     it('does not throw when unregistering an unknown key', async () => {
       const { service, registry } = makeService();
       await service.start();
-      expect(() =>
-        registry.events.emit('tool.unregistered', 'nonexistent'),
-      ).not.toThrow();
+      expect(() => registry.events.emit('tool.unregistered', 'nonexistent')).not.toThrow();
     });
   });
 

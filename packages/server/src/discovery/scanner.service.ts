@@ -38,9 +38,7 @@ export class McpScannerService implements OnModuleInit {
         if (!instance || !instance.constructor) continue;
 
         // If this provider is explicitly targeted at a server, filter by current server
-        const targetedServers = serverTargetedTokens.get(
-          instance.constructor as InjectionToken,
-        );
+        const targetedServers = serverTargetedTokens.get(instance.constructor as InjectionToken);
         if (targetedServers && !targetedServers.includes(this.options.name)) {
           continue;
         }

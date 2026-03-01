@@ -305,9 +305,9 @@ describe('McpClient', () => {
       // After connecting, the stored handler is applied to the client
       await mcpClient.connect();
       const clientInstance = MockedClient.mock.results[0].value;
-      expect(
-        clientInstance._notificationHandlers.has('notifications/tools/list_changed'),
-      ).toBe(true);
+      expect(clientInstance._notificationHandlers.has('notifications/tools/list_changed')).toBe(
+        true,
+      );
     });
 
     it('onNotification handler survives reconnect (new Client instance)', async () => {
@@ -323,9 +323,9 @@ describe('McpClient', () => {
       // Capture the current client instance (created in the constructor above)
       // before reconnect swaps it out
       const initialClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
-      expect(
-        initialClient._notificationHandlers.has('notifications/tools/list_changed'),
-      ).toBe(true);
+      expect(initialClient._notificationHandlers.has('notifications/tools/list_changed')).toBe(
+        true,
+      );
 
       // Trigger disconnect — reconnect creates a brand-new Client instance
       const transport = mockedCreateTransport.mock.results[0].value;
@@ -334,10 +334,11 @@ describe('McpClient', () => {
       expect(mcpClient.isConnected()).toBe(true);
 
       // The newly created Client instance should also have the handler
-      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
-      expect(
-        reconnectedClient._notificationHandlers.has('notifications/tools/list_changed'),
-      ).toBe(true);
+      const reconnectedClient =
+        MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      expect(reconnectedClient._notificationHandlers.has('notifications/tools/list_changed')).toBe(
+        true,
+      );
     });
   });
 
@@ -456,7 +457,8 @@ describe('McpClient', () => {
 
       // Reconnect should have created a second Client instance
       expect(MockedClient.mock.results.length).toBeGreaterThan(1);
-      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      const reconnectedClient =
+        MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
 
       // _reapplyRequestHandlers wires up setRequestHandler on the new client
       expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
@@ -632,7 +634,8 @@ describe('McpClient', () => {
 
       expect(mcpClient.isConnected()).toBe(true);
 
-      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      const reconnectedClient =
+        MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
       expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
     });
 
@@ -649,7 +652,8 @@ describe('McpClient', () => {
 
       expect(mcpClient.isConnected()).toBe(true);
 
-      const reconnectedClient = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      const reconnectedClient =
+        MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
       expect(reconnectedClient.setRequestHandler).toHaveBeenCalled();
     });
   });

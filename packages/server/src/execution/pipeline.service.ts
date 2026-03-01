@@ -12,7 +12,13 @@ import type {
   ToolCallResult,
 } from '@nest-mcp/common';
 import type { McpGuard, McpGuardClass } from '@nest-mcp/common';
-import { MCP_OPTIONS, MCP_REQUEST_CANCELLED, McpError, McpTimeoutError, ToolExecutionError } from '@nest-mcp/common';
+import {
+  MCP_OPTIONS,
+  MCP_REQUEST_CANCELLED,
+  McpError,
+  McpTimeoutError,
+  ToolExecutionError,
+} from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
@@ -74,29 +80,34 @@ export class ExecutionPipelineService {
       const startTime = Date.now();
 
       try {
-        const result = await this.middlewareService.executeChain(middleware, ctx, args, async () => {
-          // Rate limiting
-          const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
-          if (rateLimitConfig) {
-            await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
-          }
+        const result = await this.middlewareService.executeChain(
+          middleware,
+          ctx,
+          args,
+          async () => {
+            // Rate limiting
+            const rateLimitConfig = tool.rateLimit ?? this.options.resilience?.rateLimit;
+            if (rateLimitConfig) {
+              await this.rateLimiter.checkLimit(name, rateLimitConfig, ctx.user?.id);
+            }
 
-          // Resolve resilience configs
-          const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
-          const retryConfig = tool.retry ?? this.options.resilience?.retry;
+            // Resolve resilience configs
+            const cbConfig = tool.circuitBreaker ?? this.options.resilience?.circuitBreaker;
+            const retryConfig = tool.retry ?? this.options.resilience?.retry;
 
-          // Build execution chain with resilience wrappers
-          const baseFn = () => this.executor.callTool(name, args, ctx);
-          const executionFn = this.buildExecutionChain(baseFn, name, {
-            retry: retryConfig,
-            circuitBreaker: cbConfig,
-          });
+            // Build execution chain with resilience wrappers
+            const baseFn = () => this.executor.callTool(name, args, ctx);
+            const executionFn = this.buildExecutionChain(baseFn, name, {
+              retry: retryConfig,
+              circuitBreaker: cbConfig,
+            });
 
-          const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
-          return timeoutMs
-            ? this.withTimeout(executionFn(), name, timeoutMs, ctx.signal)
-            : executionFn();
-        });
+            const timeoutMs = tool.timeout ?? this.options.resilience?.timeout;
+            return timeoutMs
+              ? this.withTimeout(executionFn(), name, timeoutMs, ctx.signal)
+              : executionFn();
+          },
+        );
 
         const duration = Date.now() - startTime;
         this.metrics.recordCall(name, duration, true);
@@ -251,9 +262,7 @@ export class ExecutionPipelineService {
   ): Promise<T> {
     // If already aborted, reject immediately
     if (signal?.aborted) {
-      return Promise.reject(
-        new McpError('Request cancelled', MCP_REQUEST_CANCELLED),
-      );
+      return Promise.reject(new McpError('Request cancelled', MCP_REQUEST_CANCELLED));
     }
 
     return new Promise<T>((resolve, reject) => {

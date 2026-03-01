@@ -65,7 +65,9 @@ export class ToolAggregatorService {
         name: prefix ? this.router.buildPrefixedName(prefix, tool.name) : tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema as ToolInputSchema,
-        ...(tool.outputSchema ? { outputSchema: tool.outputSchema as Record<string, unknown> } : {}),
+        ...(tool.outputSchema
+          ? { outputSchema: tool.outputSchema as Record<string, unknown> }
+          : {}),
         ...(tool.annotations ? { annotations: tool.annotations as ToolAnnotations } : {}),
         upstreamName,
         originalName: tool.name,

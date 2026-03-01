@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { extractZodDescriptions, warnMissingDescriptions, zodToJsonSchema } from './schema-converter';
+import {
+  extractZodDescriptions,
+  warnMissingDescriptions,
+  zodToJsonSchema,
+} from './schema-converter';
 
 describe('zodToJsonSchema', () => {
   it('should convert ZodString to JSON Schema', () => {
@@ -264,7 +268,9 @@ describe('warnMissingDescriptions', () => {
       })
       .describe('A user');
     warnMissingDescriptions(schema, 'userTool');
-    expect(warn).toHaveBeenCalledWith("[nest-mcp] userTool: field 'age' is missing a .describe() call");
+    expect(warn).toHaveBeenCalledWith(
+      "[nest-mcp] userTool: field 'age' is missing a .describe() call",
+    );
     expect(warn).not.toHaveBeenCalledWith(
       "[nest-mcp] userTool: field 'name' is missing a .describe() call",
     );

@@ -50,9 +50,7 @@ describe('collectFulfilled', () => {
   });
 
   it('should return the value from a single fulfilled result', () => {
-    const results: PromiseSettledResult<number[]>[] = [
-      { status: 'fulfilled', value: [42] },
-    ];
+    const results: PromiseSettledResult<number[]>[] = [{ status: 'fulfilled', value: [42] }];
     expect(collectFulfilled(results)).toEqual([42]);
   });
 });
