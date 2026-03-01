@@ -4,8 +4,15 @@ import {
   MCP_RESOURCE_TEMPLATE_METADATA,
   MCP_TOOL_METADATA,
 } from '@btwld/mcp-common';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { DiscoveryService, ModulesContainer } from '@nestjs/core';
+import type { McpModuleOptions } from '@btwld/mcp-common';
+import { MCP_OPTIONS } from '@btwld/mcp-common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { InjectionToken } from '@nestjs/common';
+import { ModulesContainer } from '@nestjs/core';
+import {
+  MCP_FEATURE_REGISTRATION,
+  type McpFeatureRegistration,
+} from './feature-registration.constants';
 import { McpRegistryService } from './registry.service';
 
 @Injectable()
@@ -15,6 +22,7 @@ export class McpScannerService implements OnModuleInit {
   constructor(
     private readonly modulesContainer: ModulesContainer,
     private readonly registry: McpRegistryService,
+    @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
   ) {}
 
   onModuleInit(): void {
@@ -22,10 +30,20 @@ export class McpScannerService implements OnModuleInit {
   }
 
   private scan(): void {
+    const serverTargetedTokens = this.collectServerTargetedTokens();
+
     for (const [, moduleRef] of this.modulesContainer) {
       for (const [, wrapper] of moduleRef.providers) {
         const instance = wrapper?.instance;
         if (!instance || !instance.constructor) continue;
+
+        // If this provider is explicitly targeted at a server, filter by current server
+        const targetedServers = serverTargetedTokens.get(
+          instance.constructor as InjectionToken,
+        );
+        if (targetedServers && !targetedServers.includes(this.options.name)) {
+          continue;
+        }
 
         if (this.hasAnyMcpDecorator(instance)) {
           this.registry.registerProvider(instance);
@@ -39,6 +57,30 @@ export class McpScannerService implements OnModuleInit {
         `${this.registry.getAllResourceTemplates().length} templates, ` +
         `${this.registry.getAllPrompts().length} prompts`,
     );
+  }
+
+  /** Collect all feature registrations and build: token → server names */
+  private collectServerTargetedTokens(): Map<InjectionToken, string[]> {
+    const map = new Map<InjectionToken, string[]>();
+
+    for (const [, moduleRef] of this.modulesContainer) {
+      for (const [key, wrapper] of moduleRef.providers) {
+        if (
+          typeof key === 'string' &&
+          key.startsWith(MCP_FEATURE_REGISTRATION) &&
+          wrapper?.instance
+        ) {
+          const reg = wrapper.instance as McpFeatureRegistration;
+          for (const token of reg.providerTokens) {
+            const existing = map.get(token) ?? [];
+            existing.push(reg.serverName);
+            map.set(token, existing);
+          }
+        }
+      }
+    }
+
+    return map;
   }
 
   private hasAnyMcpDecorator(instance: unknown): boolean {

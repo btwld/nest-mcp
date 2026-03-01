@@ -9,6 +9,12 @@ import {
   type Type,
 } from '@nestjs/common';
 
+import {
+  type McpFeatureRegistration,
+  nextFeatureRegistrationToken,
+} from './discovery/feature-registration.constants';
+import { McpFeatureModule } from './discovery/mcp-feature.module';
+
 // Discovery
 import { McpRegistryService } from './discovery/registry.service';
 import { McpScannerService } from './discovery/scanner.service';
@@ -207,11 +213,20 @@ export class McpModule {
     };
   }
 
-  static forFeature(providers: Provider[]): DynamicModule {
+  static forFeature(providers: Type[], serverName?: string): DynamicModule {
+    if (!serverName) {
+      // Backward-compatible: no server targeting
+      return { module: McpModule, providers, exports: providers };
+    }
+
+    const registration: McpFeatureRegistration = { serverName, providerTokens: providers };
+    const registrationToken = nextFeatureRegistrationToken();
+
     return {
-      module: McpModule,
-      providers,
-      exports: providers,
+      module: McpFeatureModule,
+      providers: [...providers, { provide: registrationToken, useValue: registration }],
+      exports: [...providers, registrationToken],
+      global: true,
     };
   }
 }

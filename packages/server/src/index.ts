@@ -22,6 +22,8 @@ export {
 } from './decorators';
 
 // Discovery
+export { McpFeatureModule } from './discovery/mcp-feature.module';
+export type { McpFeatureRegistration } from './discovery/feature-registration.constants';
 export { McpRegistryService } from './discovery/registry.service';
 export type {
   RegisteredTool,
