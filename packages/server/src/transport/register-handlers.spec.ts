@@ -535,6 +535,23 @@ describe('registerHandlers', () => {
     expect(result.completion).not.toHaveProperty('hasMore');
     expect(result.completion).not.toHaveProperty('total');
   });
+
+  it('does not register completion handler when no prompts or resources are configured', () => {
+    mockRegistry.hasPrompts = false;
+    mockRegistry.hasResources = false;
+    mockRegistry.hasResourceTemplates = false;
+    const minimalOptions = {
+      name: 'test',
+      version: '1.0.0',
+      transport: McpTransportType.STDIO,
+    } as McpModuleOptions;
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, minimalOptions);
+
+    // Only ListTools (1) — no resources/prompts list handlers, no completion handler
+    expect(mockInnerServer.setRequestHandler).toHaveBeenCalledTimes(1);
+  });
+
   // --- Task proxy handlers ---
 
   it('registers task proxy handlers when taskHandlerConfig is set and tasks capability enabled', () => {
@@ -887,6 +904,26 @@ describe('registerToolOnServer', () => {
 
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
     expect(passedCtx.signal!.aborted).toBe(true);
+  });
+
+  // --- elicit ---
+
+  it('tool callback wires elicit to server.server.elicitInput', async () => {
+    const elicitInput = vi.fn().mockResolvedValue({ action: 'accept', content: {} });
+    (mockServer.server as Record<string, unknown>).elicitInput = elicitInput;
+
+    const tool = { name: 'elicit-tool', description: 'Elicit', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-e1' });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.elicit).toBeDefined();
+
+    const elicitParams = { method: 'elicitation/create', params: {} };
+    await passedCtx.elicit(elicitParams as never, { signal: undefined });
+    expect(elicitInput).toHaveBeenCalledWith(elicitParams, { signal: undefined });
   });
 });
 
