@@ -1,5 +1,11 @@
 # @nest-mcp/common
 
+## 0.1.5
+
+### Patch Changes
+
+- ac72e05: Add homepage links and npm/CI badges to each package README
+
 ## 0.1.4
 
 ### Patch Changes
