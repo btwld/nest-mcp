@@ -1,5 +1,14 @@
 # @nest-mcp/example-gateway
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [378b3c3]
+  - @nest-mcp/common@0.1.3
+  - @nest-mcp/gateway@0.1.3
+  - @nest-mcp/server@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

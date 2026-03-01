@@ -1,6 +1,6 @@
 {
   "name": "@nest-mcp/playground",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Playground app demonstrating @nest-mcp packages",
   "scripts": {
