@@ -445,6 +445,23 @@ describe('OAuthController - token', () => {
       expect(result.access_token).toBe('at');
       expect(store.revokeToken).toHaveBeenCalledWith('old-jti');
     });
+
+    it('skips revokeToken when refresh token has no jti', async () => {
+      jwtService.validateToken.mockReturnValue({
+        type: 'refresh',
+        sub: 'user-1',
+        client_id: 'client-1',
+        scope: '',
+        // no jti
+      });
+      // biome-ignore lint/suspicious/noExplicitAny: test access to method
+      const result = await (controller as any).token({
+        grant_type: 'refresh_token',
+        refresh_token: 'no-jti-rt',
+      });
+      expect(result.access_token).toBe('at');
+      expect(store.revokeToken).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -564,5 +581,16 @@ describe('OAuthController - authorize', () => {
     expect(res.redirect).toHaveBeenCalledWith(302, expect.stringContaining('code='));
     expect(res.redirect).toHaveBeenCalledWith(302, expect.stringContaining('state=state-xyz'));
     expect(store.storeAuthCode).toHaveBeenCalled();
+  });
+
+  it('stores code_challenge_method as "plain" when plain is requested', async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test access to method
+    await (controller as any).authorize(
+      'code', 'client-1', baseAuthQuery.redirectUri, 'my-plain-challenge', 'plain',
+      '', 'st', '', {}, res,
+    );
+    expect(store.storeAuthCode).toHaveBeenCalledWith(
+      expect.objectContaining({ code_challenge_method: 'plain' }),
+    );
   });
 });
