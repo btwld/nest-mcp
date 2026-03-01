@@ -17,7 +17,7 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "release": "turbo run build && changeset publish --provenance"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
