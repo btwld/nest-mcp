@@ -98,4 +98,43 @@ describe('MiddlewareService', () => {
 
     await expect(service.executeChain([mw], ctx, {}, handler)).rejects.toThrow('handler error');
   });
+
+  it('middleware can transform the return value from next()', async () => {
+    const handler = vi.fn().mockResolvedValue('original');
+    const mw: McpMiddleware = async (_ctx, _args, next) => {
+      const result = await next();
+      return `wrapped:${result}`;
+    };
+
+    const result = await service.executeChain([mw], ctx, {}, handler);
+    expect(result).toBe('wrapped:original');
+  });
+
+  it('handler is called with no arguments', async () => {
+    const handler = vi.fn().mockResolvedValue('ok');
+    await service.executeChain([], ctx, { key: 'value' }, handler);
+    expect(handler).toHaveBeenCalledWith();
+  });
+
+  it('three middleware chain executes in correct onion order', async () => {
+    const order: string[] = [];
+    const make = (name: string): McpMiddleware => async (_ctx, _args, next) => {
+      order.push(`${name}-before`);
+      const r = await next();
+      order.push(`${name}-after`);
+      return r;
+    };
+
+    const handler = vi.fn().mockImplementation(async () => {
+      order.push('handler');
+      return 'done';
+    });
+
+    await service.executeChain([make('a'), make('b'), make('c')], ctx, {}, handler);
+    expect(order).toEqual([
+      'a-before', 'b-before', 'c-before',
+      'handler',
+      'c-after', 'b-after', 'a-after',
+    ]);
+  });
 });
