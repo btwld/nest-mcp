@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/btwld/nest-mcp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@nest-mcp/server.svg?label=npm)](https://www.npmjs.com/package/@nest-mcp/server)
-[![License](https://img.shields.io/github/license/btwld/nest-mcp)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![npm downloads](https://img.shields.io/npm/dm/@nest-mcp/server.svg)](https://www.npmjs.com/package/@nest-mcp/server)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
 
-Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, clients, and gateways using the NestJS ecosystem you already know — decorators, dependency injection, modules, and guards, without learning a new framework.
+Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, clients, and gateways using the NestJS ecosystem you already know: decorators, dependency injection, modules, and guards, without learning a new framework.
 
 ## Packages
 
@@ -348,4 +349,4 @@ pnpm changeset
 
 ## License
 
-MIT
+BSD-3-Clause
