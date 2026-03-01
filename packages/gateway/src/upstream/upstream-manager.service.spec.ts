@@ -345,6 +345,41 @@ describe('UpstreamManagerService', () => {
         'Upstream "sampling-upstream" requested sampling but no downstream client context is active',
       );
     });
+
+    it('forwards sampling request to active forwarder and returns result', async () => {
+      const config: UpstreamConfig = {
+        name: 'sampling-upstream',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+      await service.connect(config);
+
+      const samplingResult = {
+        role: 'assistant' as const,
+        content: { type: 'text', text: 'hello' },
+        model: 'claude-3',
+        stopReason: 'end_turn',
+      };
+      const forwarder = vi.fn().mockResolvedValue(samplingResult);
+      service.activateSampling('sampling-upstream', forwarder);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      const [, samplingHandler] = instance.setRequestHandler.mock.calls[0] as [
+        unknown,
+        (req: { params: unknown }) => Promise<unknown>,
+      ];
+
+      const params = { messages: [{ role: 'user', content: { type: 'text', text: 'hi' } }], maxTokens: 100 };
+      const result = await samplingHandler({ params });
+
+      expect(forwarder).toHaveBeenCalledWith(params);
+      expect(result).toEqual({
+        role: 'assistant',
+        content: { type: 'text', text: 'hello' },
+        model: 'claude-3',
+        stopReason: 'end_turn',
+      });
+    });
   });
 
   describe('elicitation forwarder', () => {
@@ -384,6 +419,31 @@ describe('UpstreamManagerService', () => {
       await expect(elicitHandler({})).rejects.toThrow(
         'Upstream "elicit-upstream" requested elicitation but no downstream client context is active',
       );
+    });
+
+    it('forwards elicitation request to active forwarder and returns result', async () => {
+      const config: UpstreamConfig = {
+        name: 'elicit-upstream',
+        transport: 'sse',
+        url: 'http://localhost:3000/sse',
+      };
+      await service.connect(config);
+
+      const elicitResult = { action: 'accept' as const, content: {} };
+      const forwarder = vi.fn().mockResolvedValue(elicitResult);
+      service.activateElicitation('elicit-upstream', forwarder);
+
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+      const [, elicitHandler] = instance.setRequestHandler.mock.calls[1] as [
+        unknown,
+        (req: { params: unknown }) => Promise<unknown>,
+      ];
+
+      const params = { method: 'elicitation/create', params: { message: 'test', requestedSchema: { type: 'object', properties: {} } } };
+      const result = await elicitHandler({ params });
+
+      expect(forwarder).toHaveBeenCalledWith(params);
+      expect(result).toEqual(elicitResult);
     });
   });
 
