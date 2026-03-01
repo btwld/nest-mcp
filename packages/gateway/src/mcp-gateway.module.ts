@@ -61,7 +61,7 @@ export interface McpGatewayOptions {
 export interface McpGatewayAsyncOptions {
   // biome-ignore lint/suspicious/noExplicitAny: NestJS DynamicModule requires broad module types
   imports?: any[];
-  server: { transport: McpTransportType; transportOptions?: TransportOptions };
+  server: { transport: McpTransportType | McpTransportType[]; transportOptions?: TransportOptions };
   // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
   useFactory: (...args: any[]) => McpGatewayOptions | Promise<McpGatewayOptions>;
   // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types

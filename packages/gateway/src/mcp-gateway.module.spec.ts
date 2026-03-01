@@ -1,7 +1,32 @@
 import 'reflect-metadata';
+import { McpTransportType } from '@btwld/mcp-common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpRegistryService } from '../../server/src/discovery/registry.service';
 import { McpToolBuilder } from '../../server/src/dynamic/tool-builder.service';
+import { McpGatewayModule } from './mcp-gateway.module';
+
+describe('McpGatewayModule', () => {
+  describe('forRootAsync with multiple transports', () => {
+    it('accepts an array of transports in server config', () => {
+      const mod = McpGatewayModule.forRootAsync({
+        server: {
+          transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+        },
+        useFactory: () => ({
+          server: {
+            name: 'test-gateway',
+            version: '1.0',
+            transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+          },
+          upstreams: [],
+        }),
+      });
+
+      expect(mod.imports).toBeDefined();
+      expect(mod.providers).toBeDefined();
+    });
+  });
+});
 
 describe('Gateway tool registration with inputSchema', () => {
   let registry: McpRegistryService;
