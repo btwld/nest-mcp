@@ -116,4 +116,22 @@ describe('RateLimiterService', () => {
       await expect(service.checkLimit('tool-bad', config)).resolves.toBeUndefined();
     });
   });
+
+  it('different tools are counted independently', async () => {
+    const config = { max: 1, window: '10s' };
+    await service.checkLimit('tool-a', config);
+    // tool-a exhausted
+    await expect(service.checkLimit('tool-a', config)).rejects.toThrow(McpError);
+    // tool-b is a separate bucket — unaffected
+    await expect(service.checkLimit('tool-b', config)).resolves.toBeUndefined();
+  });
+
+  it('perUser:true without userId falls back to tool-level bucket', async () => {
+    const config = { max: 1, window: '10s', perUser: true };
+    await service.checkLimit('tool-a', config, undefined);
+    // Second call without userId hits the same global tool bucket → rate limited
+    await expect(service.checkLimit('tool-a', config, undefined)).rejects.toThrow(McpError);
+    // Call with a userId uses a distinct per-user bucket → succeeds
+    await expect(service.checkLimit('tool-a', config, 'user-1')).resolves.toBeUndefined();
+  });
 });

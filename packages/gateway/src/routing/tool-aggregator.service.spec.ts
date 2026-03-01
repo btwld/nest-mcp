@@ -179,6 +179,74 @@ describe('ToolAggregatorService', () => {
 
       expect(service.getCachedTools()).toHaveLength(1);
     });
+
+    it('should collect multiple tools from a single upstream', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            { name: 'tool1', inputSchema: { type: 'object' } },
+            { name: 'tool2', description: 'Second tool', inputSchema: { type: 'object' } },
+          ],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const tools = await service.aggregateAll();
+
+      expect(tools).toHaveLength(2);
+      expect(tools[0].originalName).toBe('tool1');
+      expect(tools[1].originalName).toBe('tool2');
+    });
+
+    it('should combine tools from multiple upstreams', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['gh', 'sl']);
+      upstreamManager.getClient
+        .mockReturnValueOnce({
+          listTools: vi.fn().mockResolvedValue({
+            tools: [{ name: 'listRepos', inputSchema: {} }],
+          }),
+        })
+        .mockReturnValueOnce({
+          listTools: vi.fn().mockResolvedValue({
+            tools: [{ name: 'sendMessage', inputSchema: {} }],
+          }),
+        });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const tools = await service.aggregateAll();
+
+      expect(tools).toHaveLength(2);
+      const names = tools.map((t) => t.originalName);
+      expect(names).toContain('listRepos');
+      expect(names).toContain('sendMessage');
+    });
+
+    it('should paginate through all tools when nextCursor is present', async () => {
+      const listTools = vi
+        .fn()
+        .mockResolvedValueOnce({
+          tools: [{ name: 'tool1', inputSchema: {} }],
+          nextCursor: 'page2',
+        })
+        .mockResolvedValueOnce({
+          tools: [{ name: 'tool2', inputSchema: {} }],
+        });
+
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({ listTools });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const tools = await service.aggregateAll();
+
+      expect(tools).toHaveLength(2);
+      expect(listTools).toHaveBeenCalledTimes(2);
+      expect(listTools).toHaveBeenNthCalledWith(1, undefined);
+      expect(listTools).toHaveBeenNthCalledWith(2, { cursor: 'page2' });
+    });
   });
 
   describe('getCachedTools', () => {

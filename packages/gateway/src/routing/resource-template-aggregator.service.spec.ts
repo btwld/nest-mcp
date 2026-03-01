@@ -163,6 +163,48 @@ describe('ResourceTemplateAggregatorService', () => {
 
       expect(service.getCachedTemplates()).toHaveLength(1);
     });
+
+    it('should collect multiple templates from a single upstream', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['files']);
+      upstreamManager.getClient.mockReturnValue({
+        listResourceTemplates: vi.fn().mockResolvedValue({
+          resourceTemplates: [
+            { uriTemplate: 'file:///{path}', name: 'file' },
+            { uriTemplate: 'file:///logs/{name}', name: 'log' },
+          ],
+        }),
+      });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const templates = await service.aggregateAll();
+
+      expect(templates).toHaveLength(2);
+      expect(templates[0].originalUriTemplate).toBe('file:///{path}');
+      expect(templates[1].originalUriTemplate).toBe('file:///logs/{name}');
+    });
+
+    it('should paginate through all templates when nextCursor is present', async () => {
+      const listResourceTemplates = vi
+        .fn()
+        .mockResolvedValueOnce({
+          resourceTemplates: [{ uriTemplate: 'file:///{path}', name: 'file' }],
+          nextCursor: 'page2',
+        })
+        .mockResolvedValueOnce({
+          resourceTemplates: [{ uriTemplate: 'db:///{table}', name: 'table' }],
+        });
+
+      upstreamManager.getAllNames.mockReturnValue(['store']);
+      upstreamManager.getClient.mockReturnValue({ listResourceTemplates });
+      upstreamManager.isHealthy.mockReturnValue(true);
+      router.getPrefixForUpstream.mockReturnValue(undefined);
+
+      const templates = await service.aggregateAll();
+
+      expect(templates).toHaveLength(2);
+      expect(listResourceTemplates).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getCachedTemplates', () => {
