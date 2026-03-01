@@ -83,5 +83,25 @@ describe('ResponseTransformService', () => {
 
       expect(baseResponse.toolName).toBe(original.toolName);
     });
+
+    it('can toggle isError field', async () => {
+      service.register((res) => ({ ...res, isError: !res.isError }));
+
+      const result = await service.apply({ ...baseResponse, isError: false });
+
+      expect(result.isError).toBe(true);
+    });
+
+    it('can add items to content array', async () => {
+      service.register((res) => ({
+        ...res,
+        content: [...res.content, { type: 'text' as const, text: 'extra' }],
+      }));
+
+      const result = await service.apply(baseResponse);
+
+      expect(result.content).toHaveLength(2);
+      expect(result.content[1]).toEqual({ type: 'text', text: 'extra' });
+    });
   });
 });

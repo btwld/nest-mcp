@@ -101,4 +101,33 @@ describe('ResourceSubscriptionManager', () => {
     await expect(manager.notifyResourceUpdated('file:///a.txt')).resolves.not.toThrow();
     expect(server2.server.sendResourceUpdated).toHaveBeenCalledWith({ uri: 'file:///a.txt' });
   });
+
+  it('removeSession is safe for unknown session', () => {
+    expect(() => manager.removeSession('unknown-session')).not.toThrow();
+  });
+
+  it('subscribing same session twice to same URI does not create duplicate notifications', async () => {
+    const server = createMockServer();
+    manager.subscribe('session-1', 'file:///a.txt', server);
+    manager.subscribe('session-1', 'file:///a.txt', server); // second subscribe overwrites
+
+    await manager.notifyResourceUpdated('file:///a.txt');
+
+    // Should only be called once (not twice)
+    expect(server.server.sendResourceUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribes only specific URI leaving other URIs intact', async () => {
+    const server = createMockServer();
+    manager.subscribe('session-1', 'file:///a.txt', server);
+    manager.subscribe('session-1', 'file:///b.txt', server);
+
+    manager.unsubscribe('session-1', 'file:///a.txt');
+
+    await manager.notifyResourceUpdated('file:///a.txt');
+    await manager.notifyResourceUpdated('file:///b.txt');
+
+    expect(server.server.sendResourceUpdated).toHaveBeenCalledTimes(1);
+    expect(server.server.sendResourceUpdated).toHaveBeenCalledWith({ uri: 'file:///b.txt' });
+  });
 });

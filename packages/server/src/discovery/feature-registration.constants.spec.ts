@@ -36,4 +36,17 @@ describe('nextFeatureRegistrationToken()', () => {
     const suffix2 = Number(t2.split('_').pop());
     expect(suffix2).toBeGreaterThan(suffix1);
   });
+
+  it('suffix is a positive finite number', () => {
+    const token = nextFeatureRegistrationToken();
+    const suffix = Number(token.split('_').pop());
+    expect(Number.isFinite(suffix)).toBe(true);
+    expect(suffix).toBeGreaterThan(0);
+  });
+
+  it('generates at least 5 unique tokens across successive calls', () => {
+    const tokens = Array.from({ length: 5 }, () => nextFeatureRegistrationToken());
+    const unique = new Set(tokens);
+    expect(unique.size).toBe(5);
+  });
 });

@@ -143,4 +143,38 @@ describe('RetryService', () => {
       expect(fn).toHaveBeenCalledTimes(3);
     });
   });
+
+  it('succeeds on retry after first failure', async () => {
+    const fn = vi.fn()
+      .mockRejectedValueOnce(new Error('transient failure'))
+      .mockResolvedValue('success');
+
+    const result = await service.execute('tool-a', { maxAttempts: 3, backoff: 'fixed' }, fn);
+
+    expect(result).toBe('success');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('maxAttempts=1 never retries', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('fail'));
+
+    await expect(
+      service.execute('tool-a', { maxAttempts: 1, backoff: 'fixed' }, fn),
+    ).rejects.toThrow('fail');
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<typeof vi.fn>;
+    expect(sleepSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses default initialDelay of 100ms when not provided', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('fail'));
+    const sleepSpy = (service as unknown as Record<string, unknown>).sleep as ReturnType<typeof vi.fn>;
+
+    await expect(
+      service.execute('tool-a', { maxAttempts: 2, backoff: 'fixed' }, fn),
+    ).rejects.toThrow('fail');
+
+    expect(sleepSpy).toHaveBeenCalledWith(100);
+  });
 });

@@ -85,4 +85,24 @@ describe('McpRequestContextService', () => {
       expect(service.getContext()).toBe(outer);
     });
   });
+
+  it('returns the value from the callback', async () => {
+    const service = new McpRequestContextService();
+    const ctx = makeCtx('session-val');
+
+    const result = await service.run(ctx, async () => 42);
+
+    expect(result).toBe(42);
+  });
+
+  it('propagates errors thrown inside run()', async () => {
+    const service = new McpRequestContextService();
+    const ctx = makeCtx('session-err');
+
+    await expect(
+      service.run(ctx, async () => {
+        throw new Error('inner error');
+      }),
+    ).rejects.toThrow('inner error');
+  });
 });

@@ -82,5 +82,22 @@ describe('RequestTransformService', () => {
 
       expect(baseRequest.toolName).toBe(original.toolName);
     });
+
+    it('can transform the upstreamName field', async () => {
+      service.register((req) => ({ ...req, upstreamName: 'rerouted' }));
+
+      const result = await service.apply(baseRequest);
+
+      expect(result.upstreamName).toBe('rerouted');
+    });
+
+    it('second transform sees result of first transform', async () => {
+      service.register((req) => ({ ...req, arguments: { ...req.arguments, step: 1 } }));
+      service.register((req) => ({ ...req, arguments: { ...req.arguments, step: 2 } }));
+
+      const result = await service.apply(baseRequest);
+
+      expect((result.arguments as Record<string, unknown>).step).toBe(2);
+    });
   });
 });
