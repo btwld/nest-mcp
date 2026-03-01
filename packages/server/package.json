@@ -19,6 +19,11 @@
     "dist",
     "!dist/**/*.js.map"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btwld/nest-mcp",
+    "directory": "packages/server"
+  },
   "publishConfig": {
     "access": "public"
   },
