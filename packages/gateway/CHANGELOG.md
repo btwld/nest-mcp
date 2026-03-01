@@ -1,5 +1,15 @@
 # @nest-mcp/gateway
 
+## 0.1.4
+
+### Patch Changes
+
+- aaca8d0: Fix npm provenance via NPM_CONFIG_PROVENANCE environment variable
+- Updated dependencies [aaca8d0]
+  - @nest-mcp/client@0.1.4
+  - @nest-mcp/common@0.1.4
+  - @nest-mcp/server@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
