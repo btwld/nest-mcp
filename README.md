@@ -4,6 +4,7 @@
 [![npm](https://img.shields.io/npm/v/@nest-mcp/server.svg?label=npm)](https://www.npmjs.com/package/@nest-mcp/server)
 [![npm downloads](https://img.shields.io/npm/dm/@nest-mcp/server.svg)](https://www.npmjs.com/package/@nest-mcp/server)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/btwld/nest-mcp/blob/main/LICENSE)
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/btwld/nest-mcp)
 
 Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, clients, and gateways using the NestJS ecosystem you already know: decorators, dependency injection, modules, and guards, without learning a new framework.
 
