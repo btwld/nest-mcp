@@ -1,5 +1,11 @@
 # @nest-mcp/common
 
+## 0.1.8
+
+### Patch Changes
+
+- f943fca: Migrate to Zod v4. Zod v4 is now the required peer dependency.
+
 ## 0.1.7
 
 ### Patch Changes
