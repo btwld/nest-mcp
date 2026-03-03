@@ -16,7 +16,7 @@ import {
   zodToJsonSchema,
 } from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { ZodType } from 'zod';
+import { ZodEnum, ZodObject, type ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
 
@@ -286,23 +286,16 @@ export class McpExecutorService {
     const prompt = this.registry.getPrompt(promptName);
     if (!prompt?.parameters) return { values: [] };
 
-    const def = (
-      prompt.parameters as unknown as {
-        _def?: {
-          shape?: () => Record<string, { _def?: { typeName?: string; values?: string[] } }>;
-        };
-      }
-    )?._def;
-    const shape = def?.shape?.();
-    if (!shape) return { values: [] };
+    if (!(prompt.parameters instanceof ZodObject)) return { values: [] };
+    const shape = prompt.parameters.shape;
 
-    const field = shape[argument.name];
-    if (!field?._def) return { values: [] };
+    const field = shape[argument.name] as ZodType | undefined;
+    if (!field) return { values: [] };
 
     // Support ZodEnum fields: filter values by prefix
-    if (field._def.typeName === 'ZodEnum' && Array.isArray(field._def.values)) {
+    if (field instanceof ZodEnum) {
       const prefix = argument.value.toLowerCase();
-      const filtered = (field._def.values as string[]).filter((v) =>
+      const filtered = (field.options as string[]).filter((v) =>
         v.toLowerCase().startsWith(prefix),
       );
       return this.normalizeCompletionResult({ values: filtered });

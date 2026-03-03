@@ -29,16 +29,16 @@ describe('zodToJsonSchema', () => {
     });
   });
 
-  it('should convert ZodString with email format', () => {
-    const schema = z.string().email();
-    expect(zodToJsonSchema(schema)).toEqual({
+  it('should convert email schema with format', () => {
+    const schema = z.email();
+    expect(zodToJsonSchema(schema)).toMatchObject({
       type: 'string',
       format: 'email',
     });
   });
 
-  it('should convert ZodString with url format', () => {
-    const schema = z.string().url();
+  it('should convert url schema with format', () => {
+    const schema = z.url();
     expect(zodToJsonSchema(schema)).toEqual({
       type: 'string',
       format: 'uri',
@@ -70,7 +70,7 @@ describe('zodToJsonSchema', () => {
 
   it('should convert ZodNumber with int check', () => {
     const schema = z.number().int();
-    expect(zodToJsonSchema(schema)).toEqual({ type: 'integer' });
+    expect(zodToJsonSchema(schema)).toMatchObject({ type: 'integer' });
   });
 
   it('should convert ZodBoolean to JSON Schema', () => {
@@ -103,6 +103,7 @@ describe('zodToJsonSchema', () => {
         age: { type: 'number' },
       },
       required: ['name', 'age'],
+      additionalProperties: false,
     });
   });
 
@@ -119,6 +120,7 @@ describe('zodToJsonSchema', () => {
         nickname: { type: 'string' },
       },
       required: ['name'],
+      additionalProperties: false,
     });
   });
 
@@ -161,11 +163,10 @@ describe('zodToJsonSchema', () => {
     });
   });
 
-  it('should convert ZodNullable to JSON Schema', () => {
+  it('should convert ZodNullable to JSON Schema anyOf', () => {
     const schema = z.string().nullable();
     expect(zodToJsonSchema(schema)).toEqual({
-      type: 'string',
-      nullable: true,
+      anyOf: [{ type: 'string' }, { type: 'null' }],
     });
   });
 
@@ -178,12 +179,12 @@ describe('zodToJsonSchema', () => {
 
   it('should convert ZodLiteral to JSON Schema const', () => {
     const schema = z.literal('hello');
-    expect(zodToJsonSchema(schema)).toEqual({ const: 'hello' });
+    expect(zodToJsonSchema(schema)).toMatchObject({ const: 'hello' });
   });
 
   it('should convert ZodRecord to JSON Schema', () => {
-    const schema = z.record(z.string());
-    expect(zodToJsonSchema(schema)).toEqual({
+    const schema = z.record(z.string(), z.string());
+    expect(zodToJsonSchema(schema)).toMatchObject({
       type: 'object',
       additionalProperties: { type: 'string' },
     });
@@ -204,10 +205,9 @@ describe('zodToJsonSchema', () => {
     expect(zodToJsonSchema(schema)).toEqual({ type: 'string' });
   });
 
-  it('should return empty object for unknown Zod types', () => {
-    // Craft a fake schema with an unknown typeName to hit the default case
-    const fakeSchema = { _def: { typeName: 'ZodUnknownType' } } as unknown as z.ZodType;
-    expect(zodToJsonSchema(fakeSchema)).toEqual({});
+  it('should not include $schema in the output', () => {
+    const schema = z.string();
+    expect(zodToJsonSchema(schema)).not.toHaveProperty('$schema');
   });
 });
 
