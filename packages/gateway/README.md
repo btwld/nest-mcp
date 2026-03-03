@@ -10,7 +10,7 @@ NestJS module for aggregating multiple upstream [MCP](https://modelcontextprotoc
 ## Installation
 
 ```bash
-npm install @nest-mcp/gateway @modelcontextprotocol/sdk
+npm install @nest-mcp/gateway @modelcontextprotocol/sdk zod@^4
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 

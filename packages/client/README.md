@@ -10,7 +10,7 @@ NestJS module for connecting to and consuming [Model Context Protocol (MCP)](htt
 ## Installation
 
 ```bash
-npm install @nest-mcp/client @modelcontextprotocol/sdk
+npm install @nest-mcp/client @modelcontextprotocol/sdk zod@^4
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
