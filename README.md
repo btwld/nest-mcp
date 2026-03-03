@@ -171,8 +171,6 @@ Peer dependencies (all packages):
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs zod@^4
 ```
 
-> **Note:** `zod@^4` is required. Zod v3 is not supported.
-
 ## Quick start
 
 ### Server
