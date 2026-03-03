@@ -168,7 +168,7 @@ npm install @nest-mcp/gateway @modelcontextprotocol/sdk
 Peer dependencies (all packages):
 
 ```bash
-npm install @nestjs/common @nestjs/core reflect-metadata rxjs
+npm install @nestjs/common @nestjs/core reflect-metadata rxjs zod@^4
 ```
 
 ## Quick start

@@ -39,7 +39,7 @@ import type { ResourceSubscriptionManager } from '../subscription/resource-subsc
  * tools (e.g. gateway-proxied tools) that only have JSON schemas, not Zod schemas.
  * The MCP SDK requires a Zod schema to pass arguments to the handler callback.
  */
-const PASSTHROUGH_SCHEMA = z.object({}).passthrough();
+const PASSTHROUGH_SCHEMA = z.looseObject({});
 
 /**
  * Map of active request IDs to their AbortControllers.
