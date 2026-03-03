@@ -168,8 +168,10 @@ npm install @nest-mcp/gateway @modelcontextprotocol/sdk
 Peer dependencies (all packages):
 
 ```bash
-npm install @nestjs/common @nestjs/core reflect-metadata rxjs
+npm install @nestjs/common @nestjs/core reflect-metadata rxjs zod
 ```
+
+> **Note:** `zod@^4` is required. Zod v3 is not supported.
 
 ## Quick start
 
