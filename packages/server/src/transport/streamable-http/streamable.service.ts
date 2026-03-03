@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { StreamableHTTPServerTransportOptions } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { MCP_OPTIONS } from '@nest-mcp/common';
 import { McpTransportType } from '@nest-mcp/common';
@@ -125,10 +126,22 @@ export class StreamableHttpService implements OnModuleDestroy {
     }
   }
 
+  private buildTransportOptions(stateless: boolean): StreamableHTTPServerTransportOptions {
+    const opts = this.options.transportOptions?.streamableHttp;
+    return {
+      sessionIdGenerator: stateless
+        ? undefined
+        : (opts?.sessionIdGenerator ?? (() => randomUUID())),
+      enableJsonResponse: opts?.enableJsonResponse,
+      eventStore: opts?.eventStore,
+      onsessioninitialized: opts?.onsessioninitialized,
+      onsessionclosed: opts?.onsessionclosed,
+      retryInterval: opts?.retryInterval,
+    };
+  }
+
   private async handleStatelessPost(req: unknown, res: unknown): Promise<void> {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
-    });
+    const transport = new StreamableHTTPServerTransport(this.buildTransportOptions(true));
 
     const server = this.createAndConnectServer(
       transport,
@@ -164,9 +177,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     }
 
     // New session
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-    });
+    const transport = new StreamableHTTPServerTransport(this.buildTransportOptions(false));
 
     transport.onclose = () => {
       const sid = transport.sessionId;

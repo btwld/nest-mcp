@@ -1,3 +1,4 @@
+import type { LogLevel } from '@nestjs/common';
 import type { McpGuardClass } from './mcp-auth.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
 import type {
@@ -36,9 +37,17 @@ export interface McpModuleOptions {
     enabled?: boolean;
     endpoint?: string;
   };
-  logging?: {
-    level?: 'debug' | 'info' | 'warn' | 'error';
-  };
+  /**
+   * Log-level filtering for STDIO transport.
+   *
+   * - `LogLevel[]` — only these levels are emitted (e.g. `['error', 'warn']`).
+   * - `false` — suppresses all logging.
+   *
+   * For HTTP transports, use the standard NestJS `app.useLogger()` at bootstrap.
+   * This option is consumed automatically by `bootstrapStdioApp()` as a fallback
+   * when `StdioBootstrapOptions.logLevels` is not explicitly provided.
+   */
+  logging?: false | LogLevel[];
 
   // Session
   session?: {
