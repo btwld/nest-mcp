@@ -5,9 +5,8 @@ import { ZodObject, type ZodType, z } from 'zod';
  * Uses Zod v4's native z.toJSONSchema() for accurate conversion.
  */
 export function zodToJsonSchema(schema: ZodType): Record<string, unknown> {
-  const result = z.toJSONSchema(schema) as Record<string, unknown>;
   // Strip $schema metadata — not needed for MCP tool/resource schemas
-  delete result.$schema;
+  const { $schema: _$schema, ...result } = z.toJSONSchema(schema) as Record<string, unknown>;
   return result;
 }
 
