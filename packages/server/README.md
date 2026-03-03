@@ -10,7 +10,7 @@ NestJS module for building [Model Context Protocol (MCP)](https://modelcontextpr
 ## Installation
 
 ```bash
-npm install @nest-mcp/server @modelcontextprotocol/sdk
+npm install @nest-mcp/server @modelcontextprotocol/sdk zod@^4
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
