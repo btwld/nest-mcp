@@ -156,19 +156,19 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, 
 
 ```bash
 # Server — expose tools/resources to AI clients
-npm install @nest-mcp/server @modelcontextprotocol/sdk
+npm install @nest-mcp/server @modelcontextprotocol/sdk zod@^4
 
 # Client — call tools on a remote MCP server
-npm install @nest-mcp/client @modelcontextprotocol/sdk
+npm install @nest-mcp/client @modelcontextprotocol/sdk zod@^4
 
 # Gateway — aggregate multiple servers into one
-npm install @nest-mcp/gateway @modelcontextprotocol/sdk
+npm install @nest-mcp/gateway @modelcontextprotocol/sdk zod@^4
 ```
 
-Peer dependencies (all packages):
+NestJS peer dependencies (if not already installed):
 
 ```bash
-npm install @nestjs/common @nestjs/core reflect-metadata rxjs zod@^4
+npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
 ## Quick start
