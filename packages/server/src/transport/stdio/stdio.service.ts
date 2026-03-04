@@ -2,7 +2,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
-import { Inject, Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+  Optional,
+} from '@nestjs/common';
 import type {
   RegisteredPrompt,
   RegisteredResource,
@@ -26,10 +33,11 @@ import {
 import type { SdkHandle } from '../register-handlers';
 
 @Injectable()
-export class StdioService implements OnModuleDestroy {
+export class StdioService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(StdioService.name);
   private server?: McpServer;
   private ctx?: McpExecutionContext;
+  private started = false;
   /** SDK handles keyed by item name/uri for removal. */
   private readonly sdkHandles = new Map<string, SdkHandle>();
 
@@ -50,7 +58,14 @@ export class StdioService implements OnModuleDestroy {
     this.subscribeToRegistryEvents();
   }
 
+  async onApplicationBootstrap(): Promise<void> {
+    await this.start();
+  }
+
   async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
+
     const transport = new StdioServerTransport();
     const server = createMcpServer(this.registry, this.options, this.taskManager);
 

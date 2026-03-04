@@ -111,14 +111,13 @@ export class AppModule {}
 
 ## Using STDIO Transport
 
-For CLI-based MCP servers, use the STDIO transport with `bootstrapStdioApp`:
+For CLI-based MCP servers, use the STDIO transport. `StdioService` auto-starts via the `OnApplicationBootstrap` lifecycle hook — no manual `.start()` call required:
 
 ```typescript
 // main.ts
 import { McpModule } from '@nest-mcp/server';
 import { McpTransportType } from '@nest-mcp/common';
-import { bootstrapStdioApp } from '@nest-mcp/server';
-import { StdioService } from '@nest-mcp/server';
+import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ToolsService } from './tools.service';
 
@@ -135,13 +134,18 @@ import { ToolsService } from './tools.service';
 class AppModule {}
 
 async function main() {
-  const app = await bootstrapStdioApp(AppModule);
-  await app.get(StdioService).start();
+  await NestFactory.createApplicationContext(AppModule, { logger: false });
 }
 main().catch(console.error);
 ```
 
-`bootstrapStdioApp` automatically redirects NestJS logging to stderr so that stdout remains reserved for JSON-RPC messages.
+Setting `logger: false` prevents NestJS log output from corrupting the JSON-RPC stream on stdout. For finer control over log levels, use the optional `bootstrapStdioApp` helper which redirects logs to stderr instead:
+
+```typescript
+import { bootstrapStdioApp } from '@nest-mcp/server';
+
+const app = await bootstrapStdioApp(AppModule);
+```
 
 ## Return Value Normalization
 

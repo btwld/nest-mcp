@@ -132,6 +132,17 @@ describe('StdioService', () => {
     });
   });
 
+  // ─── onApplicationBootstrap ─────────────────────────────────────────────
+
+  describe('onApplicationBootstrap()', () => {
+    it('calls start() and connects the server', async () => {
+      const { service } = makeService();
+      await service.onApplicationBootstrap();
+      expect(createMcpServer).toHaveBeenCalled();
+      expect(mockServer.connect).toHaveBeenCalled();
+    });
+  });
+
   // ─── start() ────────────────────────────────────────────────────────────
 
   describe('start()', () => {
@@ -140,6 +151,22 @@ describe('StdioService', () => {
       await service.start();
       expect(createMcpServer).toHaveBeenCalled();
       expect(mockServer.connect).toHaveBeenCalled();
+    });
+
+    it('is idempotent — second call is a no-op', async () => {
+      const { service } = makeService();
+      await service.start();
+      await service.start();
+      expect(createMcpServer).toHaveBeenCalledTimes(1);
+      expect(mockServer.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it('is idempotent after onApplicationBootstrap', async () => {
+      const { service } = makeService();
+      await service.onApplicationBootstrap();
+      await service.start();
+      expect(createMcpServer).toHaveBeenCalledTimes(1);
+      expect(mockServer.connect).toHaveBeenCalledTimes(1);
     });
   });
 

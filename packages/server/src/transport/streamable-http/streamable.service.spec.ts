@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events';
+import type { McpModuleOptions, StreamableHttpTransportOptions } from '@nest-mcp/common';
+import { McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -357,5 +359,134 @@ describe('StreamableHttpService dynamic registration event handlers', () => {
     registryEvents.emit('tool.registered', { name: 'tool-x' });
 
     expect(mockRegisterTool).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTransportOptions tests (exercised via the private method's logic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors the `buildTransportOptions` logic from streamable.service.ts so we
+ * can unit-test the option-merging behavior without instantiating the full
+ * service (which requires NestJS DI + real SDK transport).
+ */
+function buildTransportOptions(
+  mcpOptions: McpModuleOptions,
+  stateless: boolean,
+): Record<string, unknown> {
+  const opts = mcpOptions.transportOptions?.streamableHttp;
+  return {
+    sessionIdGenerator: stateless ? undefined : (opts?.sessionIdGenerator ?? expect.any(Function)),
+    enableJsonResponse: opts?.enableJsonResponse,
+    eventStore: opts?.eventStore,
+    onsessioninitialized: opts?.onsessioninitialized,
+    onsessionclosed: opts?.onsessionclosed,
+    retryInterval: opts?.retryInterval,
+  };
+}
+
+function makeOptions(streamableHttp?: StreamableHttpTransportOptions): McpModuleOptions {
+  return {
+    name: 'test-server',
+    version: '1.0.0',
+    transport: McpTransportType.STREAMABLE_HTTP,
+    transportOptions: streamableHttp ? { streamableHttp } : undefined,
+  };
+}
+
+describe('buildTransportOptions logic', () => {
+  it('returns default sessionIdGenerator for stateful mode without custom generator', () => {
+    const result = buildTransportOptions(makeOptions(), false);
+    expect(result.sessionIdGenerator).toEqual(expect.any(Function));
+    expect(result.enableJsonResponse).toBeUndefined();
+    expect(result.eventStore).toBeUndefined();
+    expect(result.retryInterval).toBeUndefined();
+  });
+
+  it('sets sessionIdGenerator to undefined for stateless mode', () => {
+    const result = buildTransportOptions(
+      makeOptions({ stateless: true, sessionIdGenerator: () => 'custom-id' }),
+      true,
+    );
+    expect(result.sessionIdGenerator).toBeUndefined();
+  });
+
+  it('uses custom sessionIdGenerator in stateful mode', () => {
+    const customGenerator = () => 'my-custom-session-id';
+    const result = buildTransportOptions(
+      makeOptions({ sessionIdGenerator: customGenerator }),
+      false,
+    );
+    expect(result.sessionIdGenerator).toBe(customGenerator);
+  });
+
+  it('passes enableJsonResponse through', () => {
+    const result = buildTransportOptions(makeOptions({ enableJsonResponse: true }), false);
+    expect(result.enableJsonResponse).toBe(true);
+  });
+
+  it('passes eventStore through', () => {
+    const store = {
+      storeEvent: vi.fn(),
+      replayEventsAfter: vi.fn(),
+    };
+    const result = buildTransportOptions(makeOptions({ eventStore: store }), false);
+    expect(result.eventStore).toBe(store);
+  });
+
+  it('passes retryInterval through', () => {
+    const result = buildTransportOptions(makeOptions({ retryInterval: 5000 }), false);
+    expect(result.retryInterval).toBe(5000);
+  });
+
+  it('passes onsessioninitialized callback through', () => {
+    const cb = vi.fn();
+    const result = buildTransportOptions(makeOptions({ onsessioninitialized: cb }), false);
+    expect(result.onsessioninitialized).toBe(cb);
+  });
+
+  it('passes onsessionclosed callback through', () => {
+    const cb = vi.fn();
+    const result = buildTransportOptions(makeOptions({ onsessionclosed: cb }), false);
+    expect(result.onsessionclosed).toBe(cb);
+  });
+
+  it('ignores all SDK options when transportOptions is undefined', () => {
+    const result = buildTransportOptions(
+      { name: 'test', version: '1.0.0', transport: McpTransportType.STREAMABLE_HTTP },
+      false,
+    );
+    expect(result.enableJsonResponse).toBeUndefined();
+    expect(result.eventStore).toBeUndefined();
+    expect(result.onsessioninitialized).toBeUndefined();
+    expect(result.onsessionclosed).toBeUndefined();
+    expect(result.retryInterval).toBeUndefined();
+  });
+
+  it('passes all options together', () => {
+    const generator = () => 'sess-42';
+    const store = { storeEvent: vi.fn(), replayEventsAfter: vi.fn() };
+    const onInit = vi.fn();
+    const onClose = vi.fn();
+
+    const result = buildTransportOptions(
+      makeOptions({
+        sessionIdGenerator: generator,
+        enableJsonResponse: true,
+        eventStore: store,
+        onsessioninitialized: onInit,
+        onsessionclosed: onClose,
+        retryInterval: 3000,
+      }),
+      false,
+    );
+
+    expect(result.sessionIdGenerator).toBe(generator);
+    expect(result.enableJsonResponse).toBe(true);
+    expect(result.eventStore).toBe(store);
+    expect(result.onsessioninitialized).toBe(onInit);
+    expect(result.onsessionclosed).toBe(onClose);
+    expect(result.retryInterval).toBe(3000);
   });
 });

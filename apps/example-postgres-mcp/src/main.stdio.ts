@@ -1,12 +1,8 @@
-import 'reflect-metadata';
-import { StdioService, bootstrapStdioApp } from '@nest-mcp/server';
+import { NestFactory } from '@nestjs/core';
 import { AppStdioModule } from './app-stdio.module';
 
 async function bootstrap() {
-  const app = await bootstrapStdioApp(AppStdioModule);
-
-  const stdioService = app.get(StdioService);
-  await stdioService.start();
+  const app = await NestFactory.createApplicationContext(AppStdioModule, { logger: false });
 
   process.stderr.write('Postgres MCP stdio server started. Communicating via stdin/stdout.\n');
   process.stderr.write(

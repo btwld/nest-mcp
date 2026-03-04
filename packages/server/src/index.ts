@@ -106,6 +106,14 @@ export type { ToolMetrics } from './observability/metrics.service';
 // Server factory
 export { createMcpServer } from './server/server.factory';
 
+// SDK transport types — re-exported for convenience so users don't need to
+// import directly from @modelcontextprotocol/sdk
+export type {
+  EventStore,
+  StreamId,
+  EventId,
+} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+
 // Re-export everything from @nest-mcp/common for convenience —
 // users only need to install @nest-mcp/server
 export * from '@nest-mcp/common';
