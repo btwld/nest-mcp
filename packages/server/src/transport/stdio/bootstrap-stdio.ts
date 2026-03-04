@@ -33,8 +33,7 @@ function resolveLoggingFromModule(app: INestApplicationContext): LogLevel[] | fa
  *
  * @example
  * async function main() {
- *   const app = await bootstrapStdioApp(AppModule);
- *   await app.get(StdioService).start();
+ *   await bootstrapStdioApp(AppModule);
  * }
  * main().catch(console.error);
  */

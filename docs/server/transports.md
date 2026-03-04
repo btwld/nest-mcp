@@ -96,12 +96,12 @@ McpModule.forRoot({
 
 ### Bootstrap
 
-STDIO requires a special bootstrap function that redirects NestJS logging to stderr:
+`StdioService` auto-starts via the `OnApplicationBootstrap` lifecycle hook. The simplest setup disables logging to keep stdout clean for JSON-RPC:
 
 ```typescript
 import { McpModule } from '@nest-mcp/server';
 import { McpTransportType } from '@nest-mcp/common';
-import { bootstrapStdioApp, StdioService } from '@nest-mcp/server';
+import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ToolsService } from './tools.service';
 
@@ -118,12 +118,19 @@ import { ToolsService } from './tools.service';
 class AppModule {}
 
 async function main() {
-  const app = await bootstrapStdioApp(AppModule, {
-    logLevels: ['error', 'warn'], // optional: filter log levels
-  });
-  await app.get(StdioService).start();
+  await NestFactory.createApplicationContext(AppModule, { logger: false });
 }
 main().catch(console.error);
+```
+
+For stderr-redirected logging with optional level filtering, use the `bootstrapStdioApp` helper:
+
+```typescript
+import { bootstrapStdioApp } from '@nest-mcp/server';
+
+const app = await bootstrapStdioApp(AppModule, {
+  logLevels: ['error', 'warn'], // optional: filter log levels
+});
 ```
 
 `bootstrapStdioApp` uses `NestFactory.createApplicationContext` with a `StderrLogger` so that stdout is reserved exclusively for JSON-RPC messages.
