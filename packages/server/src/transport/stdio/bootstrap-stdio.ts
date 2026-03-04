@@ -9,6 +9,15 @@ export interface StdioBootstrapOptions {
   logLevels?: LogLevel[];
 }
 
+/** Reads `McpModuleOptions.logging` from DI, returning `undefined` when unavailable. */
+function resolveLoggingFromModule(app: INestApplicationContext): LogLevel[] | false | undefined {
+  try {
+    return app.get<McpModuleOptions>(MCP_OPTIONS).logging;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Bootstraps a standalone NestJS application context for STDIO MCP transport.
  *
@@ -40,15 +49,10 @@ export async function bootstrapStdioApp(
     bufferLogs: false,
   });
 
-  // Apply McpModuleOptions.logging as fallback when logLevels was not explicitly provided
   if (!options?.logLevels) {
-    try {
-      const mcpOptions = app.get<McpModuleOptions>(MCP_OPTIONS);
-      if (mcpOptions.logging !== undefined) {
-        logger.setLogLevels(mcpOptions.logging === false ? [] : mcpOptions.logging);
-      }
-    } catch {
-      // MCP_OPTIONS not available (e.g. not using McpModule) — no-op
+    const logging = resolveLoggingFromModule(app);
+    if (logging !== undefined) {
+      logger.setLogLevels(logging === false ? [] : logging);
     }
   }
 
