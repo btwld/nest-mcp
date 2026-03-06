@@ -1,5 +1,12 @@
 # @nest-mcp/example-postgres
 
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [043aa34]
+  - @nest-mcp/server@0.4.0
+
 ## 0.1.10
 
 ### Patch Changes
