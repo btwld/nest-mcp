@@ -1,5 +1,11 @@
 # @nest-mcp/server
 
+## 0.4.0
+
+### Minor Changes
+
+- 043aa34: Add `imports` option to `McpModule.forFeature()` allowing feature modules to import other modules that export providers needed by the feature's tools.
+
 ## 0.3.0
 
 ### Minor Changes
