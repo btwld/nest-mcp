@@ -144,10 +144,44 @@ import { WeatherTools } from './weather-tools.service';
 export class WeatherModule {}
 ```
 
+With an options object, you can import modules that export providers needed by the feature's tools:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { McpModule } from '@nest-mcp/server';
+import { HttpModule } from '@nestjs/axios';
+import { WeatherTools } from './weather-tools.service';
+
+@Module({
+  imports: [
+    McpModule.forFeature([WeatherTools], {
+      imports: [HttpModule],
+    }),
+  ],
+})
+export class WeatherModule {}
+```
+
+### McpForFeatureOptions
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `imports` | `any[]` | No | Modules that export providers needed by the feature's tools |
+| `serverName` | `string` | No | Server name to scope providers to a specific server instance |
+
 With a `serverName` parameter, providers are scoped to a specific server instance:
 
 ```typescript
 McpModule.forFeature([WeatherTools], 'weather-server');
+```
+
+You can also combine both options:
+
+```typescript
+McpModule.forFeature([WeatherTools], {
+  imports: [HttpModule],
+  serverName: 'weather-server',
+});
 ```
 
 ## Global Module

@@ -9,6 +9,14 @@ import {
   type Type,
 } from '@nestjs/common';
 
+export interface McpForFeatureOptions {
+  /** Modules to import that export providers needed by the feature's tools. */
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS ModuleMetadata uses any[]
+  imports?: any[];
+  /** Server name to scope providers to a specific server instance. */
+  serverName?: string;
+}
+
 import {
   type McpFeatureRegistration,
   nextFeatureRegistrationToken,
@@ -221,17 +229,33 @@ export class McpModule {
     };
   }
 
-  static forFeature(providers: Type[], serverName?: string): DynamicModule {
-    if (!serverName) {
-      // Backward-compatible: no server targeting
-      return { module: McpModule, providers, exports: providers };
+  static forFeature(providers: Type[]): DynamicModule;
+  static forFeature(providers: Type[], serverName: string): DynamicModule;
+  static forFeature(providers: Type[], options: McpForFeatureOptions): DynamicModule;
+  static forFeature(
+    providers: Type[],
+    serverNameOrOptions?: string | McpForFeatureOptions,
+  ): DynamicModule {
+    const opts: McpForFeatureOptions =
+      typeof serverNameOrOptions === 'string'
+        ? { serverName: serverNameOrOptions }
+        : (serverNameOrOptions ?? {});
+
+    const imports = opts.imports ?? [];
+
+    if (!opts.serverName) {
+      return { module: McpModule, imports, providers, exports: providers };
     }
 
-    const registration: McpFeatureRegistration = { serverName, providerTokens: providers };
+    const registration: McpFeatureRegistration = {
+      serverName: opts.serverName,
+      providerTokens: providers,
+    };
     const registrationToken = nextFeatureRegistrationToken();
 
     return {
       module: McpFeatureModule,
+      imports,
       providers: [...providers, { provide: registrationToken, useValue: registration }],
       exports: [...providers, registrationToken],
       global: true,

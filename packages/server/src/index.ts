@@ -2,6 +2,7 @@
 
 // Module
 export { McpModule } from './mcp.module';
+export type { McpForFeatureOptions } from './mcp.module';
 
 // Decorators
 export {

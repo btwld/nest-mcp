@@ -227,6 +227,71 @@ describe('McpModule', () => {
       expect(mod.module).toBe(McpModule);
     });
 
+    describe('with options object', () => {
+      it('includes imports in returned module without serverName', () => {
+        class FakeProvider {}
+        class FakeImportModule {}
+        const mod = McpModule.forFeature([FakeProvider], { imports: [FakeImportModule] });
+
+        expect(mod.module).toBe(McpModule);
+        expect(mod.imports).toContain(FakeImportModule);
+        expect(mod.providers).toContain(FakeProvider);
+        expect(mod.exports).toContain(FakeProvider);
+      });
+
+      it('defaults imports to empty array when options object has no imports', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], {});
+
+        expect(mod.module).toBe(McpModule);
+        expect(mod.imports).toEqual([]);
+      });
+
+      it('includes imports with serverName using McpFeatureModule', async () => {
+        const { McpFeatureModule } = await import('./discovery/mcp-feature.module');
+        class FakeProvider {}
+        class FakeImportModule {}
+        const mod = McpModule.forFeature([FakeProvider], {
+          imports: [FakeImportModule],
+          serverName: 'my-server',
+        });
+
+        expect(mod.module).toBe(McpFeatureModule);
+        expect(mod.imports).toContain(FakeImportModule);
+        expect(mod.global).toBe(true);
+      });
+
+      it('creates registration token when serverName is provided via options', () => {
+        class FakeProvider {}
+        const mod = McpModule.forFeature([FakeProvider], {
+          serverName: 'target-server',
+          imports: [],
+        });
+        const registrationProvider = (
+          mod.providers as { provide: string; useValue: unknown }[]
+        ).find(
+          (p) => typeof p.provide === 'string' && p.provide.startsWith('MCP_FEATURE_REGISTRATION_'),
+        );
+        expect(registrationProvider).toBeDefined();
+        expect(registrationProvider?.useValue).toMatchObject({
+          serverName: 'target-server',
+          providerTokens: [FakeProvider],
+        });
+      });
+
+      it('passes through multiple imports', () => {
+        class FakeProvider {}
+        class ModuleA {}
+        class ModuleB {}
+        class ModuleC {}
+        const mod = McpModule.forFeature([FakeProvider], {
+          imports: [ModuleA, ModuleB, ModuleC],
+        });
+
+        expect(mod.imports).toEqual([ModuleA, ModuleB, ModuleC]);
+      });
+    });
+
     describe('with serverName (named-server targeting)', () => {
       it('uses McpFeatureModule instead of McpModule', async () => {
         const { McpFeatureModule } = await import('./discovery/mcp-feature.module');
