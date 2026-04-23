@@ -18,7 +18,7 @@ function makeTool(overrides: Partial<RegisteredTool>): RegisteredTool {
     name: 'tool',
     description: 'desc',
     methodName: 'fn',
-    target: class {} as unknown as abstract new (...args: unknown[]) => unknown,
+    target: class {},
     instance: {},
     ...overrides,
   };

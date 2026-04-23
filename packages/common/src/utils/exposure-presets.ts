@@ -8,6 +8,23 @@ import {
 import { clientSupports } from './exposure-capabilities';
 
 /**
+ * Return type of {@link defineResolver}. The declared `kinds` are carried on
+ * the branded property as a literal tuple (via the `const` type parameter),
+ * so downstream consumers — including `ExposureService` — see the exact set
+ * of strategy kinds the resolver can produce rather than the widened
+ * `ExposureStrategy['kind'][]`.
+ *
+ * The return type is also narrowed to `Extract<ExposureStrategy, { kind: K }>`
+ * so callers can rely on the kind discriminant if they introspect the
+ * resolver's output statically.
+ */
+export type DeclaredExposureStrategyResolver<K extends ExposureStrategy['kind']> = ((
+  ctx: ClientContext,
+) => Extract<ExposureStrategy, { kind: K }>) & {
+  readonly [RESOLVER_KINDS]: readonly K[];
+};
+
+/**
  * Wrap a resolver function with a declaration of which strategy kinds it can
  * produce. `ExposureService` uses this declaration to decide whether to
  * register `kind: 'lazy'` meta-tools at bootstrap or leave them off entirely.
@@ -26,17 +43,16 @@ import { clientSupports } from './exposure-capabilities';
  * );
  * ```
  */
-export function defineResolver<K extends ExposureStrategy['kind']>(
+export function defineResolver<const K extends ExposureStrategy['kind']>(
   kinds: readonly K[],
   resolve: (ctx: ClientContext) => Extract<ExposureStrategy, { kind: K }>,
-): ExposureStrategyResolver {
-  const widened = resolve as (ctx: ClientContext) => ExposureStrategy;
-  return Object.defineProperty(widened, RESOLVER_KINDS, {
+): DeclaredExposureStrategyResolver<K> {
+  return Object.defineProperty(resolve, RESOLVER_KINDS, {
     value: Object.freeze([...kinds]),
     enumerable: false,
     writable: false,
     configurable: false,
-  }) as ExposureStrategyResolver;
+  }) as DeclaredExposureStrategyResolver<K>;
 }
 
 export interface PreferSearchElseLazyOptions {

@@ -2,11 +2,14 @@ import {
   type ClientContext,
   type ExposureStrategy,
   type ExposureStrategyResolver,
+  type LazyStrategyOptions,
   MCP_OPTIONS,
   META_DEFER_LOADING,
   type McpModuleOptions,
   RESOLVER_KINDS,
+  type ToolListEntry,
   type ToolMetadata,
+  type ToolSelector,
 } from '@nest-mcp/common';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { McpRegistryService } from '../discovery/registry.service';
@@ -106,10 +109,10 @@ export class ExposureService implements OnApplicationBootstrap {
    * @param ctx     - Client context used to resolve the strategy.
    */
   applyStrategy(
-    entries: Array<Record<string, unknown>>,
+    entries: ToolListEntry[],
     metas: Map<string, ToolMetadata>,
     ctx: ClientContext,
-  ): Array<Record<string, unknown>> {
+  ): ToolListEntry[] {
     const strategy = this.resolveForClient(ctx);
 
     switch (strategy.kind) {
@@ -123,6 +126,12 @@ export class ExposureService implements OnApplicationBootstrap {
         throw new Error(
           "ExposureStrategy kind 'typed-api' is reserved and not implemented in this release",
         );
+      default: {
+        // Exhaustiveness guard — adding a new `kind` to ExposureStrategy
+        // becomes a compile error here instead of a silent fallthrough.
+        const _exhaustive: never = strategy;
+        return _exhaustive;
+      }
     }
   }
 
@@ -150,49 +159,42 @@ export class ExposureService implements OnApplicationBootstrap {
   // ---- Strategy implementations ----
 
   private applySearch(
-    entries: Array<Record<string, unknown>>,
+    entries: ToolListEntry[],
     metas: Map<string, ToolMetadata>,
-    eager: Parameters<typeof isEager>[1],
-  ): Array<Record<string, unknown>> {
+    eager: ToolSelector | undefined,
+  ): ToolListEntry[] {
     return this.withoutMetaTools(entries).map((entry) => {
-      const name = entry.name as string;
-      const meta = metas.get(name);
+      const meta = metas.get(entry.name);
       if (!meta || isEager(meta, eager)) {
         return entry;
       }
-      const prev = (entry._meta as Record<string, unknown> | undefined) ?? {};
       return {
         ...entry,
-        _meta: { ...prev, [META_DEFER_LOADING]: true },
+        _meta: { ...(entry._meta ?? {}), [META_DEFER_LOADING]: true },
       };
     });
   }
 
   private applyLazy(
-    entries: Array<Record<string, unknown>>,
+    entries: ToolListEntry[],
     metas: Map<string, ToolMetadata>,
-    eager: Parameters<typeof isEager>[1],
-  ): Array<Record<string, unknown>> {
+    eager: ToolSelector | undefined,
+  ): ToolListEntry[] {
     return entries.filter((entry) => {
-      const name = entry.name as string;
-      if (this.metaToolNames.has(name)) return true; // always include meta-tools under lazy
-      const meta = metas.get(name);
+      if (this.metaToolNames.has(entry.name)) return true;
+      const meta = metas.get(entry.name);
       if (!meta) return true;
       return isEager(meta, eager);
     });
   }
 
-  private withoutMetaTools(
-    entries: Array<Record<string, unknown>>,
-  ): Array<Record<string, unknown>> {
-    return entries.filter((e) => !this.metaToolNames.has(e.name as string));
+  private withoutMetaTools(entries: ToolListEntry[]): ToolListEntry[] {
+    return entries.filter((e) => !this.metaToolNames.has(e.name));
   }
 
   // ---- Configuration introspection ----
 
-  private lazyHint():
-    | { indexToolName?: string; schemaToolName?: string; maxBatchSize?: number }
-    | undefined {
+  private lazyHint(): LazyStrategyOptions | undefined {
     if (typeof this.configured !== 'object' || this.configured.kind !== 'lazy') return undefined;
     return this.configured;
   }
@@ -244,28 +246,31 @@ export class ExposureService implements OnApplicationBootstrap {
     this.metaToolNames.add(indexToolName);
     this.metaToolNames.add(schemaToolName);
 
-    const indexTool: RegisteredTool = {
+    // Single `as` cast rather than `as unknown as` laundering — `ToolMetadata.target`
+    // uses `never[]` in the parameter position (see its definition), so any concrete
+    // constructor is structurally assignable with one hop.
+    const target = ExposureService as abstract new (...args: never[]) => unknown;
+    const instance = this as unknown as Record<string, unknown>;
+
+    this.registry.registerTool({
       name: indexToolName,
       description: DEFAULT_LIST_TOOL_DESCRIPTION,
       parameters: listAvailableToolsSchema,
       exposure: 'eager',
       methodName: 'handleListAvailableTools',
-      target: ExposureService as unknown as abstract new (...args: unknown[]) => unknown,
-      instance: this as unknown as Record<string, unknown>,
-    };
+      target,
+      instance,
+    });
 
-    const schemaTool: RegisteredTool = {
+    this.registry.registerTool({
       name: schemaToolName,
       description: DEFAULT_SCHEMA_TOOL_DESCRIPTION,
       parameters: getToolSchemaSchema,
       exposure: 'eager',
       methodName: 'handleGetToolSchema',
-      target: ExposureService as unknown as abstract new (...args: unknown[]) => unknown,
-      instance: this as unknown as Record<string, unknown>,
-    };
-
-    this.registry.registerTool(indexTool);
-    this.registry.registerTool(schemaTool);
+      target,
+      instance,
+    });
   }
 
   // ---- Validation ----
@@ -282,24 +287,23 @@ export class ExposureService implements OnApplicationBootstrap {
   }
 
   private validateSearchReachable(): void {
-    if (!this.canResolveToSearch()) return;
-    const strategy = typeof this.configured === 'function' ? undefined : this.configured;
+    // Resolver-based strategies can't be statically validated — their eager
+    // selector depends on runtime client context. Validation runs implicitly
+    // at request time (Anthropic's API rejects all-deferred requests).
+    if (typeof this.configured === 'function') return;
+    if (this.configured.kind !== 'search') return;
 
-    // Only static search strategies can be exhaustively validated at bootstrap.
-    if (!strategy || strategy.kind !== 'search') return;
-
+    const strategy = this.configured;
     const tools = this.registry.getAllTools().filter((t) => !this.metaToolNames.has(t.name));
+    if (tools.length === 0) return;
+
     const anyEager = tools.some((t) => isEager(t, strategy.eager));
-    if (tools.length > 0 && !anyEager) {
-      const behavior = strategy.onAllDeferred ?? 'throw';
-      const message = `ExposureService: kind 'search' resolved zero eager tools. Anthropic requires at least one non-deferred tool per request. Add 'eager' tags to your core tools or set exposure.onAllDeferred to override.`;
-      if (behavior === 'throw') {
-        throw new Error(message);
-      }
-      if (behavior === 'warn') {
-        this.logger.warn(message);
-      }
-      // 'promoteFirst' is handled at transform time
-    }
+    if (anyEager) return;
+
+    const behavior = strategy.onAllDeferred ?? 'throw';
+    const message = `ExposureService: kind 'search' resolved zero eager tools. Anthropic requires at least one non-deferred tool per request. Add 'eager' tags to your core tools or set exposure.onAllDeferred to override.`;
+    if (behavior === 'throw') throw new Error(message);
+    if (behavior === 'warn') this.logger.warn(message);
+    // 'promoteFirst' is handled at transform time.
   }
 }

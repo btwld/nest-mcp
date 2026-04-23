@@ -7,7 +7,7 @@ function meta(overrides: Partial<ToolMetadata> = {}): ToolMetadata {
     name: 'tool',
     description: 'desc',
     methodName: 'fn',
-    target: class {} as unknown as abstract new (...args: unknown[]) => unknown,
+    target: class {},
     ...overrides,
   };
 }

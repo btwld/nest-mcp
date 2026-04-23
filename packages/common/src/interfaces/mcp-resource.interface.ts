@@ -21,7 +21,7 @@ export interface ResourceMetadata {
   icons?: Icon[];
   _meta?: Record<string, unknown>;
   methodName: string;
-  target: abstract new (...args: unknown[]) => unknown;
+  target: abstract new (...args: never[]) => unknown;
 }
 
 export interface ResourceTemplateOptions {
@@ -45,7 +45,7 @@ export interface ResourceTemplateMetadata {
   icons?: Icon[];
   _meta?: Record<string, unknown>;
   methodName: string;
-  target: abstract new (...args: unknown[]) => unknown;
+  target: abstract new (...args: never[]) => unknown;
 }
 
 export interface ResourceContent {

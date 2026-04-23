@@ -1,4 +1,4 @@
-import { type ToolMetadata, zodToJsonSchema } from '@nest-mcp/common';
+import { type ToolAnnotations, type ToolMetadata, zodToJsonSchema } from '@nest-mcp/common';
 import { z } from 'zod';
 
 export const DEFAULT_SCHEMA_TOOL_NAME = 'get_tool_schema';
@@ -23,7 +23,7 @@ export interface ToolSchemaEntry {
   description: string;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
-  annotations?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
 }
 
 export interface GetToolSchemaResult {
@@ -62,7 +62,7 @@ export function getToolSchema(
         : meta.rawOutputSchema
           ? { outputSchema: meta.rawOutputSchema }
           : {}),
-      ...(meta.annotations ? { annotations: meta.annotations as Record<string, unknown> } : {}),
+      ...(meta.annotations ? { annotations: meta.annotations } : {}),
     });
   }
   return { schemas, notFound };
