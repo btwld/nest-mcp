@@ -446,7 +446,10 @@ describe('registerHandlers', () => {
     const handler = listToolsCall?.[1];
     const result = await handler({ method: 'tools/list', params: { cursor: 'abc123' } });
 
-    expect(mockPipeline.listTools).toHaveBeenCalledWith('abc123');
+    expect(mockPipeline.listTools).toHaveBeenCalledWith(
+      'abc123',
+      expect.objectContaining({ transport: ctx.transport }),
+    );
     expect(result).toEqual({ tools: [{ name: 'tool-a' }], nextCursor: 'abc123' });
   });
 

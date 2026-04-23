@@ -34,8 +34,15 @@ export class McpExecutorService {
 
   // ---- Tools ----
 
-  async listTools(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
-    const all = this.registry.getAllTools().map((tool) => ({
+  /**
+   * Build the full list of tool entries (unpaginated) in the same shape
+   * surfaced by `tools/list`. Exposed so that the pipeline can insert a
+   * catalog-presentation transform (see {@link ExposureService}) before
+   * pagination — filtering or annotating entries post-pagination would
+   * produce uneven page sizes.
+   */
+  buildToolEntries(): Array<Record<string, unknown>> {
+    return this.registry.getAllTools().map((tool) => ({
       name: tool.name,
       ...(tool.title != null ? { title: tool.title } : {}),
       description: tool.description,
@@ -52,7 +59,10 @@ export class McpExecutorService {
       ...(tool.execution ? { execution: tool.execution } : {}),
       ...(tool._meta ? { _meta: tool._meta } : {}),
     }));
-    return paginate(all, cursor, this.pageSize);
+  }
+
+  async listTools(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
+    return paginate(this.buildToolEntries(), cursor, this.pageSize);
   }
 
   async callTool(

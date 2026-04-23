@@ -20,6 +20,7 @@ export * from './interfaces/http-adapter.interface';
 export * from './interfaces/mcp-completion.interface';
 export * from './interfaces/mcp-elicitation.interface';
 export * from './interfaces/mcp-sampling.interface';
+export * from './interfaces/mcp-exposure.interface';
 
 // Types
 export * from './types/json-rpc.types';
@@ -45,6 +46,9 @@ export * from './utils/capabilities-builder';
 export * from './utils/duration';
 export { paginate, type PaginatedResult } from './utils/paginator';
 export { drainAllPages } from './utils/drain-pages';
+export * from './utils/exposure-capabilities';
+export * from './utils/exposure-presets';
+export * from './utils/build-client-context';
 
 // Decorators
 export * from './decorators/metadata.utils';

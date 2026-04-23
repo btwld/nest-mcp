@@ -1,5 +1,6 @@
 import type { LogLevel } from '@nestjs/common';
 import type { McpGuardClass } from './mcp-auth.interface';
+import type { ExposureStrategy, ExposureStrategyResolver } from './mcp-exposure.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
 import type {
   CircuitBreakerConfig,
@@ -70,6 +71,14 @@ export interface McpModuleOptions {
     /** Vendor-specific experimental capability flags passed verbatim to the SDK. */
     experimental?: Record<string, unknown>;
   };
+
+  /**
+   * Catalog-presentation strategy. Controls how `tools/list` surfaces tools
+   * to clients (eager, deferred behind a search meta-tool, or on-demand via
+   * a lazy index). Per-client tiering is expressed by passing a resolver
+   * function instead of a static strategy. Defaults to `{ kind: 'eager' }`.
+   */
+  exposure?: ExposureStrategy | ExposureStrategyResolver;
 }
 
 export interface McpModuleAsyncOptions {

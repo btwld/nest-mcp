@@ -22,6 +22,7 @@ import type {
   McpProgress,
   ToolContent,
 } from '@nest-mcp/common';
+import { buildClientContext } from '@nest-mcp/common';
 import { z } from 'zod';
 import type {
   McpRegistryService,
@@ -102,7 +103,7 @@ export function registerHandlers(
     registerPromptOnServer(server, prompt, pipeline, ctx);
   }
   registerCancellationHandler(server);
-  registerListHandlers(server, pipeline, registry, options);
+  registerListHandlers(server, pipeline, registry, options, ctx);
   registerCompletionHandler(server, pipeline, registry, options);
   if (subscriptionManager) {
     registerSubscriptionHandlers(server, subscriptionManager, ctx);
@@ -336,10 +337,15 @@ function registerListHandlers(
   pipeline: ExecutionPipelineService,
   registry: McpRegistryService,
   options: McpModuleOptions,
+  ctx: McpExecutionContext,
 ): void {
   server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
     const cursor = request.params?.cursor;
-    const result = await pipeline.listTools(cursor);
+    const clientContext = buildClientContext({
+      transport: ctx.transport,
+      request: ctx.request,
+    });
+    const result = await pipeline.listTools(cursor, clientContext);
     return { tools: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
   });
 
