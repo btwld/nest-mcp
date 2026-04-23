@@ -467,4 +467,56 @@ describe('McpClientBootstrap notification wiring', () => {
 
     expect(onNotificationFn).not.toHaveBeenCalled();
   });
+
+  it('skips non-function prototype own properties without throwing', async () => {
+    const onNotificationFn = vi.fn();
+    const clientA = {
+      name: 'server-a',
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      isConnected: vi.fn().mockReturnValue(true),
+      onNotification: onNotificationFn,
+    } as unknown as McpClient;
+
+    // Simulates providers registered with `useValue: {}` (plain object) or
+    // classes whose prototype exposes non-function own properties via
+    // accessors — `Reflect.getMetadata` throws TypeError on non-object targets.
+    class HandlerWithAccessor {
+      handleNotification() {}
+    }
+    Object.defineProperty(HandlerWithAccessor.prototype, 'nonFunctionProp', {
+      get() {
+        return null;
+      },
+      enumerable: false,
+      configurable: true,
+    });
+    Object.defineProperty(HandlerWithAccessor.prototype, 'primitiveProp', {
+      value: 42,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+    const handlerInstance = new HandlerWithAccessor();
+    Reflect.defineMetadata(
+      MCP_NOTIFICATION_METADATA,
+      { connectionName: 'server-a', method: 'notifications/tools/list_changed' },
+      HandlerWithAccessor.prototype.handleNotification,
+    );
+
+    const plainValueProvider = {};
+
+    const modulesContainer = createMockModulesContainer([
+      { instance: plainValueProvider },
+      { instance: handlerInstance },
+    ]);
+
+    const boot = new McpClientBootstrap([clientA], modulesContainer);
+    await expect(boot.onApplicationBootstrap()).resolves.toBeUndefined();
+
+    expect(onNotificationFn).toHaveBeenCalledWith(
+      'notifications/tools/list_changed',
+      expect.any(Function),
+    );
+  });
 });
