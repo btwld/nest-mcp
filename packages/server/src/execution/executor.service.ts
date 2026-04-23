@@ -9,6 +9,7 @@ import {
   type ResourceReadResult,
   type ToolCallResult,
   ToolExecutionError,
+  type ToolListEntry,
   ValidationError,
   extractZodDescriptions,
   matchUriTemplate,
@@ -34,25 +35,37 @@ export class McpExecutorService {
 
   // ---- Tools ----
 
-  async listTools(cursor?: string): Promise<PaginatedResult<Record<string, unknown>>> {
-    const all = this.registry.getAllTools().map((tool) => ({
-      name: tool.name,
-      ...(tool.title != null ? { title: tool.title } : {}),
-      description: tool.description,
-      inputSchema: tool.parameters
-        ? zodToJsonSchema(tool.parameters)
-        : (tool.inputSchema ?? { type: 'object' }),
-      ...(tool.outputSchema
-        ? { outputSchema: zodToJsonSchema(tool.outputSchema) }
-        : tool.rawOutputSchema
-          ? { outputSchema: tool.rawOutputSchema }
-          : {}),
-      ...(tool.annotations ? { annotations: tool.annotations } : {}),
-      ...(tool.icons ? { icons: tool.icons } : {}),
-      ...(tool.execution ? { execution: tool.execution } : {}),
-      ...(tool._meta ? { _meta: tool._meta } : {}),
-    }));
-    return paginate(all, cursor, this.pageSize);
+  /**
+   * Build the full list of tool entries (unpaginated) in the same shape
+   * surfaced by `tools/list`. Exposed so that the pipeline can insert a
+   * catalog-presentation transform (see {@link ExposureService}) before
+   * pagination — filtering or annotating entries post-pagination would
+   * produce uneven page sizes.
+   */
+  buildToolEntries(): ToolListEntry[] {
+    return this.registry.getAllTools().map((tool): ToolListEntry => {
+      const inputSchema = tool.parameters
+        ? (zodToJsonSchema(tool.parameters) as Record<string, unknown>)
+        : (tool.inputSchema ?? { type: 'object' });
+      const outputSchema = tool.outputSchema
+        ? (zodToJsonSchema(tool.outputSchema) as Record<string, unknown>)
+        : tool.rawOutputSchema;
+      return {
+        name: tool.name,
+        ...(tool.title != null ? { title: tool.title } : {}),
+        description: tool.description,
+        inputSchema,
+        ...(outputSchema ? { outputSchema } : {}),
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
+        ...(tool.icons ? { icons: tool.icons } : {}),
+        ...(tool.execution ? { execution: tool.execution } : {}),
+        ...(tool._meta ? { _meta: tool._meta } : {}),
+      };
+    });
+  }
+
+  async listTools(cursor?: string): Promise<PaginatedResult<ToolListEntry>> {
+    return paginate(this.buildToolEntries(), cursor, this.pageSize);
   }
 
   async callTool(

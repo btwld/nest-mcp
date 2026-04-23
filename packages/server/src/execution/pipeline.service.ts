@@ -1,5 +1,6 @@
 import type {
   CircuitBreakerConfig,
+  ClientContext,
   CompletionRequest,
   CompletionResult,
   McpExecutionContext,
@@ -10,6 +11,7 @@ import type {
   ResourceReadResult,
   RetryConfig,
   ToolCallResult,
+  ToolMetadata,
 } from '@nest-mcp/common';
 import type { McpGuard, McpGuardClass } from '@nest-mcp/common';
 import {
@@ -18,11 +20,13 @@ import {
   McpError,
   McpTimeoutError,
   ToolExecutionError,
+  paginate,
 } from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ToolAuthGuardService } from '../auth/guards/tool-auth.guard';
 import { McpRegistryService } from '../discovery/registry.service';
+import { ExposureService } from '../exposure/exposure.service';
 import { MiddlewareService } from '../middleware/middleware.service';
 import { MetricsService } from '../observability/metrics.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
@@ -47,6 +51,7 @@ export class ExecutionPipelineService {
     @Inject(MCP_OPTIONS) private readonly options: McpModuleOptions,
     private readonly moduleRef: ModuleRef,
     private readonly requestContext: McpRequestContextService,
+    private readonly exposure: ExposureService,
   ) {}
 
   // ---- Tools ----
@@ -185,8 +190,18 @@ export class ExecutionPipelineService {
 
   // ---- List methods (delegate directly) ----
 
-  async listTools(cursor?: string) {
-    return this.executor.listTools(cursor);
+  async listTools(cursor?: string, ctx?: ClientContext) {
+    // When a client context is supplied, apply the exposure strategy before
+    // paginating so filtered strategies (e.g. `lazy`) produce even page sizes.
+    if (!ctx) {
+      return this.executor.listTools(cursor);
+    }
+    const entries = this.executor.buildToolEntries();
+    const metaMap = new Map<string, ToolMetadata>(
+      this.registry.getAllTools().map((t) => [t.name, t]),
+    );
+    const shaped = this.exposure.applyStrategy(entries, metaMap, ctx);
+    return paginate(shaped, cursor, this.options.pagination?.defaultPageSize);
   }
 
   async listResources(cursor?: string) {

@@ -20,7 +20,7 @@ export interface PromptMetadata {
   icons?: Icon[];
   _meta?: Record<string, unknown>;
   methodName: string;
-  target: abstract new (...args: unknown[]) => unknown;
+  target: abstract new (...args: never[]) => unknown;
 }
 
 export interface PromptArgument {

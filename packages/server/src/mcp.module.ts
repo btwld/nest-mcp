@@ -33,6 +33,9 @@ import { McpExecutorService } from './execution/executor.service';
 import { ExecutionPipelineService } from './execution/pipeline.service';
 import { McpRequestContextService } from './execution/request-context.service';
 
+// Exposure
+import { ExposureService } from './exposure/exposure.service';
+
 import { createSseController } from './transport/sse/sse.controller.factory';
 import { SseService } from './transport/sse/sse.service';
 import { StdioService } from './transport/stdio/stdio.service';
@@ -93,6 +96,7 @@ export class McpModule {
       McpRegistryService,
       McpScannerService,
       McpExecutorService,
+      ExposureService,
       ExecutionPipelineService,
       McpRequestContextService,
       McpContextFactory,
@@ -141,6 +145,7 @@ export class McpModule {
       exports: [
         McpRegistryService,
         McpExecutorService,
+        ExposureService,
         ExecutionPipelineService,
         McpRequestContextService,
         McpToolBuilder,
@@ -166,6 +171,7 @@ export class McpModule {
       McpRegistryService,
       McpScannerService,
       McpExecutorService,
+      ExposureService,
       ExecutionPipelineService,
       McpRequestContextService,
       McpContextFactory,
@@ -215,6 +221,7 @@ export class McpModule {
       exports: [
         McpRegistryService,
         McpExecutorService,
+        ExposureService,
         ExecutionPipelineService,
         McpRequestContextService,
         McpToolBuilder,

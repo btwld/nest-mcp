@@ -13,6 +13,8 @@ export function Tool(options: ToolOptions): MethodDecorator {
       ...(options.icons != null ? { icons: options.icons } : {}),
       ...(options.execution != null ? { execution: options.execution } : {}),
       ...('_meta' in options && options._meta != null ? { _meta: options._meta } : {}),
+      ...(options.tags != null ? { tags: options.tags } : {}),
+      ...(options.exposure != null ? { exposure: options.exposure } : {}),
       methodName: String(propertyKey),
       target: target.constructor as abstract new (...args: unknown[]) => unknown,
     };

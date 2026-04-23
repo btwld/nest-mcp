@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod';
 import type { McpGuardClass } from './mcp-auth.interface';
+import type { ToolExposure } from './mcp-exposure.interface';
 import type { McpMiddleware } from './mcp-middleware.interface';
 import type {
   CircuitBreakerConfig,
@@ -39,6 +40,18 @@ export interface ToolOptions {
   icons?: Icon[];
   execution?: ToolExecution;
   _meta?: Record<string, unknown>;
+  /**
+   * Free-form labels used by selectors in {@link ExposureStrategy} (e.g.
+   * `eager: { tags: ['core'] }`). Not transmitted over the wire.
+   */
+  tags?: string[];
+  /**
+   * Per-tool override for catalog presentation:
+   * - `eager` keeps this tool's full schema in `tools/list` even when the module defers the rest.
+   * - `deferred` removes this tool from the initial `tools/list` regardless of module strategy.
+   * - `auto` (default) follows the module strategy.
+   */
+  exposure?: ToolExposure;
 }
 
 export interface ToolMetadata {
@@ -67,9 +80,41 @@ export interface ToolMetadata {
   circuitBreaker?: CircuitBreakerConfig;
   // Middleware
   middleware?: McpMiddleware[];
+  // Exposure
+  tags?: string[];
+  exposure?: ToolExposure;
   // Internal
   methodName: string;
-  target: abstract new (...args: unknown[]) => unknown;
+  /**
+   * The class whose prototype carried the decorator. Uses `never[]` in the
+   * parameter position so ANY concrete constructor is assignable without
+   * `as unknown as` laundering (see Matt Pocock's "universal constructor
+   * type" pattern — `never` is the bottom type, assignable to any specific
+   * parameter list under strict function-type checking).
+   */
+  target: abstract new (
+    ...args: never[]
+  ) => unknown;
+}
+
+/**
+ * Shape of a single entry in the `tools/list` response, per the MCP spec.
+ *
+ * Produced by the executor's `buildToolEntries()` method and transformed
+ * by `ExposureService.applyStrategy()` before pagination. Using a typed
+ * shape (rather than `Record<string, unknown>`) lets every downstream
+ * consumer read `entry.name`, `entry._meta`, etc. without casts.
+ */
+export interface ToolListEntry {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
+  icons?: Icon[];
+  execution?: ToolExecution;
+  _meta?: Record<string, unknown>;
 }
 
 export interface ToolCallResult {

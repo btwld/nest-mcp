@@ -3,6 +3,7 @@ import type {
   PromptGetResult,
   ResourceReadResult,
   ToolCallResult,
+  ToolListEntry,
 } from '@nest-mcp/common';
 import { McpTransportType } from '@nest-mcp/common';
 import type { DynamicModule, ForwardReference, Provider, Type } from '@nestjs/common';
@@ -15,7 +16,7 @@ import { McpExecutorService } from '../execution/executor.service';
 export interface McpTestApp {
   callTool(name: string, args?: Record<string, unknown>): Promise<ToolCallResult>;
   readResource(uri: string): Promise<ResourceReadResult>;
-  listTools(): Promise<PaginatedResult<Record<string, unknown>>>;
+  listTools(): Promise<PaginatedResult<ToolListEntry>>;
   listResources(): Promise<PaginatedResult<Record<string, unknown>>>;
   listPrompts(): Promise<PaginatedResult<Record<string, unknown>>>;
   getPrompt(name: string, args?: Record<string, unknown>): Promise<PromptGetResult>;
