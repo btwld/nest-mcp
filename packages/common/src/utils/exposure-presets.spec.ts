@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ClientContext } from '../interfaces/mcp-exposure.interface';
+import { type ClientContext, RESOLVER_KINDS } from '../interfaces/mcp-exposure.interface';
 import { McpTransportType } from '../interfaces/mcp-transport.interface';
 import { ANTHROPIC_ADVANCED_TOOL_USE_BETA } from './exposure-capabilities';
-import { preferSearchElseLazy } from './exposure-presets';
+import { defineResolver, preferSearchElseLazy } from './exposure-presets';
 
 function ctx(partial: Partial<ClientContext> = {}): ClientContext {
   return { transport: McpTransportType.STREAMABLE_HTTP, ...partial };
@@ -60,5 +60,34 @@ describe('preferSearchElseLazy', () => {
       indexToolName: 'my_index',
       schemaToolName: 'my_schema',
     });
+  });
+
+  it('declares ["search", "lazy"] via RESOLVER_KINDS so ExposureService can skip conservative meta-tool registration', () => {
+    const resolver = preferSearchElseLazy();
+    expect(resolver[RESOLVER_KINDS]).toEqual(['search', 'lazy']);
+  });
+});
+
+describe('defineResolver', () => {
+  it('attaches the declared kinds to the returned function via RESOLVER_KINDS', () => {
+    const resolver = defineResolver(['search'], () => ({ kind: 'search', variant: 'bm25' }));
+    expect(resolver[RESOLVER_KINDS]).toEqual(['search']);
+  });
+
+  it('still calls through to the underlying resolver function', () => {
+    const resolver = defineResolver(['eager'], () => ({ kind: 'eager' }));
+    expect(resolver(ctx())).toEqual({ kind: 'eager' });
+  });
+
+  it('freezes the kinds array so callers cannot mutate the declaration', () => {
+    const resolver = defineResolver(['search', 'lazy'], () => ({ kind: 'lazy' }));
+    const kinds = resolver[RESOLVER_KINDS];
+    expect(Object.isFrozen(kinds)).toBe(true);
+  });
+
+  it('makes RESOLVER_KINDS non-enumerable so it does not pollute Object.keys', () => {
+    const resolver = defineResolver(['eager'], () => ({ kind: 'eager' }));
+    const keys = Object.getOwnPropertyNames(resolver);
+    expect(keys).not.toContain(String(RESOLVER_KINDS));
   });
 });

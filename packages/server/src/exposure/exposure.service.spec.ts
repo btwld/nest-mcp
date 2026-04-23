@@ -7,6 +7,7 @@ import {
   type McpModuleOptions,
   McpTransportType,
   type ToolMetadata,
+  defineResolver,
 } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { McpRegistryService, RegisteredTool } from '../discovery/registry.service';
@@ -202,9 +203,32 @@ describe('ExposureService — meta-tool registration (onApplicationBootstrap)', 
     ]);
   });
 
-  it('conservatively registers meta-tools when a resolver is configured', () => {
+  it('conservatively registers meta-tools when an undeclared resolver is configured', () => {
     const registry = makeRegistry();
     const resolver: ExposureStrategyResolver = () => ({ kind: 'search', variant: 'bm25' });
+    const svc = new ExposureService({ ...baseOptions, exposure: resolver }, registry);
+    svc.onApplicationBootstrap();
+    expect(registry.__added.map((t) => t.name).sort()).toEqual([
+      'get_tool_schema',
+      'list_available_tools',
+    ]);
+  });
+
+  it('skips meta-tool registration when defineResolver declares only non-lazy kinds', () => {
+    const registry = makeRegistry();
+    const resolver = defineResolver(['search'], () => ({ kind: 'search', variant: 'bm25' }));
+    const svc = new ExposureService({ ...baseOptions, exposure: resolver }, registry);
+    svc.onApplicationBootstrap();
+    expect(registry.__added).toHaveLength(0);
+  });
+
+  it('registers meta-tools when defineResolver declares lazy among its kinds', () => {
+    const registry = makeRegistry();
+    const resolver = defineResolver(['search', 'lazy'], (ctx) =>
+      ctx.betaHeaders?.includes(ANTHROPIC_ADVANCED_TOOL_USE_BETA)
+        ? { kind: 'search', variant: 'bm25' }
+        : { kind: 'lazy' },
+    );
     const svc = new ExposureService({ ...baseOptions, exposure: resolver }, registry);
     svc.onApplicationBootstrap();
     expect(registry.__added.map((t) => t.name).sort()).toEqual([

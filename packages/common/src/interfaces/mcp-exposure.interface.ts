@@ -79,10 +79,26 @@ export interface ClientContext {
 }
 
 /**
+ * Symbol-keyed marker for attaching "which kinds can this resolver return?"
+ * metadata to a resolver function. Set by {@link defineResolver} and read by
+ * `ExposureService` at bootstrap to avoid conservative meta-tool registration.
+ *
+ * Kept as a module-local Symbol (not `Symbol.for`) so there's no cross-realm
+ * collision risk and no accidental key-name overlap on user-supplied functions.
+ */
+export const RESOLVER_KINDS: unique symbol = Symbol('@nest-mcp/exposure.resolver.kinds');
+
+/**
  * Either a plain strategy or a function that picks one from client context.
  * The function form is how per-client tiering is expressed.
+ *
+ * When the function form is used, wrap with {@link defineResolver} to declare
+ * which strategy kinds it can produce. Without that declaration, the service
+ * falls back to conservative meta-tool registration.
  */
-export type ExposureStrategyResolver = (ctx: ClientContext) => ExposureStrategy;
+export type ExposureStrategyResolver = ((ctx: ClientContext) => ExposureStrategy) & {
+  readonly [RESOLVER_KINDS]?: ReadonlyArray<ExposureStrategy['kind']>;
+};
 
 /** Shape carried in `_meta.defer_loading` on deferred tool entries for `kind: 'search'`. */
 export const META_DEFER_LOADING = 'defer_loading' as const;

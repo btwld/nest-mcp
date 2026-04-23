@@ -1,5 +1,43 @@
-import type { ExposureStrategyResolver, ToolSelector } from '../interfaces/mcp-exposure.interface';
+import {
+  type ClientContext,
+  type ExposureStrategy,
+  type ExposureStrategyResolver,
+  RESOLVER_KINDS,
+  type ToolSelector,
+} from '../interfaces/mcp-exposure.interface';
 import { clientSupports } from './exposure-capabilities';
+
+/**
+ * Wrap a resolver function with a declaration of which strategy kinds it can
+ * produce. `ExposureService` uses this declaration to decide whether to
+ * register `kind: 'lazy'` meta-tools at bootstrap or leave them off entirely.
+ *
+ * Without this wrapper, the service must assume a plain resolver *could*
+ * return `lazy` and registers meta-tools defensively — a safe default, but
+ * one that pollutes the registry when the resolver never actually returns
+ * `lazy`. Declaring kinds up front eliminates that drift.
+ *
+ * @example
+ * ```ts
+ * const exposure = defineResolver(['search', 'lazy'], (ctx) =>
+ *   clientSupports.search(ctx)
+ *     ? { kind: 'search', variant: 'bm25', eager: { tags: ['core'] } }
+ *     : { kind: 'lazy', eager: { tags: ['core'] } },
+ * );
+ * ```
+ */
+export function defineResolver<K extends ExposureStrategy['kind']>(
+  kinds: readonly K[],
+  resolve: (ctx: ClientContext) => Extract<ExposureStrategy, { kind: K }>,
+): ExposureStrategyResolver {
+  const widened = resolve as (ctx: ClientContext) => ExposureStrategy;
+  return Object.defineProperty(widened, RESOLVER_KINDS, {
+    value: Object.freeze([...kinds]),
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  }) as ExposureStrategyResolver;
+}
 
 export interface PreferSearchElseLazyOptions {
   /** Tool selector shared across both strategies. */
@@ -29,7 +67,7 @@ export function preferSearchElseLazy(
   options: PreferSearchElseLazyOptions = {},
 ): ExposureStrategyResolver {
   const { eager, variant = 'bm25', indexToolName, schemaToolName } = options;
-  return (ctx) =>
+  return defineResolver(['search', 'lazy'], (ctx) =>
     clientSupports.search(ctx)
       ? { kind: 'search', variant, eager }
       : {
@@ -37,5 +75,6 @@ export function preferSearchElseLazy(
           eager,
           ...(indexToolName ? { indexToolName } : {}),
           ...(schemaToolName ? { schemaToolName } : {}),
-        };
+        },
+  );
 }

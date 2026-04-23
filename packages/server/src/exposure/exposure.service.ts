@@ -5,6 +5,7 @@ import {
   MCP_OPTIONS,
   META_DEFER_LOADING,
   type McpModuleOptions,
+  RESOLVER_KINDS,
   type ToolMetadata,
 } from '@nest-mcp/common';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
@@ -197,14 +198,43 @@ export class ExposureService implements OnApplicationBootstrap {
   }
 
   private canResolveToLazy(): boolean {
-    // Resolver form: we can't know statically what it returns. Register to be safe.
-    if (typeof this.configured === 'function') return true;
-    return this.configured.kind === 'lazy';
+    return this.canResolveTo('lazy');
   }
 
   private canResolveToSearch(): boolean {
-    if (typeof this.configured === 'function') return true;
-    return this.configured.kind === 'search';
+    return this.canResolveTo('search');
+  }
+
+  /**
+   * Decide whether the configured strategy could resolve to a given kind.
+   *
+   * - Static strategies: exact answer from the `kind` discriminant.
+   * - Resolver functions with declared kinds (via `defineResolver`): exact
+   *   answer from the declaration.
+   * - Plain resolver functions: conservative `true`, with a one-time warning
+   *   suggesting the user wrap with `defineResolver` to tighten behavior.
+   */
+  private canResolveTo(kind: ExposureStrategy['kind']): boolean {
+    if (typeof this.configured !== 'function') {
+      return this.configured.kind === kind;
+    }
+    const declared = this.configured[RESOLVER_KINDS];
+    if (declared) {
+      return declared.includes(kind);
+    }
+    this.warnUndeclaredResolverOnce();
+    return true; // conservative fallback
+  }
+
+  private warnedUndeclaredResolver = false;
+
+  private warnUndeclaredResolverOnce(): void {
+    if (this.warnedUndeclaredResolver) return;
+    this.warnedUndeclaredResolver = true;
+    this.logger.warn(
+      'ExposureService: the configured resolver does not declare which strategy kinds it can produce. ' +
+        'Wrap with `defineResolver([...kinds], fn)` from @nest-mcp/common to avoid conservative meta-tool registration.',
+    );
   }
 
   // ---- Registration ----
