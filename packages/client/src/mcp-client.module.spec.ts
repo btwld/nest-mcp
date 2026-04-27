@@ -468,8 +468,11 @@ describe('McpClientBootstrap notification wiring', () => {
     expect(onNotificationFn).not.toHaveBeenCalled();
   });
 
-  it('skips non-function prototype own properties without throwing', async () => {
+  it('skips non-function prototype own properties without invoking accessors', async () => {
     const onNotificationFn = vi.fn();
+    const accessor = vi.fn(() => {
+      throw new Error('getter should not be invoked while scanning handlers');
+    });
     const clientA = {
       name: 'server-a',
       connect: vi.fn().mockResolvedValue(undefined),
@@ -480,14 +483,12 @@ describe('McpClientBootstrap notification wiring', () => {
 
     // Simulates providers registered with `useValue: {}` (plain object) or
     // classes whose prototype exposes non-function own properties via
-    // accessors — `Reflect.getMetadata` throws TypeError on non-object targets.
+    // accessors. The scan must not invoke getters while looking for methods.
     class HandlerWithAccessor {
       handleNotification() {}
     }
     Object.defineProperty(HandlerWithAccessor.prototype, 'nonFunctionProp', {
-      get() {
-        return null;
-      },
+      get: accessor,
       enumerable: false,
       configurable: true,
     });
@@ -518,5 +519,6 @@ describe('McpClientBootstrap notification wiring', () => {
       'notifications/tools/list_changed',
       expect.any(Function),
     );
+    expect(accessor).not.toHaveBeenCalled();
   });
 });
