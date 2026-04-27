@@ -1,5 +1,11 @@
 # @nest-mcp/client
 
+## 0.2.8
+
+### Patch Changes
+
+- 7012df3: Avoid invoking provider prototype accessors while wiring `@OnMcpNotification` handlers. The bootstrap scanner now inspects property descriptors and only reads method values, preventing Nest provider getters from throwing during app startup.
+
 ## 0.2.7
 
 ### Patch Changes
