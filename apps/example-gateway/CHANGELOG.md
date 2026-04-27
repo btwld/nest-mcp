@@ -1,5 +1,11 @@
 # @nest-mcp/example-gateway
 
+## 0.1.14
+
+### Patch Changes
+
+- @nest-mcp/gateway@0.2.9
+
 ## 0.1.13
 
 ### Patch Changes
