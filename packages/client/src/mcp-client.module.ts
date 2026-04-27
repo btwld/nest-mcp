@@ -184,11 +184,8 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
         );
 
         for (const methodName of methodNames) {
-          // Prototype own-property names can include non-function values
-          // (e.g. `Object.prototype.__proto__` on `useValue: {}` providers, or
-          // accessor properties on library classes). `Reflect.getMetadata`
-          // throws TypeError on non-object targets, so skip non-functions.
-          const method = prototype[methodName];
+          const descriptor = Object.getOwnPropertyDescriptor(prototype, methodName);
+          const method = descriptor?.value;
           if (typeof method !== 'function') continue;
 
           // NestJS SetMetadata stores metadata on the descriptor.value (the method
@@ -210,9 +207,7 @@ export class McpClientBootstrap implements OnApplicationBootstrap, OnApplication
             continue;
           }
 
-          const boundHandler = (
-            instance as Record<string, (...args: unknown[]) => void | Promise<void>>
-          )[methodName].bind(instance);
+          const boundHandler = method.bind(instance);
           client.onNotification(metadata.method, boundHandler);
           wiredCount++;
         }
