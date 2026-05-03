@@ -43,18 +43,34 @@ export interface TaskHandlerConfig {
 
 export interface RegisteredTool extends ToolMetadata {
   instance: Record<string, unknown>;
+  /**
+   * Origin tag for non-decorator registrations. Decorator-registered tools
+   * leave this undefined. External bridges (auto-mcp, openapi-mcp) set a
+   * source like `'nestjs:UsersController'` or `'openapi:petstore'` so the
+   * registry can replace or remove an entire batch on refresh.
+   */
+  source?: string;
 }
 
 export interface RegisteredResource extends ResourceMetadata {
   instance: Record<string, unknown>;
+  source?: string;
 }
 
 export interface RegisteredResourceTemplate extends ResourceTemplateMetadata {
   instance: Record<string, unknown>;
+  source?: string;
 }
 
 export interface RegisteredPrompt extends PromptMetadata {
   instance: Record<string, unknown>;
+  source?: string;
+}
+
+export interface ReplaceExternalBatchResult {
+  added: string[];
+  removed: string[];
+  unchanged: number;
 }
 
 export interface RegisteredCompletion {
@@ -369,5 +385,148 @@ export class McpRegistryService {
       this.events.emit('prompt.unregistered', name);
     }
     return deleted;
+  }
+
+  // ---- External-source registration ----
+  //
+  // External bridges (auto-mcp, openapi-mcp) tag every registration with a
+  // `source` string. Decorator tools omit `source`. The shared rule for
+  // collisions is "decorator wins, then first-external wins": a new external
+  // registration is skipped if an existing tool with the same name was
+  // registered by a decorator or by a different source.
+
+  /**
+   * Register a tool from an external source (e.g. a bridge package).
+   * Skips with a warning if a tool with the same name already exists from a
+   * different origin (decorator or another source).
+   */
+  registerExternalTool(tool: RegisteredTool, source: string): boolean {
+    const existing = this.tools.get(tool.name);
+    if (existing && existing.source !== source) {
+      this.logger.warn(
+        `External tool "${tool.name}" from source "${source}" skipped: name already registered by ${
+          existing.source ? `source "${existing.source}"` : 'a decorator'
+        }.`,
+      );
+      return false;
+    }
+    const tagged: RegisteredTool = { ...tool, source };
+    this.warnIfMissingDescription('Tool', tagged.name, tagged.description);
+    this.tools.set(tagged.name, tagged);
+    this.events.emit('tool.registered', tagged);
+    return true;
+  }
+
+  /**
+   * Replace every tool from `source` with the supplied list. Returns the diff:
+   *   - `added`: names not previously registered for this source
+   *   - `removed`: names previously registered but absent from the new batch
+   *   - `unchanged`: count of names present in both
+   *
+   * Tools with the same `source` are replaced; tools registered by a different
+   * source or by a decorator are never touched. Idempotent.
+   */
+  replaceExternalBatch(source: string, tools: RegisteredTool[]): ReplaceExternalBatchResult {
+    const incoming = new Set(tools.map((t) => t.name));
+    // Snapshot existing-source names before any mutation so iteration is stable
+    // and event listeners that re-enter the registry can't perturb us.
+    const previous = new Set(
+      Array.from(this.tools.values())
+        .filter((t) => t.source === source)
+        .map((t) => t.name),
+    );
+
+    const added: string[] = [];
+    const removed: string[] = [];
+    let unchanged = 0;
+
+    const namesToRemove: string[] = [];
+    for (const name of previous) {
+      if (!incoming.has(name)) namesToRemove.push(name);
+    }
+    for (const name of namesToRemove) {
+      this.tools.delete(name);
+      this.events.emit('tool.unregistered', name);
+      removed.push(name);
+    }
+
+    for (const tool of tools) {
+      const existing = this.tools.get(tool.name);
+      if (existing && existing.source !== source) {
+        this.logger.warn(
+          `External tool "${tool.name}" from source "${source}" skipped: name already registered by ${
+            existing.source ? `source "${existing.source}"` : 'a decorator'
+          }.`,
+        );
+        continue;
+      }
+      const tagged: RegisteredTool = { ...tool, source };
+      this.tools.set(tagged.name, tagged);
+      if (previous.has(tool.name)) {
+        unchanged++;
+      } else {
+        this.events.emit('tool.registered', tagged);
+        added.push(tool.name);
+      }
+    }
+
+    this.logger.log(
+      `replaceExternalBatch[${source}]: +${added.length} -${removed.length} =${unchanged}`,
+    );
+    return { added, removed, unchanged };
+  }
+
+  /**
+   * Remove every tool, resource, resource template, and prompt registered by
+   * the given source. Returns the count removed in each bucket.
+   */
+  unregisterBySource(source: string): {
+    tools: number;
+    resources: number;
+    resourceTemplates: number;
+    prompts: number;
+  } {
+    // Snapshot keys to remove before mutating, so emit listeners cannot perturb iteration.
+    const toolKeys = Array.from(this.tools.entries())
+      .filter(([, t]) => t.source === source)
+      .map(([k]) => k);
+    const resourceKeys = Array.from(this.resources.entries())
+      .filter(([, r]) => r.source === source)
+      .map(([k]) => k);
+    const templateKeys = Array.from(this.resourceTemplates.entries())
+      .filter(([, t]) => t.source === source)
+      .map(([k]) => k);
+    const promptKeys = Array.from(this.prompts.entries())
+      .filter(([, p]) => p.source === source)
+      .map(([k]) => k);
+
+    for (const k of toolKeys) {
+      this.tools.delete(k);
+      this.events.emit('tool.unregistered', k);
+    }
+    for (const k of resourceKeys) {
+      this.resources.delete(k);
+      this.events.emit('resource.unregistered', k);
+    }
+    for (const k of templateKeys) {
+      this.resourceTemplates.delete(k);
+      this.events.emit('resourceTemplate.unregistered', k);
+    }
+    for (const k of promptKeys) {
+      this.prompts.delete(k);
+      this.events.emit('prompt.unregistered', k);
+    }
+
+    return {
+      tools: toolKeys.length,
+      resources: resourceKeys.length,
+      resourceTemplates: templateKeys.length,
+      prompts: promptKeys.length,
+    };
+  }
+
+  /** Diagnostics: list every tool registered by a given source. */
+  getToolsBySource(source: string): RegisteredTool[] {
+    return Array.from(this.tools.values()).filter((t) => t.source === source);
   }
 }

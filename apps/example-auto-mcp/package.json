@@ -1,0 +1,30 @@
+{
+  "name": "@nest-mcp/example-auto-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example: auto-expose existing NestJS controllers as MCP tools (stdio transport)",
+  "bin": {
+    "example-auto-mcp": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "start:dev": "tsc --outDir dist && node dist/main.js",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "@nest-mcp/auto-mcp": "workspace:*",
+    "@nest-mcp/common": "workspace:*",
+    "@nest-mcp/server": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "class-validator": "^0.14.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
