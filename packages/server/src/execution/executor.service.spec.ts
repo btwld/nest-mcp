@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { McpTransportType, ToolExecutionError, ValidationError } from '@nest-mcp/common';
 import type { McpModuleOptions } from '@nest-mcp/common';
+import { Reflector } from '@nestjs/core';
 import { z } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type {
@@ -10,6 +11,7 @@ import type {
   RegisteredTool,
 } from '../discovery/registry.service';
 import { mockMcpContext } from '../testing/mock-context';
+import { McpExceptionFilterRunner } from './exception-filter.runner';
 import { McpExecutorService } from './executor.service';
 
 const defaultOptions: McpModuleOptions = {
@@ -25,7 +27,11 @@ describe('McpExecutorService', () => {
 
   beforeEach(() => {
     registry = new McpRegistryService();
-    executor = new McpExecutorService(registry, defaultOptions);
+    executor = new McpExecutorService(
+      registry,
+      new McpExceptionFilterRunner(new Reflector()),
+      defaultOptions,
+    );
     ctx = mockMcpContext();
   });
 
@@ -203,20 +209,24 @@ describe('McpExecutorService', () => {
       );
     });
 
-    it('throws ValidationError on bad input', async () => {
+    it('returns isError tool result for invalid input (per MCP spec)', async () => {
       const schema = z.object({ count: z.number() });
+      const handler = vi.fn();
       registry.registerTool({
         name: 'count',
         description: 'Count',
         methodName: 'count',
         target: Object,
-        instance: { count: vi.fn() },
+        instance: { count: handler },
         parameters: schema,
       } as RegisteredTool);
 
-      await expect(executor.callTool('count', { count: 'not-a-number' }, ctx)).rejects.toThrow(
-        ValidationError,
-      );
+      const result = await executor.callTool('count', { count: 'not-a-number' }, ctx);
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ type: 'text' });
+      expect((result.content[0] as { text: string }).text).toContain('Invalid parameters');
+      expect((result.content[0] as { text: string }).text).toContain('[count]');
+      expect(handler).not.toHaveBeenCalled();
     });
 
     it('passes parsed/coerced args to handler', async () => {
@@ -288,6 +298,98 @@ describe('McpExecutorService', () => {
       } as RegisteredTool);
 
       await expect(executor.callTool('fail', {}, ctx)).rejects.toThrow(ToolExecutionError);
+    });
+  });
+
+  // --- outputSchema / structuredContent ---
+
+  describe('outputSchema', () => {
+    it('attaches structuredContent from a plain-object handler return', async () => {
+      const outputSchema = z.object({ count: z.number(), label: z.string() });
+      registry.registerTool({
+        name: 'metric',
+        description: 'metric',
+        methodName: 'metric',
+        target: Object,
+        instance: { metric: vi.fn().mockResolvedValue({ count: 5, label: 'ok' }) },
+        outputSchema,
+      } as RegisteredTool);
+
+      const result = await executor.callTool('metric', {}, ctx);
+      expect(result.structuredContent).toEqual({ count: 5, label: 'ok' });
+    });
+
+    it('uses validated data (with defaults) for structuredContent', async () => {
+      const outputSchema = z.object({
+        count: z.number(),
+        label: z.string().default('default'),
+      });
+      registry.registerTool({
+        name: 'metric',
+        description: 'metric',
+        methodName: 'metric',
+        target: Object,
+        instance: { metric: vi.fn().mockResolvedValue({ count: 5 }) },
+        outputSchema,
+      } as RegisteredTool);
+
+      const result = await executor.callTool('metric', {}, ctx);
+      expect(result.structuredContent).toEqual({ count: 5, label: 'default' });
+    });
+
+    it('throws ToolExecutionError when handler output fails outputSchema', async () => {
+      const outputSchema = z.object({ count: z.number() });
+      registry.registerTool({
+        name: 'metric',
+        description: 'metric',
+        methodName: 'metric',
+        target: Object,
+        instance: { metric: vi.fn().mockResolvedValue({ count: 'not-a-number' }) },
+        outputSchema,
+      } as RegisteredTool);
+
+      await expect(executor.callTool('metric', {}, ctx)).rejects.toThrow(
+        /outputSchema validation failed/,
+      );
+    });
+
+    it('skips structuredContent when handler returns a content-shaped result', async () => {
+      const outputSchema = z.object({ count: z.number() });
+      registry.registerTool({
+        name: 'metric',
+        description: 'metric',
+        methodName: 'metric',
+        target: Object,
+        instance: {
+          metric: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'pre-formed' }] }),
+        },
+        outputSchema,
+      } as RegisteredTool);
+
+      const result = await executor.callTool('metric', {}, ctx);
+      expect(result.content).toEqual([{ type: 'text', text: 'pre-formed' }]);
+      expect(result.structuredContent).toBeUndefined();
+    });
+
+    it('does not run outputSchema when isError is true', async () => {
+      const outputSchema = z.object({ count: z.number() });
+      registry.registerTool({
+        name: 'metric',
+        description: 'metric',
+        methodName: 'metric',
+        target: Object,
+        instance: {
+          metric: vi.fn().mockResolvedValue({
+            content: [{ type: 'text', text: 'oops' }],
+            isError: true,
+          }),
+        },
+        outputSchema,
+      } as RegisteredTool);
+
+      const result = await executor.callTool('metric', {}, ctx);
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toBeUndefined();
     });
   });
 
@@ -858,10 +960,14 @@ describe('McpExecutorService', () => {
   describe('pagination configuration', () => {
     it('uses custom page size from options', async () => {
       const customRegistry = new McpRegistryService();
-      const customExecutor = new McpExecutorService(customRegistry, {
-        ...defaultOptions,
-        pagination: { defaultPageSize: 2 },
-      });
+      const customExecutor = new McpExecutorService(
+        customRegistry,
+        new McpExceptionFilterRunner(new Reflector()),
+        {
+          ...defaultOptions,
+          pagination: { defaultPageSize: 2 },
+        },
+      );
 
       for (let i = 0; i < 5; i++) {
         customRegistry.registerTool({

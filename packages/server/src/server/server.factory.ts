@@ -22,16 +22,26 @@ export function createMcpServer(
 
   logger.debug(`Building MCP server '${options.name}' v${options.version}`);
 
-  const mcpServer = new McpServer({ name: options.name, version: options.version }, {
-    capabilities: capabilities as ServerOptions['capabilities'],
-    ...(options.description ? { instructions: options.description } : {}),
-    ...(taskManager
-      ? {
-          taskStore: taskManager.store,
-          taskMessageQueue: taskManager.queue,
-        }
-      : {}),
-  } as ServerOptions);
+  const mcpServer = new McpServer(
+    {
+      name: options.name,
+      version: options.version,
+      ...(options.title ? { title: options.title } : {}),
+      ...(options.description ? { description: options.description } : {}),
+      ...(options.websiteUrl ? { websiteUrl: options.websiteUrl } : {}),
+      ...(options.icons ? { icons: options.icons } : {}),
+    },
+    {
+      capabilities: capabilities as ServerOptions['capabilities'],
+      ...(options.description ? { instructions: options.description } : {}),
+      ...(taskManager
+        ? {
+            taskStore: taskManager.store,
+            taskMessageQueue: taskManager.queue,
+          }
+        : {}),
+    } as ServerOptions,
+  );
 
-  return mcpServer;
+  return options.serverMutator ? (options.serverMutator(mcpServer) as McpServer) : mcpServer;
 }

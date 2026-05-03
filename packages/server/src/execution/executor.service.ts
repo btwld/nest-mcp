@@ -1,7 +1,9 @@
 import {
   type CompletionRequest,
   type CompletionResult,
+  JSON_RPC_INTERNAL_ERROR,
   MCP_OPTIONS,
+  McpError,
   type McpExecutionContext,
   type McpModuleOptions,
   type PaginatedResult,
@@ -20,6 +22,50 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ZodEnum, ZodObject, type ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
+import { isPlainRecord } from '../utils/coerce';
+import { type FilterTarget, McpExceptionFilterRunner } from './exception-filter.runner';
+
+interface ZodIssueLike {
+  path: ReadonlyArray<PropertyKey>;
+  message: string;
+}
+
+function formatZodIssues(issues: ReadonlyArray<ZodIssueLike>): string {
+  return issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.map(String).join('.') : '';
+      return path ? `[${path}]: ${issue.message}` : issue.message;
+    })
+    .join('; ');
+}
+
+/**
+ * Structural type guard: "is this object already in the SDK's
+ * `ToolCallResult` envelope shape?". Trusts the discriminator (`content`
+ * key present) — same trust as the previous `as ToolCallResult` cast,
+ * just localized to one predicate.
+ */
+function isToolCallResult(value: unknown): value is ToolCallResult {
+  return isPlainRecord(value) && 'content' in value;
+}
+
+/** Coerce arbitrary handler returns into the SDK `ToolCallResult` envelope. */
+function shapeToolResult(result: unknown): ToolCallResult {
+  if (result === null || result === undefined) {
+    return { content: [{ type: 'text', text: '' }] };
+  }
+  if (isToolCallResult(result)) return result;
+  if (typeof result === 'string') {
+    return { content: [{ type: 'text', text: result }] };
+  }
+  return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+}
+
+/** Pick the structured payload from a raw handler return, or `undefined` when there isn't one. */
+function extractStructuredCandidate(result: unknown): Record<string, unknown> | undefined {
+  if (!isPlainRecord(result) || isToolCallResult(result)) return undefined;
+  return result;
+}
 
 @Injectable()
 export class McpExecutorService {
@@ -28,6 +74,7 @@ export class McpExecutorService {
 
   constructor(
     private readonly registry: McpRegistryService,
+    private readonly exceptionFilters: McpExceptionFilterRunner,
     @Inject(MCP_OPTIONS) options: McpModuleOptions,
   ) {
     this.pageSize = options.pagination?.defaultPageSize;
@@ -78,26 +125,55 @@ export class McpExecutorService {
       throw new ToolExecutionError(name, `Tool '${name}' not found`);
     }
 
-    const validatedArgs = tool.parameters
-      ? this.validateInput(tool.parameters, args, `tool '${name}'`)
-      : args;
+    let validatedArgs: Record<string, unknown> = args;
+    if (tool.parameters) {
+      const parsed = tool.parameters.safeParse(args);
+      if (!parsed.success) {
+        // MCP spec: tool input-validation failures must surface as a tool
+        // result with `isError: true` so the model can self-correct. Throwing
+        // would surface as a JSON-RPC `InvalidParams` and abort the call.
+        return {
+          isError: true,
+          content: [
+            { type: 'text', text: `Invalid parameters: ${formatZodIssues(parsed.error.issues)}` },
+          ],
+        };
+      }
+      validatedArgs = parsed.data as Record<string, unknown>;
+    }
 
     try {
       const handler = tool.instance[tool.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
       const result = await handler.call(tool.instance, validatedArgs, ctx);
-      return this.normalizeToolResult(result);
+      return this.normalizeToolResult(result, tool);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
         throw error;
       }
-      throw new ToolExecutionError(
-        name,
-        error instanceof Error ? error.message : String(error),
-        error instanceof Error ? error : undefined,
-      );
+      const err = error instanceof Error ? error : new Error(String(error));
+      const filtered = this.applyExceptionFilters(err, tool, ctx);
+      if (filtered) throw filtered;
+      throw new ToolExecutionError(name, err.message, err);
     }
+  }
+
+  /**
+   * Walk `@UseFilters` metadata on the capability's class/method. If a filter
+   * handles the error, render its result as an `McpError` (matches upstream
+   * behavior — filter output flows back as a JSON-RPC error). Returns `null`
+   * when no filter matches.
+   */
+  private applyExceptionFilters(
+    error: Error,
+    info: FilterTarget | undefined,
+    ctx: McpExecutionContext,
+  ): McpError | null {
+    if (!info?.target || !info.methodName) return null;
+    const message = this.exceptionFilters.apply(error, info, ctx.request);
+    if (message == null) return null;
+    return new McpError(message, JSON_RPC_INTERNAL_ERROR);
   }
 
   private validateInput(
@@ -119,25 +195,35 @@ export class McpExecutorService {
     return parsed.data as Record<string, unknown>;
   }
 
-  private normalizeToolResult(result: unknown): ToolCallResult {
-    if (result === null || result === undefined) {
-      return { content: [{ type: 'text', text: '' }] };
-    }
+  private normalizeToolResult(result: unknown, tool?: RegisteredTool): ToolCallResult {
+    const normalized = shapeToolResult(result);
+    if (!tool?.outputSchema || normalized.isError) return normalized;
+    return this.attachStructuredContent(normalized, result, tool, tool.outputSchema);
+  }
 
-    // Already in ToolCallResult format
-    if (typeof result === 'object' && 'content' in (result as Record<string, unknown>)) {
-      return result as ToolCallResult;
-    }
+  /**
+   * Per MCP spec, validate the handler return against the tool's
+   * `outputSchema` and stamp the parsed value onto `structuredContent`.
+   * Falls back to the raw result object when the handler didn't pre-set
+   * `structuredContent`. Skips quietly when there's nothing to validate.
+   */
+  private attachStructuredContent(
+    normalized: ToolCallResult,
+    rawResult: unknown,
+    tool: RegisteredTool,
+    outputSchema: ZodType,
+  ): ToolCallResult {
+    const candidate = normalized.structuredContent ?? extractStructuredCandidate(rawResult);
+    if (candidate === undefined) return normalized;
 
-    // String result
-    if (typeof result === 'string') {
-      return { content: [{ type: 'text', text: result }] };
+    const parsed = outputSchema.safeParse(candidate);
+    if (!parsed.success) {
+      throw new ToolExecutionError(
+        tool.name,
+        `outputSchema validation failed: ${formatZodIssues(parsed.error.issues)}`,
+      );
     }
-
-    // Object result - serialize to JSON
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result) }],
-    };
+    return { ...normalized, structuredContent: parsed.data as Record<string, unknown> };
   }
 
   // ---- Resources ----
@@ -172,26 +258,50 @@ export class McpExecutorService {
     // Try exact match first
     const resource = this.registry.getResource(uri);
     if (resource) {
-      const handler = resource.instance[resource.methodName] as
-        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-        Function;
-      const result = await handler.call(resource.instance, new URL(uri), ctx);
-      return this.normalizeResourceResult(result, uri);
+      try {
+        const handler = resource.instance[resource.methodName] as
+          // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+          Function;
+        const result = await handler.call(resource.instance, new URL(uri), ctx);
+        return this.normalizeResourceResult(result, uri);
+      } catch (error) {
+        throw this.processCapabilityError(error, resource, ctx);
+      }
     }
 
     // Try template match
     for (const template of this.registry.getAllResourceTemplates()) {
       const match = matchUriTemplate(template.uriTemplate, uri);
       if (match) {
-        const handler = template.instance[template.methodName] as
-          // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-          Function;
-        const result = await handler.call(template.instance, new URL(uri), match.params, ctx);
-        return this.normalizeResourceResult(result, uri);
+        try {
+          const handler = template.instance[template.methodName] as
+            // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+            Function;
+          const result = await handler.call(template.instance, new URL(uri), match.params, ctx);
+          return this.normalizeResourceResult(result, uri);
+        } catch (error) {
+          throw this.processCapabilityError(error, template, ctx);
+        }
       }
     }
 
     throw new ToolExecutionError('resources/read', `Resource not found: ${uri}`);
+  }
+
+  /**
+   * Funnel a raw user error from a resource/prompt handler through the
+   * exception-filter pipeline. Existing protocol errors (`McpError` family)
+   * are passed through untouched. Always returns a real `Error` subclass —
+   * lets call sites narrow without an `unknown` cast.
+   */
+  private processCapabilityError(
+    error: unknown,
+    info: FilterTarget,
+    ctx: McpExecutionContext,
+  ): Error {
+    if (error instanceof McpError) return error;
+    const err = error instanceof Error ? error : new Error(String(error));
+    return this.applyExceptionFilters(err, info, ctx) ?? err;
   }
 
   private normalizeResourceResult(result: unknown, uri: string): ResourceReadResult {
@@ -244,10 +354,15 @@ export class McpExecutorService {
       ? this.validateInput(prompt.parameters, args, `prompt '${name}'`)
       : args;
 
-    const handler = prompt.instance[prompt.methodName] as
-      // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-      Function;
-    const result = await handler.call(prompt.instance, validatedArgs, ctx);
+    let result: unknown;
+    try {
+      const handler = prompt.instance[prompt.methodName] as
+        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+        Function;
+      result = await handler.call(prompt.instance, validatedArgs, ctx);
+    } catch (error) {
+      throw this.processCapabilityError(error, prompt, ctx);
+    }
 
     if (result && typeof result === 'object' && 'messages' in result) {
       return result as PromptGetResult;

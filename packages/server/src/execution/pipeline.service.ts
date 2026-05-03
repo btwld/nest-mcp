@@ -68,11 +68,11 @@ export class ExecutionPipelineService {
       }
 
       // Global guards (populate user from token)
-      await this.applyGlobalGuards(ctx, { toolName: name });
+      await this.applyGlobalGuards(ctx, { toolName: name, arguments: args });
 
       // Auth check
       if (!tool.isPublic) {
-        const guardContext = this.buildGuardContext(ctx, { toolName: name });
+        const guardContext = this.buildGuardContext(ctx, { toolName: name, arguments: args });
         await this.authGuard.checkAuthorization(tool, guardContext);
       }
 
@@ -168,10 +168,10 @@ export class ExecutionPipelineService {
       const prompt = this.registry.getPrompt(name);
 
       // Global guards (populate user from token)
-      await this.applyGlobalGuards(ctx, { promptName: name });
+      await this.applyGlobalGuards(ctx, { promptName: name, arguments: args });
 
       if (prompt) {
-        const guardContext = this.buildGuardContext(ctx, { promptName: name });
+        const guardContext = this.buildGuardContext(ctx, { promptName: name, arguments: args });
         await this.authGuard.checkAuthorization({ ...prompt, isPublic: false }, guardContext);
       }
 
@@ -226,7 +226,12 @@ export class ExecutionPipelineService {
 
   private async applyGlobalGuards(
     ctx: McpExecutionContext,
-    extra: { toolName?: string; resourceUri?: string; promptName?: string },
+    extra: {
+      toolName?: string;
+      resourceUri?: string;
+      promptName?: string;
+      arguments?: Record<string, unknown>;
+    },
   ): Promise<void> {
     if (!this.options.guards?.length) return;
 
@@ -302,7 +307,12 @@ export class ExecutionPipelineService {
 
   private buildGuardContext(
     ctx: McpExecutionContext,
-    extra: { toolName?: string; resourceUri?: string; promptName?: string },
+    extra: {
+      toolName?: string;
+      resourceUri?: string;
+      promptName?: string;
+      arguments?: Record<string, unknown>;
+    },
   ): McpGuardContext {
     return {
       sessionId: ctx.sessionId,

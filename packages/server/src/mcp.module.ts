@@ -29,6 +29,7 @@ import { McpScannerService } from './discovery/scanner.service';
 
 import { McpContextFactory } from './execution/context.factory';
 // Execution
+import { McpExceptionFilterRunner } from './execution/exception-filter.runner';
 import { McpExecutorService } from './execution/executor.service';
 import { ExecutionPipelineService } from './execution/pipeline.service';
 import { McpRequestContextService } from './execution/request-context.service';
@@ -95,6 +96,7 @@ export class McpModule {
       { provide: MCP_OPTIONS, useValue: options },
       McpRegistryService,
       McpScannerService,
+      McpExceptionFilterRunner,
       McpExecutorService,
       ExposureService,
       ExecutionPipelineService,
@@ -170,6 +172,7 @@ export class McpModule {
       },
       McpRegistryService,
       McpScannerService,
+      McpExceptionFilterRunner,
       McpExecutorService,
       ExposureService,
       ExecutionPipelineService,

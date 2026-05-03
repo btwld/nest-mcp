@@ -117,3 +117,49 @@ describe('edge cases', () => {
     expect(regex.test('users/123')).toBe(true);
   });
 });
+
+describe('RFC 6570 query expansion ({?param})', () => {
+  it('extracts declared query params from the URI', () => {
+    const result = matchUriTemplate(
+      'users/{id}{?expand,fields}',
+      'users/42?expand=true&fields=name',
+    );
+    expect(result).toEqual({
+      params: { id: '42', expand: 'true', fields: 'name' },
+    });
+  });
+
+  it('ignores query params that are not declared in the template', () => {
+    const result = matchUriTemplate('users/{id}{?expand}', 'users/42?expand=true&unknown=ignore');
+    expect(result).toEqual({ params: { id: '42', expand: 'true' } });
+  });
+
+  it('matches when declared query params are absent from the URI', () => {
+    const result = matchUriTemplate('users/{id}{?expand}', 'users/42');
+    expect(result).toEqual({ params: { id: '42' } });
+  });
+
+  it('matches a path-only URI when the template declares query params', () => {
+    const result = matchUriTemplate('items{?limit,offset}', 'items?limit=10&offset=0');
+    expect(result).toEqual({ params: { limit: '10', offset: '0' } });
+  });
+
+  it('decodes URL-encoded query values', () => {
+    const result = matchUriTemplate('search{?q}', 'search?q=hello%20world');
+    expect(result).toEqual({ params: { q: 'hello world' } });
+  });
+
+  it("decodes '+' as space (form-encoded query semantics)", () => {
+    const result = matchUriTemplate('search{?q}', 'search?q=hello+world');
+    expect(result).toEqual({ params: { q: 'hello world' } });
+  });
+
+  it('expandUriTemplate strips {?...} blocks (path-only expansion)', () => {
+    const result = expandUriTemplate('users/{id}{?expand}', { id: '42' });
+    expect(result).toBe('users/42');
+  });
+
+  it('getTemplateParams returns path then query param names', () => {
+    expect(getTemplateParams('users/{id}{?expand,fields}')).toEqual(['id', 'expand', 'fields']);
+  });
+});
