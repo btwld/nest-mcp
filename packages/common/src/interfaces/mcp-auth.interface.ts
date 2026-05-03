@@ -22,6 +22,13 @@ export interface McpGuardContext {
   toolName?: string;
   resourceUri?: string;
   promptName?: string;
+  /**
+   * Raw arguments the caller passed for this capability invocation. Present
+   * for tools (`tools/call`) and prompts (`prompts/get`); undefined for
+   * resource reads. These are pre-Zod (validation runs after auth) so guards
+   * inspecting fields should treat the values as `unknown`.
+   */
+  arguments?: Record<string, unknown>;
   user?: {
     id: string;
     roles?: string[];

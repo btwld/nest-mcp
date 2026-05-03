@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { McpTransportType } from '@nest-mcp/common';
 import type { McpModuleOptions } from '@nest-mcp/common';
 import { z } from 'zod';
+import { Reflector } from '@nestjs/core';
 import { McpRegistryService } from '../discovery/registry.service';
+import { McpExceptionFilterRunner } from '../execution/exception-filter.runner';
 import { McpExecutorService } from '../execution/executor.service';
 import { mockMcpContext } from '../testing/mock-context';
 import { McpPromptBuilder } from './prompt-builder.service';
@@ -358,7 +360,11 @@ describe('Dynamic Builders', () => {
   describe('Integration: builder -> executor', () => {
     it('callTool works with dynamically registered tool', async () => {
       const toolBuilder = new McpToolBuilder(registry);
-      const executor = new McpExecutorService(registry, defaultOptions);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
       const ctx = mockMcpContext();
 
       toolBuilder.register({
@@ -373,7 +379,11 @@ describe('Dynamic Builders', () => {
 
     it('readResource works with dynamically registered resource', async () => {
       const resourceBuilder = new McpResourceBuilder(registry);
-      const executor = new McpExecutorService(registry, defaultOptions);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
       const ctx = mockMcpContext();
 
       resourceBuilder.register({
@@ -388,7 +398,11 @@ describe('Dynamic Builders', () => {
 
     it('getPrompt works with dynamically registered prompt', async () => {
       const promptBuilder = new McpPromptBuilder(registry);
-      const executor = new McpExecutorService(registry, defaultOptions);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
       const ctx = mockMcpContext();
 
       promptBuilder.register({

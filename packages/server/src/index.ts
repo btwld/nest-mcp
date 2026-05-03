@@ -74,6 +74,13 @@ export type {
   OAuthProviderAdapter,
   OAuthProviderUser,
 } from './auth/interfaces/oauth-provider.interface';
+export {
+  AzureAdProvider,
+  type AzureAdProviderConfig,
+  GitHubProvider,
+  type GitHubProviderConfig,
+  OAuthCodeExchangeProvider,
+} from './auth/providers';
 export type {
   OAuthClient,
   AuthorizationCode,
@@ -106,6 +113,30 @@ export type { ToolMetrics } from './observability/metrics.service';
 
 // Server factory
 export { createMcpServer } from './server/server.factory';
+
+// URL elicitation (opt-in module)
+export {
+  COMPLETION_NOTIFIER_REGISTRY,
+  DEFAULT_ELICITATION_OPTIONS,
+  ELICITATION_MODULE_OPTIONS,
+  ELICITATION_STORE_TOKEN,
+  ElicitationCancelledError,
+  ElicitationService,
+  McpElicitationModule,
+  MemoryElicitationStore,
+  type CompleteElicitationParams,
+  type CompletionNotifier,
+  type CompletionNotifierRegistry,
+  type CreateElicitationParams,
+  type ElicitationEndpointConfiguration,
+  type ElicitationModuleOptions,
+  type ElicitationRecord,
+  type ElicitationResultRecord,
+  type ElicitationStoreConfiguration,
+  type ElicitationTemplateOptions,
+  type IElicitationStore,
+  type ResolvedElicitationOptions,
+} from './elicitation';
 
 // SDK transport types — re-exported for convenience so users don't need to
 // import directly from @modelcontextprotocol/sdk

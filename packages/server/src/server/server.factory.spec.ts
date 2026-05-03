@@ -108,4 +108,36 @@ describe('createMcpServer', () => {
     );
     expect(server).toBeInstanceOf(McpServer);
   });
+
+  it('forwards title, websiteUrl, and icons to the SDK Implementation block', () => {
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      title: 'Pretty Name',
+      websiteUrl: 'https://example.com',
+      icons: [{ src: 'https://example.com/icon.png', mimeType: 'image/png' }],
+    });
+    expect(server).toBeInstanceOf(McpServer);
+  });
+
+  it('runs serverMutator and uses the returned instance', () => {
+    const seen: McpServer[] = [];
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      serverMutator: (s) => {
+        seen.push(s as McpServer);
+        return s;
+      },
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBe(server);
+  });
+
+  it('lets serverMutator replace the server with a different instance', () => {
+    const replacement = createMcpServer(makeRegistry(), baseOptions);
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      serverMutator: () => replacement,
+    });
+    expect(server).toBe(replacement);
+  });
 });

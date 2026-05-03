@@ -7,12 +7,37 @@ import type {
   RateLimitConfig,
   RetryConfig,
 } from './mcp-resilience.interface';
+import type { Icon } from './mcp-tool.interface';
 import type { McpTransportType, TransportOptions } from './mcp-transport.interface';
+
+/**
+ * Mutator hook applied to the SDK `McpServer` after our factory builds it.
+ * Use this to register custom JSON-RPC handlers, install transport hooks,
+ * or otherwise reach into the underlying server.
+ *
+ * Generic over the server type so callers from `@nest-mcp/server` can supply
+ * the concrete `McpServer` shape via inference, while `@nest-mcp/common`
+ * itself remains free of any `@modelcontextprotocol/sdk` dependency.
+ */
+export type McpServerMutator<S = unknown> = (server: S) => S;
 
 export interface McpModuleOptions {
   name: string;
+  /** Human-readable display name (sent in MCP `Implementation`). */
+  title?: string;
   version: string;
   description?: string;
+  /** URL of the website associated with this server. */
+  websiteUrl?: string;
+  /** Icons representing this server, sent in MCP `Implementation`. */
+  icons?: Icon[];
+  /**
+   * Hook called once the underlying SDK `McpServer` instance is created,
+   * before transports attach. Mutate or replace the server (return value
+   * is used). Allows registering custom JSON-RPC methods our public API
+   * doesn't expose.
+   */
+  serverMutator?: McpServerMutator;
 
   // Transport
   transport: McpTransportType | McpTransportType[];

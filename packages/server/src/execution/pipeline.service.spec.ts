@@ -321,6 +321,36 @@ describe('ExecutionPipelineService', () => {
       );
     });
 
+    it('exposes raw tool arguments on the guard context', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const GuardClass = class ArgsGuard {} as any;
+      options.guards = [GuardClass];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+
+      await pipeline.callTool('test', { foo: 'bar' }, ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(
+        expect.objectContaining({ toolName: 'test', arguments: { foo: 'bar' } }),
+      );
+    });
+
+    it('exposes raw prompt arguments on the guard context', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const GuardClass = class ArgsGuard {} as any;
+      options.guards = [GuardClass];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getPrompt.mockReturnValue({ name: 'p', description: 'p' });
+
+      await pipeline.getPrompt('p', { topic: 'cats' }, ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(
+        expect.objectContaining({ promptName: 'p', arguments: { topic: 'cats' } }),
+      );
+    });
+
     it('instantiates guard directly when not found in DI', async () => {
       const canActivate = vi.fn().mockResolvedValue(true);
       const GuardClass = class SimpleGuard {
