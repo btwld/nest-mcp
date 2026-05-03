@@ -1,18 +1,6 @@
 import type { CanActivate, Type } from '@nestjs/common';
 import type { IElicitationStore } from './elicitation-store.interface';
 
-/** Per-endpoint path overrides. All values are appended after `/:id`. */
-export interface ElicitationEndpointConfiguration {
-  /** Default `status` */
-  status?: string;
-  /** Default `complete` */
-  complete?: string;
-  /** Default `api-key` */
-  apiKey?: string;
-  /** Default `confirm` */
-  confirm?: string;
-}
-
 /** Lightweight branding for the rendered HTML pages. */
 export interface ElicitationTemplateOptions {
   /** Inlined into the `<style>` block. */
@@ -31,7 +19,7 @@ export type ElicitationStoreConfiguration =
 export interface ElicitationModuleOptions {
   /** Origin used to build user-facing URLs (e.g. `https://api.example.com`). */
   serverUrl: string;
-  /** Path prefix for the controller. Default `elicitation`. */
+  /** Path prefix mounted via `RouterModule`. Default `elicitation`. */
   apiPrefix?: string;
   /** Default 1 hour. */
   elicitationTtlMs?: number;
@@ -39,8 +27,10 @@ export interface ElicitationModuleOptions {
   cleanupIntervalMs?: number;
   /** Default in-memory. */
   storeConfiguration?: ElicitationStoreConfiguration;
-  endpoints?: ElicitationEndpointConfiguration;
-  /** Nest guards applied to elicitation HTTP routes (e.g. JWT). */
+  /**
+   * Nest guards applied to every elicitation HTTP route via the composite
+   * guard. Registered as providers in `forRoot` so they participate in DI.
+   */
   guards?: Type<CanActivate>[];
   templateOptions?: ElicitationTemplateOptions;
 }
@@ -51,7 +41,6 @@ export interface ResolvedElicitationOptions {
   elicitationTtlMs: number;
   cleanupIntervalMs: number;
   storeConfiguration: ElicitationStoreConfiguration;
-  endpoints: Required<ElicitationEndpointConfiguration>;
   guards?: Type<CanActivate>[];
   templateOptions: ElicitationTemplateOptions;
 }
@@ -61,12 +50,6 @@ export const DEFAULT_ELICITATION_OPTIONS: Omit<ResolvedElicitationOptions, 'serv
   elicitationTtlMs: 60 * 60 * 1000,
   cleanupIntervalMs: 10 * 60 * 1000,
   storeConfiguration: { type: 'memory' },
-  endpoints: {
-    status: 'status',
-    complete: 'complete',
-    apiKey: 'api-key',
-    confirm: 'confirm',
-  },
   templateOptions: {
     appName: 'MCP Server',
     primaryColor: '#007bff',

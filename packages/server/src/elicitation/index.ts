@@ -1,8 +1,8 @@
+export { ElicitationController } from './elicitation.controller';
 export { McpElicitationModule } from './elicitation.module';
 export {
   ELICITATION_MODULE_OPTIONS,
   DEFAULT_ELICITATION_OPTIONS,
-  type ElicitationEndpointConfiguration,
   type ElicitationModuleOptions,
   type ElicitationStoreConfiguration,
   type ElicitationTemplateOptions,
@@ -18,6 +18,7 @@ export type {
   ElicitationRecord,
   ElicitationResultRecord,
 } from './interfaces/elicitation.interface';
+export { ElicitationGuardComposite } from './services/elicitation-guard.composite';
 export {
   COMPLETION_NOTIFIER_REGISTRY,
   type CompletionNotifier,

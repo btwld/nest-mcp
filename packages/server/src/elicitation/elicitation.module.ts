@@ -1,15 +1,14 @@
-import { type DynamicModule, Logger, Module, type Provider, type Type } from '@nestjs/common';
-import { createElicitationController } from './elicitation.controller';
+import { type DynamicModule, Module, type Provider } from '@nestjs/common';
+import { RouterModule } from '@nestjs/core';
+import { ElicitationController } from './elicitation.controller';
 import {
   DEFAULT_ELICITATION_OPTIONS,
   ELICITATION_MODULE_OPTIONS,
   type ElicitationModuleOptions,
   type ResolvedElicitationOptions,
 } from './interfaces/elicitation-options.interface';
-import {
-  ELICITATION_STORE_TOKEN,
-  type IElicitationStore,
-} from './interfaces/elicitation-store.interface';
+import { ELICITATION_STORE_TOKEN } from './interfaces/elicitation-store.interface';
+import { ElicitationGuardComposite } from './services/elicitation-guard.composite';
 import {
   COMPLETION_NOTIFIER_REGISTRY,
   type CompletionNotifierRegistry,
@@ -20,11 +19,8 @@ import { MemoryElicitationStore } from './stores/memory-elicitation.store';
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS dynamic-module convention
 export class McpElicitationModule {
-  private static readonly logger = new Logger('McpElicitationModule');
-
   static forRoot(options: ElicitationModuleOptions): DynamicModule {
     const resolved = resolveOptions(options);
-    const ElicitationController = createElicitationController(resolved);
     const notifierRegistry: CompletionNotifierRegistry = new Map();
 
     const storeProvider: Provider =
@@ -35,6 +31,10 @@ export class McpElicitationModule {
     const providers: Provider[] = [
       { provide: ELICITATION_MODULE_OPTIONS, useValue: resolved },
       { provide: COMPLETION_NOTIFIER_REGISTRY, useValue: notifierRegistry },
+      // User-supplied guard classes need to be in the provider list so
+      // `ElicitationGuardComposite` can resolve them via `ModuleRef`.
+      ...(options.guards ?? []),
+      ElicitationGuardComposite,
       storeProvider,
       ElicitationService,
     ];
@@ -45,7 +45,10 @@ export class McpElicitationModule {
 
     return {
       module: McpElicitationModule,
-      controllers: [ElicitationController as Type<unknown>],
+      imports: [
+        RouterModule.register([{ path: resolved.apiPrefix, module: McpElicitationModule }]),
+      ],
+      controllers: [ElicitationController],
       providers,
       exports: [ElicitationService, ELICITATION_STORE_TOKEN, ELICITATION_MODULE_OPTIONS],
     };
@@ -63,7 +66,6 @@ function resolveOptions(options: ElicitationModuleOptions): ResolvedElicitationO
     cleanupIntervalMs: options.cleanupIntervalMs ?? DEFAULT_ELICITATION_OPTIONS.cleanupIntervalMs,
     storeConfiguration:
       options.storeConfiguration ?? DEFAULT_ELICITATION_OPTIONS.storeConfiguration,
-    endpoints: { ...DEFAULT_ELICITATION_OPTIONS.endpoints, ...(options.endpoints ?? {}) },
     guards: options.guards,
     templateOptions: {
       ...DEFAULT_ELICITATION_OPTIONS.templateOptions,
