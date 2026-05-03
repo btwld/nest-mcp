@@ -1,3 +1,4 @@
+import { asString } from '../../utils/coerce';
 import type { OAuthProviderUser } from '../interfaces/oauth-provider.interface';
 import { OAuthCodeExchangeProvider } from './oauth-code-exchange.provider';
 
@@ -37,16 +38,11 @@ export class AzureAdProvider extends OAuthCodeExchangeProvider {
   }
 
   protected mapProfile(raw: Record<string, unknown>): OAuthProviderUser {
-    const id = raw.id ?? raw.oid;
-    const email =
-      (typeof raw.mail === 'string' && raw.mail) ||
-      (typeof raw.userPrincipalName === 'string' && raw.userPrincipalName) ||
-      undefined;
     return {
-      id: typeof id === 'string' ? id : '',
-      email: email || undefined,
-      name: typeof raw.displayName === 'string' ? raw.displayName : undefined,
-      tenantId: typeof raw.tenantId === 'string' ? raw.tenantId : undefined,
+      id: asString(raw.id) ?? asString(raw.oid) ?? '',
+      email: asString(raw.mail) ?? asString(raw.userPrincipalName),
+      name: asString(raw.displayName),
+      tenantId: asString(raw.tenantId),
     };
   }
 }

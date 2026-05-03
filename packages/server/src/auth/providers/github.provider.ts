@@ -1,3 +1,4 @@
+import { asString } from '../../utils/coerce';
 import type { OAuthProviderUser } from '../interfaces/oauth-provider.interface';
 import { OAuthCodeExchangeProvider } from './oauth-code-exchange.provider';
 
@@ -37,15 +38,10 @@ export class GitHubProvider extends OAuthCodeExchangeProvider {
     const id = raw.id;
     return {
       id: typeof id === 'number' || typeof id === 'string' ? String(id) : '',
-      email: typeof raw.email === 'string' ? raw.email : undefined,
-      name:
-        typeof raw.name === 'string'
-          ? raw.name
-          : typeof raw.login === 'string'
-            ? raw.login
-            : undefined,
-      login: typeof raw.login === 'string' ? raw.login : undefined,
-      avatarUrl: typeof raw.avatar_url === 'string' ? raw.avatar_url : undefined,
+      email: asString(raw.email),
+      name: asString(raw.name) ?? asString(raw.login),
+      login: asString(raw.login),
+      avatarUrl: asString(raw.avatar_url),
     };
   }
 }

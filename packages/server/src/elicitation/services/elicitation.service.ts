@@ -89,12 +89,12 @@ export class ElicitationService implements OnModuleDestroy {
     query?: Record<string, string>,
   ): string {
     const base = this.options.serverUrl.replace(/\/$/, '');
-    const prefix = this.options.apiPrefix;
-    let url = `${base}/${prefix}/${elicitationId}`;
+    let url = `${base}/${this.options.apiPrefix}/${elicitationId}`;
     if (path) url += `/${path}`;
-    if (query && Object.keys(query).length > 0) {
-      url += `?${new URLSearchParams(query).toString()}`;
-    }
+    // Empty `URLSearchParams({})` serializes to '', so the falsy check covers
+    // both 'no query passed' and 'query was an empty object'.
+    const search = query && new URLSearchParams(query).toString();
+    if (search) url += `?${search}`;
     return url;
   }
 

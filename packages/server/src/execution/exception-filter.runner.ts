@@ -40,21 +40,16 @@ export class McpExceptionFilterRunner {
     const classFilters =
       this.reflector.get<Type<ExceptionFilter>[]>(EXCEPTION_FILTERS_METADATA, clazz) ?? [];
 
-    const allFilters = [...methodFilters, ...classFilters];
-    if (allFilters.length === 0) return null;
+    const matched = [...methodFilters, ...classFilters].find((f) =>
+      this.matchesError(error, f),
+    );
+    if (!matched) return null;
 
-    for (const FilterClass of allFilters) {
-      if (!this.matchesError(error, FilterClass)) continue;
+    const host = new ExecutionContextHost([request], clazz, method);
+    host.setType('http');
 
-      const instance = new FilterClass();
-      const host = new ExecutionContextHost([request], clazz, method);
-      host.setType('http');
-
-      const result = instance.catch(error, host);
-      return typeof result === 'string' ? result : JSON.stringify(result);
-    }
-
-    return null;
+    const result = new matched().catch(error, host);
+    return typeof result === 'string' ? result : JSON.stringify(result);
   }
 
   private matchesError(error: Error, filter: Type<ExceptionFilter>): boolean {

@@ -12,6 +12,7 @@ import {
   type Type,
   UseGuards,
 } from '@nestjs/common';
+import { asString } from '../utils/coerce';
 import {
   ELICITATION_MODULE_OPTIONS,
   type ResolvedElicitationOptions,
@@ -91,11 +92,10 @@ export function createElicitationController(
       const meta = record.metadata ?? {};
       const html = apiKeyFormTemplate({
         elicitationId: id,
-        message: typeof meta.message === 'string' ? meta.message : 'Please enter your API key.',
-        fieldLabel: typeof meta.fieldLabel === 'string' ? meta.fieldLabel : 'API Key',
-        placeholder:
-          typeof meta.placeholder === 'string' ? meta.placeholder : 'Enter your API key',
-        description: typeof meta.description === 'string' ? meta.description : undefined,
+        message: asString(meta.message) ?? 'Please enter your API key.',
+        fieldLabel: asString(meta.fieldLabel) ?? 'API Key',
+        placeholder: asString(meta.placeholder) ?? 'Enter your API key',
+        description: asString(meta.description),
         actionUrl: this.service.buildElicitationUrl(id, endpoints.apiKey),
         options: this.opts.templateOptions,
       });
@@ -147,12 +147,11 @@ export function createElicitationController(
       const meta = record.metadata ?? {};
       const html = confirmationFormTemplate({
         elicitationId: id,
-        title: typeof meta.title === 'string' ? meta.title : 'Confirm Action',
-        message:
-          typeof meta.message === 'string' ? meta.message : 'Please confirm you want to proceed.',
-        warning: typeof meta.warning === 'string' ? meta.warning : undefined,
-        confirmLabel: typeof meta.confirmLabel === 'string' ? meta.confirmLabel : 'Confirm',
-        cancelLabel: typeof meta.cancelLabel === 'string' ? meta.cancelLabel : 'Cancel',
+        title: asString(meta.title) ?? 'Confirm Action',
+        message: asString(meta.message) ?? 'Please confirm you want to proceed.',
+        warning: asString(meta.warning),
+        confirmLabel: asString(meta.confirmLabel) ?? 'Confirm',
+        cancelLabel: asString(meta.cancelLabel) ?? 'Cancel',
         actionUrl: this.service.buildElicitationUrl(id, endpoints.confirm),
         options: this.opts.templateOptions,
       });

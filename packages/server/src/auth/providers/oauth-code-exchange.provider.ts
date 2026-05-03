@@ -1,3 +1,4 @@
+import { asString } from '../../utils/coerce';
 import type {
   OAuthProviderAdapter,
   OAuthProviderUser,
@@ -60,19 +61,18 @@ export abstract class OAuthCodeExchangeProvider implements OAuthProviderAdapter 
   }
 
   async exchangeToken(code: string, redirectUri: string): Promise<OAuthProviderUser | null> {
+    // `URLSearchParams` as the body has fetch set the
+    // `application/x-www-form-urlencoded` Content-Type automatically.
     const tokenRes = await fetch(this.tokenUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
+      headers: { Accept: 'application/json' },
       body: new URLSearchParams({
         client_id: this.config.clientId,
         client_secret: this.config.clientSecret,
         code,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
-      }).toString(),
+      }),
     });
     if (!tokenRes.ok) return null;
 
@@ -84,9 +84,8 @@ export abstract class OAuthCodeExchangeProvider implements OAuthProviderAdapter 
 
   async validateUser(req: unknown): Promise<OAuthProviderUser | null> {
     const query = (req as RequestWithQuery)?.query;
-    const code = typeof query?.code === 'string' ? query.code : undefined;
-    const redirectUri =
-      typeof query?.redirect_uri === 'string' ? query.redirect_uri : undefined;
+    const code = asString(query?.code);
+    const redirectUri = asString(query?.redirect_uri);
     if (!code || !redirectUri) return null;
     return this.exchangeToken(code, redirectUri);
   }
