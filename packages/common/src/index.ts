@@ -49,6 +49,9 @@ export { drainAllPages } from './utils/drain-pages';
 export * from './utils/exposure-capabilities';
 export * from './utils/exposure-presets';
 export * from './utils/build-client-context';
+export * from './utils/json-schema-to-zod';
+export * from './utils/compact-schema';
+export * from './utils/deduplicate-names';
 
 // Decorators
 export * from './decorators/metadata.utils';

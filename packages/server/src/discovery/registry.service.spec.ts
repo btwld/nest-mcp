@@ -903,4 +903,131 @@ describe('McpRegistryService', () => {
       );
     });
   });
+
+  describe('external-source registration', () => {
+    const buildTool = (name: string): RegisteredTool => ({
+      name,
+      description: `tool ${name}`,
+      methodName: 'invoke',
+      target: Object,
+      instance: { invoke: () => name },
+    });
+
+    describe('registerExternalTool', () => {
+      it('tags the tool with the source and registers it', () => {
+        const ok = registry.registerExternalTool(buildTool('alpha'), 'openapi:foo');
+        expect(ok).toBe(true);
+        const stored = registry.getTool('alpha');
+        expect(stored?.source).toBe('openapi:foo');
+      });
+
+      it('skips when name already registered by a decorator', () => {
+        registry.registerTool(buildTool('decorated'));
+        const ok = registry.registerExternalTool(buildTool('decorated'), 'openapi:foo');
+        expect(ok).toBe(false);
+        expect(registry.getTool('decorated')?.source).toBeUndefined();
+      });
+
+      it('skips when name already registered by a different external source', () => {
+        registry.registerExternalTool(buildTool('shared'), 'openapi:foo');
+        const ok = registry.registerExternalTool(buildTool('shared'), 'nestjs:Bar');
+        expect(ok).toBe(false);
+        expect(registry.getTool('shared')?.source).toBe('openapi:foo');
+      });
+
+      it('replaces a previous registration from the same source', () => {
+        registry.registerExternalTool(buildTool('repeat'), 'openapi:foo');
+        const replacement = { ...buildTool('repeat'), description: 'updated' };
+        const ok = registry.registerExternalTool(replacement, 'openapi:foo');
+        expect(ok).toBe(true);
+        expect(registry.getTool('repeat')?.description).toBe('updated');
+      });
+    });
+
+    describe('replaceExternalBatch', () => {
+      it('returns added/removed/unchanged diff on first registration', () => {
+        const result = registry.replaceExternalBatch('openapi:foo', [
+          buildTool('a'),
+          buildTool('b'),
+        ]);
+        expect(result).toEqual({ added: ['a', 'b'], removed: [], unchanged: 0 });
+        expect(registry.getToolsBySource('openapi:foo').map((t) => t.name).sort()).toEqual([
+          'a',
+          'b',
+        ]);
+      });
+
+      it('computes diff when batch shrinks', () => {
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a'), buildTool('b')]);
+        const result = registry.replaceExternalBatch('openapi:foo', [buildTool('a')]);
+        expect(result).toEqual({ added: [], removed: ['b'], unchanged: 1 });
+        expect(registry.getTool('b')).toBeUndefined();
+      });
+
+      it('computes diff when batch grows', () => {
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a')]);
+        const result = registry.replaceExternalBatch('openapi:foo', [
+          buildTool('a'),
+          buildTool('b'),
+        ]);
+        expect(result).toEqual({ added: ['b'], removed: [], unchanged: 1 });
+      });
+
+      it('is idempotent on identical batch', () => {
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a'), buildTool('b')]);
+        const result = registry.replaceExternalBatch('openapi:foo', [
+          buildTool('a'),
+          buildTool('b'),
+        ]);
+        expect(result).toEqual({ added: [], removed: [], unchanged: 2 });
+      });
+
+      it('does not touch tools registered by another source', () => {
+        registry.registerExternalTool(buildTool('keep'), 'nestjs:Other');
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a')]);
+        registry.replaceExternalBatch('openapi:foo', []);
+        expect(registry.getTool('keep')?.source).toBe('nestjs:Other');
+      });
+
+      it('skips inserts that collide with a decorator-registered tool', () => {
+        registry.registerTool(buildTool('decorated'));
+        const result = registry.replaceExternalBatch('openapi:foo', [
+          buildTool('decorated'),
+          buildTool('alpha'),
+        ]);
+        expect(result.added).toEqual(['alpha']);
+        expect(registry.getTool('decorated')?.source).toBeUndefined();
+      });
+
+      it('emits tool.registered for new entries and tool.unregistered for removed', () => {
+        const registeredEvents: string[] = [];
+        const unregisteredEvents: string[] = [];
+        registry.events.on('tool.registered', (t: RegisteredTool) => registeredEvents.push(t.name));
+        registry.events.on('tool.unregistered', (n: string) => unregisteredEvents.push(n));
+
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a')]);
+        registry.replaceExternalBatch('openapi:foo', [buildTool('b')]);
+
+        expect(registeredEvents).toEqual(['a', 'b']);
+        expect(unregisteredEvents).toEqual(['a']);
+      });
+    });
+
+    describe('unregisterBySource', () => {
+      it('removes every tool from a source and reports the count', () => {
+        registry.replaceExternalBatch('openapi:foo', [buildTool('a'), buildTool('b')]);
+        registry.registerTool(buildTool('decorated'));
+
+        const result = registry.unregisterBySource('openapi:foo');
+        expect(result.tools).toBe(2);
+        expect(registry.getToolsBySource('openapi:foo')).toHaveLength(0);
+        expect(registry.getTool('decorated')).toBeDefined();
+      });
+
+      it('returns zero counts for an unknown source', () => {
+        const result = registry.unregisterBySource('does-not-exist');
+        expect(result).toEqual({ tools: 0, resources: 0, resourceTemplates: 0, prompts: 0 });
+      });
+    });
+  });
 });
