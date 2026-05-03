@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Inject,
   Logger,
@@ -27,14 +28,13 @@ import {
 } from './templates';
 
 /**
- * Structural HTTP response shape — covers the Express/Fastify subset we need
- * (`status`, `setHeader`, `send`). Lets the controller stay framework-neutral
- * the same way our transport adapters do.
+ * Minimal status-setter contract — covers the subset of Express's
+ * `Response.status()` and Fastify's `FastifyReply.status()` we actually use
+ * with `@Res({ passthrough: true })`. Nest still owns the response write;
+ * we only override the status code on error paths.
  */
-interface HtmlResponse {
-  status(code: number): HtmlResponse;
-  setHeader(name: string, value: string): unknown;
-  send(body: string): unknown;
+interface StatusSettable {
+  status(code: number): unknown;
 }
 
 interface ApiKeyFormBody {
@@ -81,14 +81,18 @@ export function createElicitationController(options: ResolvedElicitationOptions)
     }
 
     @Get(endpoints.apiKey)
-    async renderApiKeyForm(@Param('id') id: string, @Res() res: HtmlResponse): Promise<void> {
+    @Header('Content-Type', 'text/html')
+    async renderApiKeyForm(
+      @Param('id') id: string,
+      @Res({ passthrough: true }) res: StatusSettable,
+    ): Promise<string> {
       const record = await this.service.getElicitation(id);
       if (!record) return this.renderError(res, 'Elicitation not found or expired');
       if (record.status === 'complete') {
         return this.renderError(res, 'This elicitation has already been completed');
       }
       const meta = record.metadata ?? {};
-      const html = apiKeyFormTemplate({
+      return apiKeyFormTemplate({
         elicitationId: id,
         message: asString(meta.message) ?? 'Please enter your API key.',
         fieldLabel: asString(meta.fieldLabel) ?? 'API Key',
@@ -97,16 +101,16 @@ export function createElicitationController(options: ResolvedElicitationOptions)
         actionUrl: this.service.buildElicitationUrl(id, endpoints.apiKey),
         options: this.opts.templateOptions,
       });
-      sendHtml(res, 200, html);
     }
 
     @Post(endpoints.apiKey)
     @HttpCode(200)
+    @Header('Content-Type', 'text/html')
     async submitApiKeyForm(
       @Param('id') id: string,
       @Body() body: ApiKeyFormBody,
-      @Res() res: HtmlResponse,
-    ): Promise<void> {
+      @Res({ passthrough: true }) res: StatusSettable,
+    ): Promise<string> {
       const record = await this.service.getElicitation(id);
       if (!record) return this.renderError(res, 'Elicitation not found or expired');
       if (record.status === 'complete') {
@@ -121,26 +125,26 @@ export function createElicitationController(options: ResolvedElicitationOptions)
         action: 'confirm',
         data: { apiKey },
       });
-      sendHtml(
-        res,
-        200,
-        successPageTemplate({
-          title: 'API Key Received',
-          message: 'Your API key has been securely received.',
-          options: this.opts.templateOptions,
-        }),
-      );
+      return successPageTemplate({
+        title: 'API Key Received',
+        message: 'Your API key has been securely received.',
+        options: this.opts.templateOptions,
+      });
     }
 
     @Get(endpoints.confirm)
-    async renderConfirmationForm(@Param('id') id: string, @Res() res: HtmlResponse): Promise<void> {
+    @Header('Content-Type', 'text/html')
+    async renderConfirmationForm(
+      @Param('id') id: string,
+      @Res({ passthrough: true }) res: StatusSettable,
+    ): Promise<string> {
       const record = await this.service.getElicitation(id);
       if (!record) return this.renderError(res, 'Elicitation not found or expired');
       if (record.status === 'complete') {
         return this.renderError(res, 'This elicitation has already been completed');
       }
       const meta = record.metadata ?? {};
-      const html = confirmationFormTemplate({
+      return confirmationFormTemplate({
         elicitationId: id,
         title: asString(meta.title) ?? 'Confirm Action',
         message: asString(meta.message) ?? 'Please confirm you want to proceed.',
@@ -150,16 +154,16 @@ export function createElicitationController(options: ResolvedElicitationOptions)
         actionUrl: this.service.buildElicitationUrl(id, endpoints.confirm),
         options: this.opts.templateOptions,
       });
-      sendHtml(res, 200, html);
     }
 
     @Post(endpoints.confirm)
     @HttpCode(200)
+    @Header('Content-Type', 'text/html')
     async submitConfirmationForm(
       @Param('id') id: string,
       @Body() body: ConfirmFormBody,
-      @Res() res: HtmlResponse,
-    ): Promise<void> {
+      @Res({ passthrough: true }) res: StatusSettable,
+    ): Promise<string> {
       const record = await this.service.getElicitation(id);
       if (!record) return this.renderError(res, 'Elicitation not found or expired');
       if (record.status === 'complete') {
@@ -177,41 +181,33 @@ export function createElicitationController(options: ResolvedElicitationOptions)
         action,
         data: {},
       });
-      sendHtml(
-        res,
-        200,
-        success
-          ? successPageTemplate({
-              title: 'Confirmed',
-              message: 'Your action has been confirmed.',
-              options: this.opts.templateOptions,
-            })
-          : cancelledPageTemplate({
-              title: 'Cancelled',
-              message: 'The action has been cancelled.',
-              options: this.opts.templateOptions,
-            }),
-      );
+      return success
+        ? successPageTemplate({
+            title: 'Confirmed',
+            message: 'Your action has been confirmed.',
+            options: this.opts.templateOptions,
+          })
+        : cancelledPageTemplate({
+            title: 'Cancelled',
+            message: 'The action has been cancelled.',
+            options: this.opts.templateOptions,
+          });
     }
 
-    private renderError(res: HtmlResponse, message: string): void {
-      sendHtml(
-        res,
-        400,
-        errorPageTemplate({
-          title: 'Error',
-          message,
-          options: this.opts.templateOptions,
-        }),
-      );
+    /**
+     * Render the error page and signal the framework to write a 400 status.
+     * Returning the HTML lets Nest commit the response normally.
+     */
+    private renderError(res: StatusSettable, message: string): string {
+      res.status(400);
+      return errorPageTemplate({
+        title: 'Error',
+        message,
+        options: this.opts.templateOptions,
+      });
     }
   }
 
   if (guardDecorator) guardDecorator(ElicitationController);
   return ElicitationController;
-}
-
-function sendHtml(res: HtmlResponse, status: number, html: string): void {
-  res.setHeader('Content-Type', 'text/html');
-  res.status(status).send(html);
 }
