@@ -21,9 +21,11 @@ export interface InvokeContext {
  * `ContextId` per call.
  *
  * Limitations (documented in the auto-mcp README):
- * - `req` is synthesized; guards reading `req.cookies`/`req.session`/`req.ip`
- *   etc. will see undefined values. Use `forwardHeaders` / `mapPrincipalToRequestUser`
- *   to populate the fields your guards need.
+ * - `req` is synthesized; guards reading `req.cookies`, `req.session`, or
+ *   bespoke fields will see undefined values. Use the synthetic-request
+ *   defaults (`req.ip`, `req.protocol`, `req.get(header)`) and the
+ *   `mapPrincipalToRequestUser` option to populate the fields your guards need.
+ *   Header forwarding from the inbound MCP request is not implemented in v1.
  * - The `res` mock supports `status/send/json/end/setHeader`; controllers that
  *   manually stream via `res.write` are not supported.
  */
@@ -42,18 +44,29 @@ export class PipelineExecutorService {
    * Lazily resolve ExternalContextCreator from the runtime container.
    * This avoids constructor-time DI for a service that's only registered by
    * `INTERNAL_CORE_MODULE` once the app is fully initialized.
+   *
+   * Also probes for `registerRequestProvider` since that method's signature
+   * was added in @nestjs/core ~10.0; older versions are unsupported.
    */
   private getExternalContextCreator(): ExternalContextCreator {
     if (this.cachedExternalContextCreator) return this.cachedExternalContextCreator;
+    let ecc: ExternalContextCreator;
     try {
-      const ecc = this.moduleRef.get(ExternalContextCreator, { strict: false });
-      this.cachedExternalContextCreator = ecc;
-      return ecc;
+      ecc = this.moduleRef.get(ExternalContextCreator, { strict: false });
     } catch {
       throw new Error(
-        'auto-mcp: ExternalContextCreator could not be resolved from the running NestJS application context.',
+        'auto-mcp: ExternalContextCreator could not be resolved from the running NestJS application context. Ensure @nestjs/core ^10 || ^11 is installed.',
       );
     }
+    if (
+      typeof (ecc as { registerRequestProvider?: unknown }).registerRequestProvider !== 'function'
+    ) {
+      throw new Error(
+        'auto-mcp: detected an @nestjs/core version without ExternalContextCreator.registerRequestProvider. Upgrade to @nestjs/core >= 10.3.',
+      );
+    }
+    this.cachedExternalContextCreator = ecc;
+    return ecc;
   }
 
   async invoke(
@@ -93,7 +106,7 @@ export class PipelineExecutorService {
       descriptor.verb,
     );
     const res = buildSyntheticResponse();
-    const next = (() => undefined) as never;
+    const next: () => void = () => undefined;
 
     const externalContextCreator = this.getExternalContextCreator();
     const contextId = ContextIdFactory.create();
@@ -130,11 +143,9 @@ export class PipelineExecutorService {
       const wrapper = moduleRef.controllers.get(descriptor.controllerType);
       if (wrapper?.instance) return wrapper.instance;
     }
-    // Fallback for controllers whose key in `controllers` map differs (rare).
-    try {
-      return this.moduleRef.get(descriptor.controllerType, { strict: false });
-    } catch {
-      return undefined;
-    }
+    // Fallback for controllers whose key in `controllers` map differs from the
+    // metatype (rare). We let any DI error propagate so the caller sees a
+    // real diagnostic instead of a generic "controller not found" message.
+    return this.moduleRef.get(descriptor.controllerType, { strict: false });
   }
 }

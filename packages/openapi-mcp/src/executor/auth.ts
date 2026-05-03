@@ -47,6 +47,10 @@ export async function applyAuth(
     return auth.apply(request);
   }
 
+  // Exhaustiveness guard: if a future variant is added to AuthConfig the compiler
+  // forces us to handle it. A silently-no-op auth path is a security bug.
+  const _exhaustive: never = auth;
+  void _exhaustive;
   return request;
 }
 

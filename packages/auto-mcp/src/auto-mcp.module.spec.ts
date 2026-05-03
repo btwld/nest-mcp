@@ -55,7 +55,7 @@ describe('AutoMcpModule', () => {
 
     registrar.onApplicationBootstrap();
 
-    const tools = registry.getToolsBySource('nestjs');
+    const tools = registry.getToolsBySource('nestjs:UsersController');
     expect(tools.map((t) => t.name).sort()).toEqual([
       'nestjs.users.create',
       'nestjs.users.findOne',
@@ -73,7 +73,7 @@ describe('AutoMcpModule', () => {
 
     expect(
       registry
-        .getToolsBySource('nestjs')
+        .getToolsBySource('nestjs:UsersController')
         .map((t) => t.name)
         .sort(),
     ).toEqual(['users.create', 'users.findOne']);
@@ -88,6 +88,6 @@ describe('AutoMcpModule', () => {
 
     registrar.onApplicationBootstrap();
 
-    expect(registry.getToolsBySource('nestjs')).toHaveLength(0);
+    expect(registry.getAllTools()).toHaveLength(0);
   });
 });

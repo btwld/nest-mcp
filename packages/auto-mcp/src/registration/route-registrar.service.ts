@@ -1,9 +1,4 @@
-import {
-  type JsonSchemaProperty,
-  MCP_AUTO_MCP_OPTIONS,
-  deduplicateNames,
-  jsonSchemaToZod,
-} from '@nest-mcp/common';
+import { MCP_AUTO_MCP_OPTIONS, deduplicateNames, jsonSchemaToZod } from '@nest-mcp/common';
 import { McpRegistryService, type RegisteredTool } from '@nest-mcp/server';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import type { RouteDescriptor } from '../discovery/route-descriptor';
@@ -14,6 +9,11 @@ import { applyNamespace, defaultDescription, defaultToolName } from '../naming/n
 import { buildInputSchema } from '../schema/schema-synthesizer';
 
 const SOURCE_PREFIX = 'nestjs';
+
+/** Build the registry source tag for a given controller. */
+export function autoMcpSourceTag(controllerName: string): string {
+  return `${SOURCE_PREFIX}:${controllerName}`;
+}
 
 @Injectable()
 export class RouteRegistrarService implements OnApplicationBootstrap {
@@ -29,17 +29,31 @@ export class RouteRegistrarService implements OnApplicationBootstrap {
   onApplicationBootstrap(): void {
     const routes = this.scanner.scan(this.options);
     const namespace = this.options.namespace ?? SOURCE_PREFIX;
-    const tools: RegisteredTool[] = [];
 
+    // Group by controller so each gets its own `nestjs:<Controller>` source.
+    // This makes per-controller refresh + diagnostics meaningful via
+    // `unregisterBySource` / `getToolsBySource`.
+    const byController = new Map<string, RegisteredTool[]>();
     for (const route of routes) {
       const tool = this.toRegisteredTool(route, namespace);
-      if (tool) tools.push(tool);
+      if (!tool) continue;
+      const bucket = byController.get(route.controllerName) ?? [];
+      bucket.push(tool);
+      byController.set(route.controllerName, bucket);
     }
 
-    deduplicateNames(tools);
-    const result = this.registry.replaceExternalBatch(`${SOURCE_PREFIX}`, tools);
+    // Run dedup once across the full set so cross-controller name collisions
+    // resolve consistently before each batch hits the registry.
+    const allTools = Array.from(byController.values()).flat();
+    deduplicateNames(allTools);
+
+    let totalAdded = 0;
+    for (const [controllerName, tools] of byController) {
+      const result = this.registry.replaceExternalBatch(autoMcpSourceTag(controllerName), tools);
+      totalAdded += result.added.length;
+    }
     this.logger.log(
-      `auto-mcp registered ${result.added.length} tool(s) from ${routes.length} route(s).`,
+      `auto-mcp registered ${totalAdded} tool(s) from ${routes.length} route(s) across ${byController.size} controller(s).`,
     );
   }
 
@@ -69,13 +83,16 @@ export class RouteRegistrarService implements OnApplicationBootstrap {
     const name = applyNamespace(baseName, namespace);
     const description = defaultDescription(route);
 
-    const zodSchema = jsonSchemaToZod(schema as JsonSchemaProperty);
+    const zodSchema = jsonSchemaToZod(schema);
 
     return {
       name,
       description,
       parameters: zodSchema,
-      inputSchema: schema,
+      // `RegisteredTool.inputSchema` is typed as `Record<string, unknown>`;
+      // `JsonSchemaProperty` has named keys but lacks the index signature, so
+      // a structural cast is needed at the boundary.
+      inputSchema: schema as Record<string, unknown>,
       methodName: route.methodName,
       target: route.controllerType,
       instance: {

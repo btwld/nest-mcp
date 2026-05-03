@@ -8,6 +8,17 @@ export interface SyntheticHttpRequest {
   query: Record<string, unknown>;
   params: Record<string, unknown>;
   user?: unknown;
+  /** Default loopback so guards expecting a present IP do not crash. */
+  ip: string;
+  ips: string[];
+  /** Default to `'http'`; users can wrap the executor to override. */
+  protocol: 'http' | 'https';
+  /** `true` when `protocol === 'https'` — kept in sync with `protocol`. */
+  secure: boolean;
+  hostname: string;
+  /** Express-compatible header lookup. Case-insensitive. */
+  get: (name: string) => string | undefined;
+  header: (name: string) => string | undefined;
   /** marker so guards/middleware can detect they're running under the MCP bridge */
   __mcpBridge: true;
 }
@@ -83,17 +94,34 @@ export function buildSyntheticRequest(
     }
   }
 
+  const headers: Record<string, string> = {
+    'x-mcp-tool': toolName,
+    ...inboundHeaders,
+  };
+  // Case-insensitive header lookup matches Express/Fastify `req.get(name)`.
+  const get = (name: string): string | undefined => {
+    const lower = name.toLowerCase();
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === lower) return headers[k];
+    }
+    return undefined;
+  };
+
   return {
     method: verb,
     url: substitutePathTokens(fullPath, reqParams),
-    headers: {
-      'x-mcp-tool': toolName,
-      ...inboundHeaders,
-    },
+    headers,
     body: reqBody,
     query: reqQuery,
     params: reqParams,
     user,
+    ip: '127.0.0.1',
+    ips: [],
+    protocol: 'http',
+    secure: false,
+    hostname: 'localhost',
+    get,
+    header: get,
     __mcpBridge: true,
   };
 }

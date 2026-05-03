@@ -1,6 +1,7 @@
 import { AutoMcpModule } from '@nest-mcp/auto-mcp';
 import { McpModule, McpTransportType } from '@nest-mcp/server';
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
+import { APP_PIPE } from '@nestjs/core';
 import { UsersController } from './users.controller';
 
 /**
@@ -29,5 +30,13 @@ import { UsersController } from './users.controller';
     }),
   ],
   controllers: [UsersController],
+  providers: [
+    // APP_PIPE works under stdio (where `app.useGlobalPipes` doesn't bind):
+    // ExternalContextCreator pulls APP_PIPE-registered pipes for every call.
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({ transform: true, whitelist: true }),
+    },
+  ],
 })
 export class AppModule {}

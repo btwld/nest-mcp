@@ -1,4 +1,4 @@
-import { Injectable, Logger, RequestMethod, type Type } from '@nestjs/common';
+import { Injectable, Logger, RequestMethod, Scope, type Type } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';
 import {
   MCP_AUTO_CONTROLLER_METADATA,
@@ -37,9 +37,7 @@ export class RouteScannerService {
   constructor(private readonly modulesContainer: ModulesContainer) {}
 
   scan(options: AutoMcpOptions): RouteDescriptor[] {
-    const controllerFilter = options.controllers
-      ? new Set(options.controllers.map((c) => c as Type))
-      : null;
+    const controllerFilter = options.controllers ? new Set(options.controllers) : null;
     const includeMatchers = compileMatchers(options.include);
     const excludeMatchers = compileMatchers(options.exclude);
 
@@ -111,7 +109,7 @@ export class RouteScannerService {
             params,
             expose,
             isHidden: false,
-            isRequestScoped: wrapper.scope === 1, // 0 = DEFAULT, 1 = REQUEST, 2 = TRANSIENT
+            isRequestScoped: wrapper.scope === Scope.REQUEST,
           });
         }
       }
@@ -131,14 +129,14 @@ function compileMatchers(
   input: AutoMcpOptions['include'] | AutoMcpOptions['exclude'],
 ): Matcher[] | null {
   if (!input || input.length === 0) return null;
-  return input.map((entry) => {
-    if (typeof entry === 'string') return { kind: 'string', value: entry } as Matcher;
-    if (entry instanceof RegExp) return { kind: 'regex', value: entry } as Matcher;
+  return input.map<Matcher>((entry) => {
+    if (typeof entry === 'string') return { kind: 'string', value: entry };
+    if (entry instanceof RegExp) return { kind: 'regex', value: entry };
     return {
       kind: 'object',
       controller: typeof entry.controller === 'string' ? entry.controller : entry.controller.name,
       method: entry.method,
-    } as Matcher;
+    };
   });
 }
 

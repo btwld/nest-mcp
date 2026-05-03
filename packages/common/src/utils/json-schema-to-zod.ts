@@ -36,7 +36,9 @@ export function jsonSchemaToZod(schema: JsonSchemaProperty): z.ZodTypeAny {
 
   if (schema.oneOf?.length || schema.anyOf?.length) {
     const variants = (schema.oneOf ?? schema.anyOf ?? []).map((s) => jsonSchemaToZod(s));
-    if (variants.length === 1) return variants[0];
+    if (variants.length === 1) {
+      return schema.nullable ? variants[0].nullable() : variants[0];
+    }
     if (variants.length >= 2) {
       const tuple = variants as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]];
       return schema.nullable ? z.union(tuple).nullable() : z.union(tuple);

@@ -24,8 +24,6 @@ export interface OpenApiMcpModuleAsyncOptions {
   useFactory: (...args: unknown[]) => OpenApiMcpOptions | Promise<OpenApiMcpOptions>;
 }
 
-const OPENAPI_MCP_SERVICE = Symbol('OPENAPI_MCP_SERVICE');
-
 /**
  * Public service for diagnostics. Owns the source services for the lifetime
  * of the application. v1 has no runtime refresh API; v2 will add `refreshAll`.
@@ -40,15 +38,22 @@ export class OpenApiMcpService implements OnApplicationBootstrap {
     @Inject(McpRegistryService) registry: McpRegistryService,
   ) {
     const sources = isMultiSource(options) ? options.sources : [options];
-    if (sources.length > 1 && sources.some((s) => !s.name)) {
-      throw new Error(
-        'OpenApiMcpModule: every source must have a `name` when more than one is registered.',
-      );
-    }
     this.sourceServices = sources.map((s) => new OpenApiSourceService(s, registry));
   }
 
   async onApplicationBootstrap(): Promise<void> {
+    // Validate config here (rather than in the constructor) so `forRootAsync`
+    // factories that resolve late still surface a clear error before any
+    // source registration is attempted.
+    if (this.sourceServices.length > 1) {
+      const unnamed = this.sourceServices.filter((s) => !s.config.name).length;
+      if (unnamed > 0) {
+        throw new Error(
+          'OpenApiMcpModule: every source must have a `name` when more than one is registered.',
+        );
+      }
+    }
+
     for (const service of this.sourceServices) {
       try {
         await service.registerAll();
@@ -95,6 +100,4 @@ export class OpenApiMcpModule {
   }
 }
 
-// Suppress unused-import warning at build time
-void OPENAPI_MCP_SERVICE;
 export type { SourceConfig };

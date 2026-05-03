@@ -20,7 +20,7 @@ export class OpenApiSourceService {
   private readonly source: string;
 
   constructor(
-    private readonly config: SourceConfig,
+    readonly config: SourceConfig,
     private readonly registry: McpRegistryService,
   ) {
     this.source = `openapi:${config.name ?? 'default'}`;
@@ -77,6 +77,8 @@ export class OpenApiSourceService {
 
 function compactInputSchema(schema: Record<string, unknown>): Record<string, unknown> {
   if (!schema.properties) return schema;
+  // `compactSchema` recurses into nested object properties on its own, so
+  // applying it once at the top reaches the full tree.
   return {
     ...schema,
     properties: compactSchema(schema.properties as Record<string, JsonSchemaProperty>),

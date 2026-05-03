@@ -87,7 +87,9 @@ export interface SourceConfig {
   redact?: (req: NormalizedRequest) => NormalizedRequest;
 }
 
-export type OpenApiMcpOptions = SourceConfig | { sources: SourceConfig[] };
+// `{ sources?: never }` on the single-source arm rules out a malformed shape
+// like `{ sources: [...], baseUrl: '...' }` at compile time.
+export type OpenApiMcpOptions = (SourceConfig & { sources?: never }) | { sources: SourceConfig[] };
 
 export function isMultiSource(options: OpenApiMcpOptions): options is { sources: SourceConfig[] } {
   return Array.isArray((options as { sources?: unknown }).sources);

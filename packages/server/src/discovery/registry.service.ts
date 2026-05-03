@@ -428,6 +428,8 @@ export class McpRegistryService {
    */
   replaceExternalBatch(source: string, tools: RegisteredTool[]): ReplaceExternalBatchResult {
     const incoming = new Set(tools.map((t) => t.name));
+    // Snapshot existing-source names before any mutation so iteration is stable
+    // and event listeners that re-enter the registry can't perturb us.
     const previous = new Set(
       Array.from(this.tools.values())
         .filter((t) => t.source === source)
@@ -438,12 +440,14 @@ export class McpRegistryService {
     const removed: string[] = [];
     let unchanged = 0;
 
+    const namesToRemove: string[] = [];
     for (const name of previous) {
-      if (!incoming.has(name)) {
-        this.tools.delete(name);
-        this.events.emit('tool.unregistered', name);
-        removed.push(name);
-      }
+      if (!incoming.has(name)) namesToRemove.push(name);
+    }
+    for (const name of namesToRemove) {
+      this.tools.delete(name);
+      this.events.emit('tool.unregistered', name);
+      removed.push(name);
     }
 
     for (const tool of tools) {
@@ -482,41 +486,43 @@ export class McpRegistryService {
     resourceTemplates: number;
     prompts: number;
   } {
-    let tools = 0;
-    let resources = 0;
-    let resourceTemplates = 0;
-    let prompts = 0;
+    // Snapshot keys to remove before mutating, so emit listeners cannot perturb iteration.
+    const toolKeys = Array.from(this.tools.entries())
+      .filter(([, t]) => t.source === source)
+      .map(([k]) => k);
+    const resourceKeys = Array.from(this.resources.entries())
+      .filter(([, r]) => r.source === source)
+      .map(([k]) => k);
+    const templateKeys = Array.from(this.resourceTemplates.entries())
+      .filter(([, t]) => t.source === source)
+      .map(([k]) => k);
+    const promptKeys = Array.from(this.prompts.entries())
+      .filter(([, p]) => p.source === source)
+      .map(([k]) => k);
 
-    for (const [name, tool] of this.tools) {
-      if (tool.source === source) {
-        this.tools.delete(name);
-        this.events.emit('tool.unregistered', name);
-        tools++;
-      }
+    for (const k of toolKeys) {
+      this.tools.delete(k);
+      this.events.emit('tool.unregistered', k);
     }
-    for (const [uri, res] of this.resources) {
-      if (res.source === source) {
-        this.resources.delete(uri);
-        this.events.emit('resource.unregistered', uri);
-        resources++;
-      }
+    for (const k of resourceKeys) {
+      this.resources.delete(k);
+      this.events.emit('resource.unregistered', k);
     }
-    for (const [uri, tpl] of this.resourceTemplates) {
-      if (tpl.source === source) {
-        this.resourceTemplates.delete(uri);
-        this.events.emit('resourceTemplate.unregistered', uri);
-        resourceTemplates++;
-      }
+    for (const k of templateKeys) {
+      this.resourceTemplates.delete(k);
+      this.events.emit('resourceTemplate.unregistered', k);
     }
-    for (const [name, prompt] of this.prompts) {
-      if (prompt.source === source) {
-        this.prompts.delete(name);
-        this.events.emit('prompt.unregistered', name);
-        prompts++;
-      }
+    for (const k of promptKeys) {
+      this.prompts.delete(k);
+      this.events.emit('prompt.unregistered', k);
     }
 
-    return { tools, resources, resourceTemplates, prompts };
+    return {
+      tools: toolKeys.length,
+      resources: resourceKeys.length,
+      resourceTemplates: templateKeys.length,
+      prompts: promptKeys.length,
+    };
   }
 
   /** Diagnostics: list every tool registered by a given source. */

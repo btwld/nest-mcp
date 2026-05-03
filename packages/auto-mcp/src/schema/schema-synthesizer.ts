@@ -23,17 +23,27 @@ const PRIMITIVE_BY_CTOR = new Map<unknown, JsonSchemaProperty>([
 export function buildInputSchema(
   params: ResolvedParam[],
   expose?: McpExposeOptions,
-): { schema: Record<string, unknown>; degraded: boolean } {
-  if (expose?.schema) return { schema: expose.schema, degraded: false };
+): { schema: JsonSchemaProperty; degraded: boolean } {
+  if (expose?.schema) return { schema: expose.schema as JsonSchemaProperty, degraded: false };
 
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
   let degraded = false;
 
   for (const param of params) {
-    if (param.kind === 'request' || param.kind === 'response' || param.kind === 'next') continue;
-    if (param.kind === 'host' || param.kind === 'session' || param.kind === 'ip') continue;
-    if (param.kind === 'file') continue; // multipart skipped in v1
+    // Listing each non-mapped kind explicitly (rather than `default:`) preserves
+    // narrowing for the `assertNeverKind(param.kind)` exhaustiveness check below.
+    if (
+      param.kind === 'request' ||
+      param.kind === 'response' ||
+      param.kind === 'next' ||
+      param.kind === 'host' ||
+      param.kind === 'session' ||
+      param.kind === 'ip' ||
+      param.kind === 'file'
+    ) {
+      continue;
+    }
     if (param.kind === 'unsupported') {
       degraded = true;
       continue;
@@ -88,9 +98,14 @@ export function buildInputSchema(
       continue;
     }
 
-    if (param.kind === 'headers' && param.data) {
-      properties[param.data] = paramSchema(param);
+    if (param.kind === 'headers') {
+      if (param.data) properties[param.data] = paramSchema(param);
+      continue;
     }
+
+    // Exhaustiveness — TS narrows `param.kind` to `never` here. If the union
+    // gains a variant, this line forces us to handle it.
+    assertNeverKind(param.kind);
   }
 
   return {
@@ -106,4 +121,8 @@ export function buildInputSchema(
 
 function paramSchema(param: ResolvedParam): JsonSchemaProperty {
   return PRIMITIVE_BY_CTOR.get(param.metaType) ?? { type: 'string' };
+}
+
+function assertNeverKind(_kind: never): void {
+  // No-op at runtime; the exhaustiveness check is purely compile-time.
 }
