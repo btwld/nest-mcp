@@ -1,5 +1,138 @@
 # @nest-mcp/server
 
+## 0.6.0
+
+### Minor Changes
+
+- 2fde58b: feat(server): add built-in `GitHubProvider` and `AzureAdProvider` for `McpAuthModule`
+
+  Two ready-made `OAuthProviderAdapter` implementations covering the most-asked
+  identity providers, plus a shared `OAuthCodeExchangeProvider` base class
+  that other Authorization-Code flows can extend. All implementations use
+  `globalThis.fetch` (Node 20+) — no Passport peer dependencies.
+
+  Public surface:
+
+  - `GitHubProvider({ clientId, clientSecret, scope?, userAgent? })`
+  - `AzureAdProvider({ clientId, clientSecret, tenant?, scope? })` — defaults to
+    the multi-tenant `common` tenant; supply a tenant GUID or domain to lock
+    the issuer to a single Microsoft Entra tenant.
+  - `OAuthCodeExchangeProvider` — abstract base; subclasses declare
+    `authorizationUrl`, `tokenUrl`, `userInfoUrl`, `scope`, and a
+    `mapProfile()` callback.
+
+  Usage:
+
+  ```ts
+  import { McpAuthModule, GitHubProvider } from "@nest-mcp/server";
+
+  const provider = new GitHubProvider({
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+  });
+
+  McpAuthModule.forProvider(provider, {
+    /* ... */
+  });
+  ```
+
+- 2fde58b: feat(server): integrate NestJS `@UseFilters()` exception filters into MCP handlers
+
+  Tools, resources, and prompts that throw a non-MCP error now consult any
+  `@UseFilters(...)` declared on the handler method or its enclosing class.
+  Filter output (string or JSON-serializable value) is rendered as the message
+  of an `McpError` and surfaced to the client as a JSON-RPC error. Unhandled
+  errors fall through to the previous `ToolExecutionError` path.
+
+- 2fde58b: feat(common,server): expose tool/prompt arguments on `McpGuardContext`
+
+  Custom guards now receive an `arguments` field on the `McpGuardContext`
+  populated with the raw arguments the caller passed to `tools/call` or
+  `prompts/get`. Values are pre-Zod (validation runs after auth), so guards
+  inspecting fields should treat them as `unknown`. Resource guards still
+  receive only `resourceUri`.
+
+- 2fde58b: feat(common,server): add `serverMutator`, `title`, `websiteUrl`, and `icons` to `McpModuleOptions`
+
+  - `serverMutator?: (server) => server` lets you reach into the underlying SDK
+    `McpServer` after our factory builds it (e.g., to register custom JSON-RPC
+    methods that the public API does not expose).
+  - `title`, `websiteUrl`, and `icons` are forwarded to the SDK
+    `Implementation` block alongside `name`, `version`, and the existing
+    `description`, so clients can display richer server metadata in the
+    `initialize` response.
+
+- 2fde58b: feat(server): MCP-spec arg validation + `outputSchema`/`structuredContent`
+
+  **Behavior change** — tool input validation no longer throws
+  `ValidationError`. Per the MCP specification, invalid `tools/call` arguments
+  now resolve to a tool result `{ isError: true, content: [{ type: 'text',
+text: 'Invalid parameters: ...' }] }` so the calling model can self-correct.
+  Callers that previously caught a JSON-RPC `InvalidParams` from the protocol
+  layer for tool calls should switch to inspecting `result.isError` instead.
+  Prompt argument validation still throws `ValidationError`.
+
+  When a tool declares an `outputSchema`, its handler return is now validated
+  against the schema and the parsed result is attached to the
+  `structuredContent` field of the `CallToolResult`. Schema mismatches throw
+  `ToolExecutionError` (server-side bug).
+
+- 2fde58b: feat(server): add `McpElicitationModule` for browser-based URL elicitation
+
+  Adds an opt-in module that hosts the HTTP endpoints + HTML forms required to
+  implement the MCP `elicit/create` flow in `mode: 'url'`. Server code (e.g.,
+  a tool handler) creates an elicitation via `ElicitationService.createElicitation`,
+  emits the URL to the client through the standard MCP elicitation request,
+  and registers a completion notifier; when the user submits the form on the
+  hosted page, the notifier fires and the awaited request resumes.
+
+  Public surface:
+
+  - `McpElicitationModule.forRoot({ serverUrl, ... })`
+  - `ElicitationService` — `createElicitation`, `completeElicitation`,
+    `buildElicitationUrl`, `registerCompletionNotifier`,
+    `findResultByUserAndType`, plus `startUrlElicitation()` (high-level
+    helper that returns `{ elicitationId, url, waitForCompletion }`).
+  - `ElicitationCancelledError` — thrown by `waitForCompletion` when the
+    user submits the cancel action.
+  - `IElicitationStore` — pluggable storage backend (default in-memory; supply
+    a Redis/DB-backed store via `storeConfiguration: { type: 'custom', store }`)
+  - `MemoryElicitationStore` — default
+  - HTML templates for API-key form, confirmation form, success/cancel/error
+    pages, with `templateOptions` for branding (logo, app name, primary color,
+    custom CSS)
+  - Configurable endpoint paths and Nest guards on the controller
+
+  Tool-handler integration pattern:
+
+  ```ts
+  const { elicitationId, url, waitForCompletion } =
+    await elicitation.startUrlElicitation({
+      sessionId: ctx.sessionId,
+      userId: ctx.user?.id,
+      metadata: { type: "api-key", message: "Enter your key" },
+    });
+  await ctx.elicit({
+    mode: "url",
+    message: "Open browser",
+    url,
+    elicitationId,
+  });
+  const result = await waitForCompletion({
+    signal: ctx.signal,
+    timeoutMs: 60_000,
+  });
+  ```
+
+  Pre-existing `ElicitURLRequest` type in `@nest-mcp/common` is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+  - @nest-mcp/common@0.4.0
+
 ## 0.5.0
 
 ### Minor Changes

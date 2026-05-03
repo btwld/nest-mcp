@@ -1,5 +1,15 @@
 # @nest-mcp/example-client
 
+## 0.1.14
+
+### Patch Changes
+
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+  - @nest-mcp/common@0.4.0
+  - @nest-mcp/client@0.2.9
+
 ## 0.1.13
 
 ### Patch Changes
