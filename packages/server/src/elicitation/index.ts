@@ -1,11 +1,13 @@
 export { ElicitationController } from './elicitation.controller';
 export { McpElicitationModule } from './elicitation.module';
 export {
+  type AsyncResolvedElicitationOptions,
   ELICITATION_MODULE_OPTIONS,
   DEFAULT_ELICITATION_OPTIONS,
   type ElicitationModuleOptions,
   type ElicitationStoreConfiguration,
   type ElicitationTemplateOptions,
+  type McpElicitationModuleAsyncOptions,
   type ResolvedElicitationOptions,
 } from './interfaces/elicitation-options.interface';
 export {

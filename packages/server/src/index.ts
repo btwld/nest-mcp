@@ -140,9 +140,11 @@ export {
   type ElicitationStoreConfiguration,
   type ElicitationTemplateOptions,
   type IElicitationStore,
+  type McpElicitationModuleAsyncOptions,
   type ResolvedElicitationOptions,
   type StartUrlElicitationParams,
   type UrlElicitationHandle,
+  type AsyncResolvedElicitationOptions,
 } from './elicitation';
 
 // SDK transport types — re-exported for convenience so users don't need to
