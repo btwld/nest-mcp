@@ -14,6 +14,28 @@ interface RequestWithQuery {
 }
 
 /**
+ * Type guard for the request shape we read from. Replaces an `as`
+ * assertion with a structural check — `validateUser`'s input is genuinely
+ * `unknown` (handed to us by Express/Fastify), so the runtime check is
+ * the right level of paranoia.
+ */
+function isRequestWithQuery(value: unknown): value is RequestWithQuery {
+  return typeof value === 'object' && value !== null && 'query' in value;
+}
+
+/**
+ * Standard OAuth 2.0 token-endpoint response (RFC 6749 §5.1). Subclasses
+ * can extend with provider-specific fields (e.g. Azure's `id_token`).
+ */
+export interface OAuthTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+}
+
+/**
  * Base class for "Authorization Code" OAuth 2.0 providers. Subclasses declare
  * the provider-specific endpoints, scope, and profile mapping; this class
  * implements the redirect URL build and the `code → access_token → profile`
@@ -84,16 +106,16 @@ export abstract class OAuthCodeExchangeProvider<TProfile = Record<string, unknow
     });
     if (!tokenRes.ok) return null;
 
-    const tokenPayload = (await tokenRes.json()) as { access_token?: string };
+    const tokenPayload = (await tokenRes.json()) as OAuthTokenResponse;
     if (!tokenPayload.access_token) return null;
 
     return this.fetchProfile(tokenPayload.access_token);
   }
 
   async validateUser(req: unknown): Promise<OAuthProviderUser | null> {
-    const query = (req as RequestWithQuery)?.query;
-    const code = asString(query?.code);
-    const redirectUri = asString(query?.redirect_uri);
+    if (!isRequestWithQuery(req)) return null;
+    const code = asString(req.query?.code);
+    const redirectUri = asString(req.query?.redirect_uri);
     if (!code || !redirectUri) return null;
     return this.exchangeToken(code, redirectUri);
   }

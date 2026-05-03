@@ -268,17 +268,17 @@ export class McpExecutorService {
   /**
    * Funnel a raw user error from a resource/prompt handler through the
    * exception-filter pipeline. Existing protocol errors (`McpError` family)
-   * are passed through untouched.
+   * are passed through untouched. Always returns a real `Error` subclass —
+   * lets call sites narrow without an `unknown` cast.
    */
   private processCapabilityError(
     error: unknown,
     info: FilterTarget,
     ctx: McpExecutionContext,
-  ): unknown {
+  ): Error {
     if (error instanceof McpError) return error;
     const err = error instanceof Error ? error : new Error(String(error));
-    const filtered = this.applyExceptionFilters(err, info, ctx);
-    return filtered ?? err;
+    return this.applyExceptionFilters(err, info, ctx) ?? err;
   }
 
   private normalizeResourceResult(result: unknown, uri: string): ResourceReadResult {

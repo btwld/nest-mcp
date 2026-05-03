@@ -18,6 +18,39 @@ import type {
 /** Callback invoked once an elicitation completes. */
 export type CompletionNotifier = () => Promise<void>;
 
+/** Options accepted by {@link UrlElicitationHandle.waitForCompletion}. */
+export interface ElicitationWaitOptions {
+  signal?: AbortSignal;
+  /** Reject after this many milliseconds without a form submission. */
+  timeoutMs?: number;
+}
+
+/**
+ * Returned from {@link ElicitationService.startUrlElicitation}. Tool handlers
+ * surface the `url` to the MCP client (typically via `ctx.elicit({ mode:
+ * 'url', ... })`) and `await waitForCompletion()` to resume once the user
+ * submits the form.
+ */
+export interface UrlElicitationHandle {
+  elicitationId: string;
+  url: string;
+  waitForCompletion: (
+    options?: ElicitationWaitOptions,
+  ) => Promise<ElicitationResultRecord>;
+}
+
+/** Parameters accepted by {@link ElicitationService.startUrlElicitation}. */
+export interface StartUrlElicitationParams {
+  sessionId: string;
+  userId?: string;
+  /** Endpoint to surface (e.g. `'api-key'`, `'confirm'`). Defaults to `'api-key'`. */
+  path?: string;
+  /** Metadata stored with the record; merged into form-template inputs. */
+  metadata?: Record<string, unknown>;
+  /** Override the module-default TTL in milliseconds. */
+  ttlMs?: number;
+}
+
 /** Thrown by `waitForCompletion` when the user cancels the form submission. */
 export class ElicitationCancelledError extends Error {
   constructor(public readonly result: ElicitationResultRecord) {
@@ -173,24 +206,7 @@ export class ElicitationService implements OnModuleDestroy {
    * The caller is responsible for telling the MCP client to open the URL —
    * typically via `ctx.elicit({ mode: 'url', message, url, elicitationId })`.
    */
-  async startUrlElicitation(params: {
-    sessionId: string;
-    userId?: string;
-    /** Endpoint to surface (e.g. `'api-key'`, `'confirm'`). Defaults to `'api-key'`. */
-    path?: string;
-    /** Metadata stored with the record; merged into form-template inputs. */
-    metadata?: Record<string, unknown>;
-    /** Override the module-default TTL in milliseconds. */
-    ttlMs?: number;
-  }): Promise<{
-    elicitationId: string;
-    url: string;
-    /** Resolves with the form result, or rejects on cancel/timeout/abort. */
-    waitForCompletion: (options?: {
-      signal?: AbortSignal;
-      timeoutMs?: number;
-    }) => Promise<ElicitationResultRecord>;
-  }> {
+  async startUrlElicitation(params: StartUrlElicitationParams): Promise<UrlElicitationHandle> {
     const elicitationId = await this.createElicitation({
       sessionId: params.sessionId,
       userId: params.userId,
@@ -199,7 +215,7 @@ export class ElicitationService implements OnModuleDestroy {
     });
     const url = this.buildElicitationUrl(elicitationId, params.path ?? 'api-key');
 
-    const waitForCompletion = (options?: { signal?: AbortSignal; timeoutMs?: number }) =>
+    const waitForCompletion = (options?: ElicitationWaitOptions) =>
       new Promise<ElicitationResultRecord>((resolve, reject) => {
         const cleanup = () => {
           this.notifierRegistry.delete(elicitationId);

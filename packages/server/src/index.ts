@@ -82,6 +82,7 @@ export {
   type GitHubProviderConfig,
   type GitHubUser,
   OAuthCodeExchangeProvider,
+  type OAuthTokenResponse,
 } from './auth/providers';
 export type {
   OAuthClient,
@@ -124,6 +125,7 @@ export {
   ELICITATION_STORE_TOKEN,
   ElicitationCancelledError,
   ElicitationService,
+  type ElicitationWaitOptions,
   McpElicitationModule,
   MemoryElicitationStore,
   type CompleteElicitationParams,
@@ -138,6 +140,8 @@ export {
   type ElicitationTemplateOptions,
   type IElicitationStore,
   type ResolvedElicitationOptions,
+  type StartUrlElicitationParams,
+  type UrlElicitationHandle,
 } from './elicitation';
 
 // SDK transport types — re-exported for convenience so users don't need to

@@ -1,4 +1,7 @@
-export { OAuthCodeExchangeProvider } from './oauth-code-exchange.provider';
+export {
+  OAuthCodeExchangeProvider,
+  type OAuthTokenResponse,
+} from './oauth-code-exchange.provider';
 export {
   GitHubProvider,
   type GitHubProviderConfig,

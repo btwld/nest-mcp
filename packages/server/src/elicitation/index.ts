@@ -24,5 +24,8 @@ export {
   type CompletionNotifierRegistry,
   ElicitationCancelledError,
   ElicitationService,
+  type ElicitationWaitOptions,
+  type StartUrlElicitationParams,
+  type UrlElicitationHandle,
 } from './services/elicitation.service';
 export { MemoryElicitationStore } from './stores/memory-elicitation.store';
