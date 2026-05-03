@@ -22,6 +22,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ZodEnum, ZodObject, type ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type { RegisteredTool } from '../discovery/registry.service';
+import { isPlainRecord } from '../utils/coerce';
 import { type FilterTarget, McpExceptionFilterRunner } from './exception-filter.runner';
 
 interface ZodIssueLike {
@@ -38,14 +39,22 @@ function formatZodIssues(issues: ReadonlyArray<ZodIssueLike>): string {
     .join('; ');
 }
 
+/**
+ * Structural type guard: "is this object already in the SDK's
+ * `ToolCallResult` envelope shape?". Trusts the discriminator (`content`
+ * key present) — same trust as the previous `as ToolCallResult` cast,
+ * just localized to one predicate.
+ */
+function isToolCallResult(value: unknown): value is ToolCallResult {
+  return isPlainRecord(value) && 'content' in value;
+}
+
 /** Coerce arbitrary handler returns into the SDK `ToolCallResult` envelope. */
 function shapeToolResult(result: unknown): ToolCallResult {
   if (result === null || result === undefined) {
     return { content: [{ type: 'text', text: '' }] };
   }
-  if (typeof result === 'object' && 'content' in (result as Record<string, unknown>)) {
-    return result as ToolCallResult;
-  }
+  if (isToolCallResult(result)) return result;
   if (typeof result === 'string') {
     return { content: [{ type: 'text', text: result }] };
   }
@@ -54,9 +63,8 @@ function shapeToolResult(result: unknown): ToolCallResult {
 
 /** Pick the structured payload from a raw handler return, or `undefined` when there isn't one. */
 function extractStructuredCandidate(result: unknown): Record<string, unknown> | undefined {
-  if (typeof result !== 'object' || result === null) return undefined;
-  if ('content' in (result as Record<string, unknown>)) return undefined;
-  return result as Record<string, unknown>;
+  if (!isPlainRecord(result) || isToolCallResult(result)) return undefined;
+  return result;
 }
 
 @Injectable()
