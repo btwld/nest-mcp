@@ -1,4 +1,3 @@
-import { asString } from '../../utils/coerce';
 import type { OAuthProviderUser } from '../interfaces/oauth-provider.interface';
 import { OAuthCodeExchangeProvider } from './oauth-code-exchange.provider';
 
@@ -16,13 +15,28 @@ export interface AzureAdProviderConfig {
 }
 
 /**
+ * Subset of the Microsoft Graph `/me` response we read. See
+ * <https://learn.microsoft.com/graph/api/user-get>. `oid` is not part of
+ * `/me` but is kept here as a fallback so subclasses pointing at a different
+ * Azure endpoint (e.g. id-token claims) still type-check.
+ */
+export interface AzureAdUser {
+  id?: string;
+  oid?: string;
+  mail?: string | null;
+  userPrincipalName?: string;
+  displayName?: string;
+  tenantId?: string;
+}
+
+/**
  * Microsoft Entra ID (Azure AD) OAuth 2.0 v2.0 provider. Documented at
  * <https://learn.microsoft.com/azure/active-directory/develop/v2-oauth2-auth-code-flow>.
  *
  * Profile data comes from Microsoft Graph (`/me`); the access token issued
  * during the code exchange must include the `User.Read` scope (the default).
  */
-export class AzureAdProvider extends OAuthCodeExchangeProvider {
+export class AzureAdProvider extends OAuthCodeExchangeProvider<AzureAdUser> {
   readonly name = 'azure-ad';
   protected readonly authorizationUrl: string;
   protected readonly tokenUrl: string;
@@ -37,12 +51,12 @@ export class AzureAdProvider extends OAuthCodeExchangeProvider {
     this.scope = config.scope ?? 'openid profile email User.Read';
   }
 
-  protected mapProfile(raw: Record<string, unknown>): OAuthProviderUser {
+  protected mapProfile(raw: AzureAdUser): OAuthProviderUser {
     return {
-      id: asString(raw.id) ?? asString(raw.oid) ?? '',
-      email: asString(raw.mail) ?? asString(raw.userPrincipalName),
-      name: asString(raw.displayName),
-      tenantId: asString(raw.tenantId),
+      id: raw.id ?? raw.oid ?? '',
+      email: raw.mail ?? raw.userPrincipalName,
+      name: raw.displayName,
+      tenantId: raw.tenantId,
     };
   }
 }

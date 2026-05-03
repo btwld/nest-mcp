@@ -19,11 +19,19 @@ interface RequestWithQuery {
  * implements the redirect URL build and the `code → access_token → profile`
  * exchange against those endpoints with `globalThis.fetch` (Node 20+).
  *
+ * `TProfile` lets each subclass type the userinfo JSON it expects (e.g.
+ * `GitHubUser`, `AzureAdUser`) so `mapProfile` can rely on declared fields
+ * instead of guarding `unknown` values one by one. The `as TProfile` cast in
+ * `fetchProfile` is the single trust boundary — change it to a Zod parse if
+ * a target API ever drifts.
+ *
  * Subclasses are not Nest providers themselves — they are plain classes
  * intended to be instantiated in the application's bootstrap and passed to
  * `McpAuthModule.forProvider()`.
  */
-export abstract class OAuthCodeExchangeProvider implements OAuthProviderAdapter {
+export abstract class OAuthCodeExchangeProvider<TProfile = Record<string, unknown>>
+  implements OAuthProviderAdapter
+{
   abstract readonly name: string;
   protected abstract readonly authorizationUrl: string;
   protected abstract readonly tokenUrl: string;
@@ -31,7 +39,7 @@ export abstract class OAuthCodeExchangeProvider implements OAuthProviderAdapter 
   protected abstract readonly scope: string;
 
   /** Map provider-specific user payload to the common `OAuthProviderUser` shape. */
-  protected abstract mapProfile(raw: Record<string, unknown>): OAuthProviderUser;
+  protected abstract mapProfile(raw: TProfile): OAuthProviderUser;
 
   /**
    * Headers sent to the userinfo endpoint. Most providers accept the default
@@ -93,6 +101,6 @@ export abstract class OAuthCodeExchangeProvider implements OAuthProviderAdapter 
   protected async fetchProfile(accessToken: string): Promise<OAuthProviderUser | null> {
     const res = await fetch(this.userInfoUrl, { headers: this.userInfoHeaders(accessToken) });
     if (!res.ok) return null;
-    return this.mapProfile((await res.json()) as Record<string, unknown>);
+    return this.mapProfile((await res.json()) as TProfile);
   }
 }

@@ -77,8 +77,10 @@ export type {
 export {
   AzureAdProvider,
   type AzureAdProviderConfig,
+  type AzureAdUser,
   GitHubProvider,
   type GitHubProviderConfig,
+  type GitHubUser,
   OAuthCodeExchangeProvider,
 } from './auth/providers';
 export type {
