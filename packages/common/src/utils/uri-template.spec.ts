@@ -146,6 +146,11 @@ describe('RFC 6570 query expansion ({?param})', () => {
     expect(result).toEqual({ params: { q: 'hello world' } });
   });
 
+  it("decodes '+' as space (form-encoded query semantics)", () => {
+    const result = matchUriTemplate('search{?q}', 'search?q=hello+world');
+    expect(result).toEqual({ params: { q: 'hello world' } });
+  });
+
   it('expandUriTemplate strips {?...} blocks (path-only expansion)', () => {
     const result = expandUriTemplate('users/{id}{?expand}', { id: '42' });
     expect(result).toBe('users/42');

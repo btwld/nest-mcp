@@ -48,26 +48,6 @@ function parseTemplate(template: string): ParsedTemplate {
   };
 }
 
-function splitUri(uri: string): { path: string; query: string } {
-  const idx = uri.indexOf('?');
-  return idx === -1
-    ? { path: uri, query: '' }
-    : { path: uri.slice(0, idx), query: uri.slice(idx + 1) };
-}
-
-function parseQueryString(query: string): Record<string, string> {
-  if (!query) return {};
-  const params: Record<string, string> = {};
-  for (const pair of query.split('&')) {
-    if (!pair) continue;
-    const eq = pair.indexOf('=');
-    const key = decodeURIComponent(eq === -1 ? pair : pair.slice(0, eq));
-    const value = eq === -1 ? '' : decodeURIComponent(pair.slice(eq + 1));
-    if (key) params[key] = value;
-  }
-  return params;
-}
-
 /**
  * @deprecated Internal — exposed for backwards compatibility. Prefer
  * {@link matchUriTemplate}, which handles both path and query expansions.
@@ -83,20 +63,27 @@ export function parseUriTemplate(template: string): {
 /**
  * Match a URI against a template and extract path + declared query params.
  * Returns `null` when the path portion does not match.
+ *
+ * Resource URIs may be relative (e.g. `users/42`), so we can't run them
+ * through `new URL(...)` — we split on the first `?` and feed the query
+ * portion to `URLSearchParams`, which gives us spec-correct
+ * `application/x-www-form-urlencoded` decoding (including `+` as space).
  */
 export function matchUriTemplate(template: string, uri: string): UriTemplateMatch | null {
   const { pathRegex, pathParamNames, queryParamNames } = parseTemplate(template);
-  const { path, query } = splitUri(uri);
+  const queryStart = uri.indexOf('?');
+  const path = queryStart === -1 ? uri : uri.slice(0, queryStart);
 
   const pathMatch = path.match(pathRegex);
   if (!pathMatch) return null;
 
   const params: Record<string, string> = {};
 
-  if (queryParamNames.length > 0) {
-    const inputQuery = parseQueryString(query);
+  if (queryParamNames.length > 0 && queryStart !== -1) {
+    const search = new URLSearchParams(uri.slice(queryStart + 1));
     for (const name of queryParamNames) {
-      if (inputQuery[name] !== undefined) params[name] = inputQuery[name];
+      const value = search.get(name);
+      if (value !== null) params[name] = value;
     }
   }
 
