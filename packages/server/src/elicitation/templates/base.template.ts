@@ -1,16 +1,22 @@
 import type { ElicitationTemplateOptions } from '../interfaces/elicitation-options.interface';
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
 /**
  * Escape HTML-significant characters. Used on every value rendered into an
  * HTML attribute or text node to prevent injection from metadata fields.
+ * Single-pass to keep ordering straightforward (any `&amp;` produced by the
+ * `&` replacement isn't re-escaped) — matters when a value already contains
+ * partial HTML entities.
  */
 export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
 /**

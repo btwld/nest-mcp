@@ -25,21 +25,17 @@ interface ParsedTemplate {
 }
 
 function parseTemplate(template: string): ParsedTemplate {
-  // Pull out the form-style query expansions first; the remainder is the path.
-  const queryParamNames: string[] = [];
-  const pathOnly = template.replace(QUERY_PARAM_RE, (_match, names: string) => {
-    for (const raw of names.split(',')) {
-      const name = raw.trim();
-      if (name) queryParamNames.push(name);
-    }
-    return '';
-  });
-
-  const pathParamNames: string[] = [];
-  const regexStr = pathOnly.replace(PATH_PARAM_RE, (_match, name: string) => {
-    pathParamNames.push(name);
-    return '([^/?]+)';
-  });
+  // Form-style query expansions are pulled out first so they don't pollute
+  // the path regex; everything else is treated as the path portion.
+  const queryParamNames = [...template.matchAll(QUERY_PARAM_RE)].flatMap((m) =>
+    m[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const pathOnly = template.replace(QUERY_PARAM_RE, '');
+  const pathParamNames = [...pathOnly.matchAll(PATH_PARAM_RE)].map((m) => m[1]);
+  const regexStr = pathOnly.replace(PATH_PARAM_RE, '([^/?]+)');
 
   return {
     pathRegex: new RegExp(`^${regexStr}$`),
