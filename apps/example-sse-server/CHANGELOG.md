@@ -1,5 +1,19 @@
 # @nest-mcp/example-sse-server
 
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+- Updated dependencies [2fde58b]
+  - @nest-mcp/server@0.6.0
+  - @nest-mcp/common@0.4.0
+
 ## 0.1.12
 
 ### Patch Changes

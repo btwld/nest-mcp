@@ -1,5 +1,36 @@
 # @nest-mcp/common
 
+## 0.4.0
+
+### Minor Changes
+
+- 2fde58b: feat(common,server): expose tool/prompt arguments on `McpGuardContext`
+
+  Custom guards now receive an `arguments` field on the `McpGuardContext`
+  populated with the raw arguments the caller passed to `tools/call` or
+  `prompts/get`. Values are pre-Zod (validation runs after auth), so guards
+  inspecting fields should treat them as `unknown`. Resource guards still
+  receive only `resourceUri`.
+
+- 2fde58b: feat(common,server): add `serverMutator`, `title`, `websiteUrl`, and `icons` to `McpModuleOptions`
+
+  - `serverMutator?: (server) => server` lets you reach into the underlying SDK
+    `McpServer` after our factory builds it (e.g., to register custom JSON-RPC
+    methods that the public API does not expose).
+  - `title`, `websiteUrl`, and `icons` are forwarded to the SDK
+    `Implementation` block alongside `name`, `version`, and the existing
+    `description`, so clients can display richer server metadata in the
+    `initialize` response.
+
+- 2fde58b: feat(common): support RFC 6570 form-style query expansion in resource URI templates
+
+  `matchUriTemplate` now recognizes the `{?name,email}` query-expansion syntax.
+  For a template like `users/{id}{?expand,fields}` matched against a URI like
+  `users/42?expand=true&fields=name`, the returned `params` map contains both
+  the path params (`id`) and the declared query params (`expand`, `fields`),
+  merged. Query params not declared in the template are ignored. Path matching
+  is unchanged for templates that don't use `{?...}`.
+
 ## 0.3.0
 
 ### Minor Changes
