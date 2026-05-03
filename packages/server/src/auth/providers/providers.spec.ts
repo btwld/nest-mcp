@@ -166,17 +166,15 @@ describe('AzureAdProvider', () => {
   });
 
   it('exchanges a code via the v2.0 token endpoint and Microsoft Graph /me', async () => {
-    fetchMock
-      .mockResolvedValueOnce(fetchOk({ access_token: 'tok-aad' }))
-      .mockResolvedValueOnce(
-        fetchOk({
-          id: 'graph-id',
-          oid: 'object-id',
-          mail: 'user@contoso.com',
-          userPrincipalName: 'user@contoso.com',
-          displayName: 'Real Name',
-        }),
-      );
+    fetchMock.mockResolvedValueOnce(fetchOk({ access_token: 'tok-aad' })).mockResolvedValueOnce(
+      fetchOk({
+        id: 'graph-id',
+        oid: 'object-id',
+        mail: 'user@contoso.com',
+        userPrincipalName: 'user@contoso.com',
+        displayName: 'Real Name',
+      }),
+    );
 
     const provider = new AzureAdProvider({
       clientId: 'cid',

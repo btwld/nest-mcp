@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { McpTransportType, ToolExecutionError, ValidationError } from '@nest-mcp/common';
 import type { McpModuleOptions } from '@nest-mcp/common';
+import { Reflector } from '@nestjs/core';
 import { z } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type {
@@ -9,7 +10,6 @@ import type {
   RegisteredResourceTemplate,
   RegisteredTool,
 } from '../discovery/registry.service';
-import { Reflector } from '@nestjs/core';
 import { mockMcpContext } from '../testing/mock-context';
 import { McpExceptionFilterRunner } from './exception-filter.runner';
 import { McpExecutorService } from './executor.service';

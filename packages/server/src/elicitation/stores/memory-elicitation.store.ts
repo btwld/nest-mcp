@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { IElicitationStore } from '../interfaces/elicitation-store.interface';
 import type {
   ElicitationRecord,
   ElicitationResultRecord,
 } from '../interfaces/elicitation.interface';
-import type { IElicitationStore } from '../interfaces/elicitation-store.interface';
 
 /**
  * In-memory `IElicitationStore`. Suitable for development and single-instance

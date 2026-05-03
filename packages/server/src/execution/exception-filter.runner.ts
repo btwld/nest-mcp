@@ -1,8 +1,5 @@
 import { type ExceptionFilter, Injectable, type Type } from '@nestjs/common';
-import {
-  EXCEPTION_FILTERS_METADATA,
-  FILTER_CATCH_EXCEPTIONS,
-} from '@nestjs/common/constants';
+import { EXCEPTION_FILTERS_METADATA, FILTER_CATCH_EXCEPTIONS } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
 
@@ -12,7 +9,9 @@ export interface FilterTarget {
    * capability metadata as a universal-constructor type; bridged to Nest's
    * concrete `Type` once inside this runner.
    */
-  target: abstract new (...args: never[]) => unknown;
+  target: abstract new (
+    ...args: never[]
+  ) => unknown;
   methodName: string;
 }
 
@@ -40,9 +39,7 @@ export class McpExceptionFilterRunner {
     const classFilters =
       this.reflector.get<Type<ExceptionFilter>[]>(EXCEPTION_FILTERS_METADATA, clazz) ?? [];
 
-    const matched = [...methodFilters, ...classFilters].find((f) =>
-      this.matchesError(error, f),
-    );
+    const matched = [...methodFilters, ...classFilters].find((f) => this.matchesError(error, f));
     if (!matched) return null;
 
     const host = new ExecutionContextHost([request], clazz, method);
@@ -53,8 +50,7 @@ export class McpExceptionFilterRunner {
   }
 
   private matchesError(error: Error, filter: Type<ExceptionFilter>): boolean {
-    const exceptionTypes =
-      this.reflector.get<Type<Error>[]>(FILTER_CATCH_EXCEPTIONS, filter) ?? [];
+    const exceptionTypes = this.reflector.get<Type<Error>[]>(FILTER_CATCH_EXCEPTIONS, filter) ?? [];
 
     if (exceptionTypes.length === 0) return true;
     return exceptionTypes.some((t) => error instanceof t);

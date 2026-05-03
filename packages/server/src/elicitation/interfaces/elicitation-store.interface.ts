@@ -1,7 +1,4 @@
-import type {
-  ElicitationRecord,
-  ElicitationResultRecord,
-} from './elicitation.interface';
+import type { ElicitationRecord, ElicitationResultRecord } from './elicitation.interface';
 
 /**
  * Storage backend for URL-mode elicitations. Implementations may use memory
@@ -11,10 +8,7 @@ import type {
 export interface IElicitationStore {
   storeElicitation(elicitation: ElicitationRecord): Promise<void>;
   getElicitation(elicitationId: string): Promise<ElicitationRecord | undefined>;
-  updateElicitation(
-    elicitationId: string,
-    updates: Partial<ElicitationRecord>,
-  ): Promise<void>;
+  updateElicitation(elicitationId: string, updates: Partial<ElicitationRecord>): Promise<void>;
   storeResult(result: ElicitationResultRecord): Promise<void>;
   getResult(elicitationId: string): Promise<ElicitationResultRecord | undefined>;
   /**

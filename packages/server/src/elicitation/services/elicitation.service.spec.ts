@@ -45,7 +45,8 @@ describe('ElicitationService', () => {
   it('uses the per-call ttlMs override when provided', async () => {
     const id = await service.createElicitation({ sessionId: 's1', ttlMs: 1_000 });
     const record = await service.getElicitation(id);
-    const window = record!.expiresAt.getTime() - record!.createdAt.getTime();
+    if (!record) throw new Error('expected record to exist');
+    const window = record.expiresAt.getTime() - record.createdAt.getTime();
     expect(window).toBe(1_000);
   });
 
@@ -189,9 +190,9 @@ describe('ElicitationService', () => {
       const handle = await service.startUrlElicitation({ sessionId: 's1' });
       const controller = new AbortController();
       controller.abort();
-      await expect(
-        handle.waitForCompletion({ signal: controller.signal }),
-      ).rejects.toThrow('Elicitation aborted');
+      await expect(handle.waitForCompletion({ signal: controller.signal })).rejects.toThrow(
+        'Elicitation aborted',
+      );
     });
 
     it('rejects with timeout when waitForCompletion exceeds the deadline', async () => {

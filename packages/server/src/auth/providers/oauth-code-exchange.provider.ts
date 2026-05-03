@@ -75,9 +75,7 @@ export abstract class OAuthCodeExchangeProvider<TProfile = Record<string, unknow
     };
   }
 
-  constructor(
-    protected readonly config: { clientId: string; clientSecret: string },
-  ) {}
+  constructor(protected readonly config: { clientId: string; clientSecret: string }) {}
 
   getAuthorizationUrl(state: string, redirectUri: string): string {
     const params = new URLSearchParams({

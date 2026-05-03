@@ -34,9 +34,7 @@ export interface ElicitationWaitOptions {
 export interface UrlElicitationHandle {
   elicitationId: string;
   url: string;
-  waitForCompletion: (
-    options?: ElicitationWaitOptions,
-  ) => Promise<ElicitationResultRecord>;
+  waitForCompletion: (options?: ElicitationWaitOptions) => Promise<ElicitationResultRecord>;
 }
 
 /** Parameters accepted by {@link ElicitationService.startUrlElicitation}. */

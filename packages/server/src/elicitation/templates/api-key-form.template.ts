@@ -10,9 +10,7 @@ export function apiKeyFormTemplate(params: {
   actionUrl: string;
   options?: ElicitationTemplateOptions;
 }): string {
-  const description = params.description
-    ? `<p>${escapeHtml(params.description)}</p>`
-    : '';
+  const description = params.description ? `<p>${escapeHtml(params.description)}</p>` : '';
 
   const body = `
     <h1>${escapeHtml(params.fieldLabel)}</h1>

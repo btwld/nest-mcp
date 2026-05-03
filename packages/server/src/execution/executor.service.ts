@@ -38,6 +38,27 @@ function formatZodIssues(issues: ReadonlyArray<ZodIssueLike>): string {
     .join('; ');
 }
 
+/** Coerce arbitrary handler returns into the SDK `ToolCallResult` envelope. */
+function shapeToolResult(result: unknown): ToolCallResult {
+  if (result === null || result === undefined) {
+    return { content: [{ type: 'text', text: '' }] };
+  }
+  if (typeof result === 'object' && 'content' in (result as Record<string, unknown>)) {
+    return result as ToolCallResult;
+  }
+  if (typeof result === 'string') {
+    return { content: [{ type: 'text', text: result }] };
+  }
+  return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+}
+
+/** Pick the structured payload from a raw handler return, or `undefined` when there isn't one. */
+function extractStructuredCandidate(result: unknown): Record<string, unknown> | undefined {
+  if (typeof result !== 'object' || result === null) return undefined;
+  if ('content' in (result as Record<string, unknown>)) return undefined;
+  return result as Record<string, unknown>;
+}
+
 @Injectable()
 export class McpExecutorService {
   private readonly logger = new Logger(McpExecutorService.name);
@@ -167,40 +188,34 @@ export class McpExecutorService {
   }
 
   private normalizeToolResult(result: unknown, tool?: RegisteredTool): ToolCallResult {
-    if (result === null || result === undefined) {
-      return { content: [{ type: 'text', text: '' }] };
-    }
+    const normalized = shapeToolResult(result);
+    if (!tool?.outputSchema || normalized.isError) return normalized;
+    return this.attachStructuredContent(normalized, result, tool, tool.outputSchema);
+  }
 
-    let normalized: ToolCallResult;
-    if (typeof result === 'object' && 'content' in (result as Record<string, unknown>)) {
-      normalized = result as ToolCallResult;
-    } else if (typeof result === 'string') {
-      normalized = { content: [{ type: 'text', text: result }] };
-    } else {
-      normalized = { content: [{ type: 'text', text: JSON.stringify(result) }] };
-    }
+  /**
+   * Per MCP spec, validate the handler return against the tool's
+   * `outputSchema` and stamp the parsed value onto `structuredContent`.
+   * Falls back to the raw result object when the handler didn't pre-set
+   * `structuredContent`. Skips quietly when there's nothing to validate.
+   */
+  private attachStructuredContent(
+    normalized: ToolCallResult,
+    rawResult: unknown,
+    tool: RegisteredTool,
+    outputSchema: ZodType,
+  ): ToolCallResult {
+    const candidate = normalized.structuredContent ?? extractStructuredCandidate(rawResult);
+    if (candidate === undefined) return normalized;
 
-    // Validate against `outputSchema` when declared and stamp the
-    // `structuredContent` field with the validated payload (per MCP spec).
-    if (tool?.outputSchema && !normalized.isError) {
-      const candidate =
-        normalized.structuredContent ??
-        (typeof result === 'object' && result !== null && !('content' in (result as object))
-          ? (result as Record<string, unknown>)
-          : undefined);
-      if (candidate !== undefined) {
-        const parsed = tool.outputSchema.safeParse(candidate);
-        if (!parsed.success) {
-          throw new ToolExecutionError(
-            tool.name,
-            `outputSchema validation failed: ${formatZodIssues(parsed.error.issues)}`,
-          );
-        }
-        normalized = { ...normalized, structuredContent: parsed.data as Record<string, unknown> };
-      }
+    const parsed = outputSchema.safeParse(candidate);
+    if (!parsed.success) {
+      throw new ToolExecutionError(
+        tool.name,
+        `outputSchema validation failed: ${formatZodIssues(parsed.error.issues)}`,
+      );
     }
-
-    return normalized;
+    return { ...normalized, structuredContent: parsed.data as Record<string, unknown> };
   }
 
   // ---- Resources ----

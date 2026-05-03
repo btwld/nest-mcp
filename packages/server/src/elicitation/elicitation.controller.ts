@@ -50,9 +50,7 @@ interface ConfirmFormBody {
  * and optional guards baked in. Pattern matches our transport controller
  * factories — Nest receives a fully-decorated class, not a builder.
  */
-export function createElicitationController(
-  options: ResolvedElicitationOptions,
-): Type<unknown> {
+export function createElicitationController(options: ResolvedElicitationOptions): Type<unknown> {
   const { apiPrefix, endpoints, guards = [] } = options;
   const guardDecorator = guards.length > 0 ? UseGuards(...guards) : null;
 
@@ -135,10 +133,7 @@ export function createElicitationController(
     }
 
     @Get(endpoints.confirm)
-    async renderConfirmationForm(
-      @Param('id') id: string,
-      @Res() res: HtmlResponse,
-    ): Promise<void> {
+    async renderConfirmationForm(@Param('id') id: string, @Res() res: HtmlResponse): Promise<void> {
       const record = await this.service.getElicitation(id);
       if (!record) return this.renderError(res, 'Elicitation not found or expired');
       if (record.status === 'complete') {

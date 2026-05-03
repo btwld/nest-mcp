@@ -60,8 +60,7 @@ function resolveOptions(options: ElicitationModuleOptions): ResolvedElicitationO
     serverUrl: options.serverUrl,
     apiPrefix: options.apiPrefix ?? DEFAULT_ELICITATION_OPTIONS.apiPrefix,
     elicitationTtlMs: options.elicitationTtlMs ?? DEFAULT_ELICITATION_OPTIONS.elicitationTtlMs,
-    cleanupIntervalMs:
-      options.cleanupIntervalMs ?? DEFAULT_ELICITATION_OPTIONS.cleanupIntervalMs,
+    cleanupIntervalMs: options.cleanupIntervalMs ?? DEFAULT_ELICITATION_OPTIONS.cleanupIntervalMs,
     storeConfiguration:
       options.storeConfiguration ?? DEFAULT_ELICITATION_OPTIONS.storeConfiguration,
     endpoints: { ...DEFAULT_ELICITATION_OPTIONS.endpoints, ...(options.endpoints ?? {}) },

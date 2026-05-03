@@ -120,7 +120,10 @@ describe('edge cases', () => {
 
 describe('RFC 6570 query expansion ({?param})', () => {
   it('extracts declared query params from the URI', () => {
-    const result = matchUriTemplate('users/{id}{?expand,fields}', 'users/42?expand=true&fields=name');
+    const result = matchUriTemplate(
+      'users/{id}{?expand,fields}',
+      'users/42?expand=true&fields=name',
+    );
     expect(result).toEqual({
       params: { id: '42', expand: 'true', fields: 'name' },
     });

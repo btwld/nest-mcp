@@ -58,9 +58,7 @@ describe('MemoryElicitationStore', () => {
 
   it('findResultByUserAndType uses the user+type index', async () => {
     const store = new MemoryElicitationStore();
-    await store.storeElicitation(
-      baseRecord({ userId: 'user-1', metadata: { type: 'api-key' } }),
-    );
+    await store.storeElicitation(baseRecord({ userId: 'user-1', metadata: { type: 'api-key' } }));
     const result: ElicitationResultRecord = {
       elicitationId: 'eid-1',
       success: true,
@@ -77,9 +75,7 @@ describe('MemoryElicitationStore', () => {
 
   it('removeElicitation drops record, result, and index entry', async () => {
     const store = new MemoryElicitationStore();
-    await store.storeElicitation(
-      baseRecord({ userId: 'u', metadata: { type: 't' } }),
-    );
+    await store.storeElicitation(baseRecord({ userId: 'u', metadata: { type: 't' } }));
     await store.storeResult({
       elicitationId: 'eid-1',
       success: true,

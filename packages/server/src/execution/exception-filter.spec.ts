@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { McpError, McpTransportType, ToolExecutionError } from '@nest-mcp/common';
+import type { McpModuleOptions } from '@nest-mcp/common';
 import {
   type ArgumentsHost,
   BadRequestException,
@@ -8,8 +10,6 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { McpError, McpTransportType, ToolExecutionError } from '@nest-mcp/common';
-import type { McpModuleOptions } from '@nest-mcp/common';
 import { McpRegistryService } from '../discovery/registry.service';
 import type {
   RegisteredPrompt,
@@ -56,11 +56,7 @@ class HttpFilter implements ExceptionFilter {
 }
 
 const makeExecutor = (registry: McpRegistryService) =>
-  new McpExecutorService(
-    registry,
-    new McpExceptionFilterRunner(new Reflector()),
-    defaultOptions,
-  );
+  new McpExecutorService(registry, new McpExceptionFilterRunner(new Reflector()), defaultOptions);
 
 describe('Exception filter integration', () => {
   function registerToolFromClass<T extends abstract new (...args: never[]) => object>(
@@ -205,9 +201,9 @@ describe('Exception filter integration', () => {
       } as RegisteredResourceTemplate);
 
       const executor = makeExecutor(registry);
-      await expect(
-        executor.readResource('users://42', mockMcpContext()),
-      ).rejects.toMatchObject({ message: 'domain: not found' });
+      await expect(executor.readResource('users://42', mockMcpContext())).rejects.toMatchObject({
+        message: 'domain: not found',
+      });
     });
   });
 
