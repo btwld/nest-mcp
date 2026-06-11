@@ -1,3 +1,4 @@
+import type { McpAuthInfo } from './mcp-auth.interface';
 import type { ElicitRequest, ElicitResult } from './mcp-elicitation.interface';
 import type { McpSamplingParams, McpSamplingResult } from './mcp-sampling.interface';
 import type { ToolContent } from './mcp-tool.interface';
@@ -16,6 +17,8 @@ export interface McpExecutionContext {
   log: McpContextLogger;
   request?: unknown;
   user?: McpAuthenticatedUser;
+  /** Verified bearer-token identity, when HTTP edge auth is enabled. */
+  authInfo?: McpAuthInfo;
   metadata: Record<string, unknown>;
   signal?: AbortSignal;
   /** Emit incremental content chunks during tool execution (FastMCP streaming extension). */

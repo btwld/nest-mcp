@@ -41,6 +41,7 @@ export { McpExecutorService } from './execution/executor.service';
 export { ExecutionPipelineService } from './execution/pipeline.service';
 export { McpContextFactory } from './execution/context.factory';
 export { McpRequestContextService } from './execution/request-context.service';
+export { resolveGuard } from './utils/resolve-guard.util';
 
 // Transport
 export { StreamableHttpService } from './transport/streamable-http/streamable.service';
@@ -67,9 +68,17 @@ export { AuthAuditService } from './auth/services/auth-audit.service';
 export type { AuditLogEntry } from './auth/services/auth-audit.service';
 export { JwtTokenService, MCP_AUTH_OPTIONS } from './auth/services/jwt-token.service';
 export { OAuthClientService, MCP_OAUTH_STORE } from './auth/services/client.service';
+export {
+  JwtBearerTokenVerifier,
+  MCP_BEARER_TOKEN_VERIFIER,
+  type BearerTokenVerifier,
+} from './auth/services/bearer-verifier.service';
 export { MemoryOAuthStore } from './auth/stores/memory-store.service';
-export type { IOAuthStore } from './auth/stores/oauth-store.interface';
-export type { McpAuthModuleOptions } from './auth/interfaces/auth-module-options.interface';
+export type { IOAuthStore, IssuedTokenRecord } from './auth/stores/oauth-store.interface';
+export type {
+  McpAuthModuleAsyncOptions,
+  McpAuthModuleOptions,
+} from './auth/interfaces/auth-module-options.interface';
 export type {
   OAuthProviderAdapter,
   OAuthProviderUser,

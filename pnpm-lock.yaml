@@ -314,7 +314,7 @@ importers:
         version: link:../common
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
+        specifier: ^1.26.0
         version: 1.26.0(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0
@@ -372,7 +372,7 @@ importers:
         version: link:../server
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
+        specifier: ^1.26.0
         version: 1.26.0(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0
@@ -409,7 +409,7 @@ importers:
         version: 8.3.0
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
+        specifier: ^1.26.0
         version: 1.26.0(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0

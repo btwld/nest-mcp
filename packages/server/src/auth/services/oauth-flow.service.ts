@@ -209,6 +209,7 @@ export class OAuthFlowService {
       authCode.scope,
       authCode.resource,
     );
+    await this.recordIssuedTokens(tokenResponse, authCode.client_id);
     this.auditService?.logTokenIssued(authCode.client_id, authCode.user_id);
     return tokenResponse;
   }
@@ -242,8 +243,35 @@ export class OAuthFlowService {
 
     const clientId = payload.client_id ?? payload.azp ?? '';
     const refreshResponse = this.jwtService.generateTokenPair(payload.sub, clientId, payload.scope);
+    await this.recordIssuedTokens(refreshResponse, clientId);
     this.auditService?.logTokenIssued(clientId, payload.sub);
     return refreshResponse;
+  }
+
+  /**
+   * Notifies the store of freshly minted tokens via the optional
+   * `recordIssuedToken` hook so host apps can track/revoke refresh chains.
+   * No-op when the store does not implement the hook.
+   */
+  private async recordIssuedTokens(tokens: TokenResponse, clientId: string): Promise<void> {
+    if (typeof this.store.recordIssuedToken !== 'function') return;
+
+    const minted = [
+      { type: 'access' as const, token: tokens.access_token },
+      { type: 'refresh' as const, token: tokens.refresh_token },
+    ];
+    for (const { type, token } of minted) {
+      const payload = this.jwtService.validateToken(token);
+      if (!payload.jti) continue;
+      await this.store.recordIssuedToken({
+        jti: payload.jti,
+        type,
+        clientId,
+        userId: payload.sub,
+        scope: payload.scope,
+        expiresAt: (payload.exp ?? 0) * 1000,
+      });
+    }
   }
 
   async revokeToken(body: Record<string, unknown>): Promise<{ success: boolean }> {

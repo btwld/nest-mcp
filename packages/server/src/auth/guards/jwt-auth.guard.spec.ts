@@ -23,6 +23,48 @@ describe('JwtAuthGuard', () => {
     };
   }
 
+  // --- authInfo fast path ---
+
+  it('returns true and populates user from authInfo without re-parsing headers', async () => {
+    const context = makeContext(undefined);
+    context.authInfo = {
+      token: 'edge-verified',
+      clientId: 'client-1',
+      scopes: ['read', 'write'],
+      extra: { sub: 'user-42' },
+    };
+
+    const result = await guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(context.user).toEqual({ id: 'user-42', scopes: ['read', 'write'] });
+    expect(jwtService.validateToken).not.toHaveBeenCalled();
+  });
+
+  it('falls back to clientId when authInfo has no sub claim', async () => {
+    const context = makeContext(undefined);
+    context.authInfo = { token: 't', clientId: 'client-7', scopes: [] };
+
+    const result = await guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(context.user).toEqual({ id: 'client-7', scopes: [] });
+  });
+
+  // --- requestInfo-shaped request ---
+
+  it('parses bearer token from a requestInfo-shaped request', async () => {
+    jwtService.validateToken.mockReturnValue({ sub: 'user-9', scope: 'read' });
+    // ctx.request is the SDK's per-request requestInfo: { headers: Record<...> }
+    const context = makeContext({ headers: { authorization: 'Bearer per-request-token' } });
+
+    const result = await guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(jwtService.validateToken).toHaveBeenCalledWith('per-request-token');
+    expect(context.user).toEqual(expect.objectContaining({ id: 'user-9', scopes: ['read'] }));
+  });
+
   // --- Missing / Invalid auth header ---
 
   it('returns false when no authorization header', async () => {

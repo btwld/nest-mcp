@@ -17,6 +17,7 @@ import {
 import type {
   ElicitRequest,
   ElicitResult,
+  McpAuthInfo,
   McpExecutionContext,
   McpModuleOptions,
   McpProgress,
@@ -48,6 +49,41 @@ const PASSTHROUGH_SCHEMA = z.looseObject({});
  * notification is received from the client.
  */
 const activeRequests = new Map<string | number, AbortController>();
+
+/** Headers of the originating HTTP request, as surfaced by the SDK transport. */
+interface RequestInfoLike {
+  headers: Record<string, string | string[] | undefined>;
+}
+
+/**
+ * Per-request auth/request surface of the SDK `RequestHandlerExtra`
+ * (structural — `@nest-mcp/common` stays SDK-free). `authInfo` carries the
+ * identity the HTTP edge attached to `req.auth`; `requestInfo` carries the
+ * headers of the HTTP request that delivered this JSON-RPC message.
+ */
+interface RequestAuthExtra {
+  authInfo?: McpAuthInfo;
+  requestInfo?: RequestInfoLike;
+}
+
+/**
+ * Builds a fresh per-request execution context from the SDK's per-request
+ * `extra`. The session-level `ctx` captured at connect time would otherwise
+ * go stale: on stateful transports every subsequent request reuses the
+ * initialize-request's headers/identity. When the transport provides neither
+ * `authInfo` nor `requestInfo` (SSE, STDIO), the context passes through
+ * unchanged.
+ */
+function withRequestAuth(ctx: McpExecutionContext, extra: RequestAuthExtra): McpExecutionContext {
+  if (!extra.authInfo && !extra.requestInfo) return ctx;
+  const user = extra.authInfo
+    ? {
+        id: (extra.authInfo.extra?.sub as string) ?? extra.authInfo.clientId,
+        scopes: extra.authInfo.scopes,
+      }
+    : ctx.user;
+  return { ...ctx, request: extra.requestInfo ?? ctx.request, authInfo: extra.authInfo, user };
+}
 
 function createSignalContext(
   ctx: McpExecutionContext,
@@ -144,7 +180,7 @@ export function registerToolOnServer(
     },
     async (
       args: Record<string, unknown>,
-      extra: {
+      extra: RequestAuthExtra & {
         signal: AbortSignal;
         requestId: string | number;
         _meta?: { progressToken?: string | number };
@@ -154,7 +190,10 @@ export function registerToolOnServer(
         }) => Promise<void>;
       },
     ) => {
-      const { ctxWithSignal: baseCtxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      // Fresh spread per call: the pipeline's user write-back stays
+      // request-isolated instead of mutating the shared session context.
+      const requestCtx = withRequestAuth(ctx, extra);
+      const { ctxWithSignal: baseCtxWithSignal, cleanup } = createSignalContext(requestCtx, extra);
 
       // Build per-request reportProgress that sends notifications/progress
       // when the client provided a progressToken in _meta
@@ -228,8 +267,11 @@ export function registerResourceOnServer(
     resource.name,
     resource.uri,
     resource.mimeType ? { mimeType: resource.mimeType } : {},
-    async (uri: URL, extra: { signal: AbortSignal; requestId: string | number }) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+    async (
+      uri: URL,
+      extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
+    ) => {
+      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
       try {
         return await pipeline.readResource(uri.href, ctxWithSignal);
       } finally {
@@ -261,9 +303,9 @@ export function registerResourceTemplateOnServer(
     async (
       uri: URL,
       _variables: Record<string, string>,
-      extra: { signal: AbortSignal; requestId: string | number },
+      extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
     ) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
       try {
         return await pipeline.readResource(uri.href, ctxWithSignal);
       } finally {
@@ -295,9 +337,9 @@ export function registerPromptOnServer(
     },
     async (
       args: Record<string, unknown>,
-      extra: { signal: AbortSignal; requestId: string | number },
+      extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
     ) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(ctx, extra);
+      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
       try {
         return await pipeline.getPrompt(prompt.name, args, ctxWithSignal);
       } finally {
@@ -325,6 +367,16 @@ function registerCancellationHandler(server: McpServer): void {
 }
 
 /**
+ * Loose per-request view of the SDK `RequestHandlerExtra` for typed
+ * `setRequestHandler` callbacks. Wider than {@link RequestAuthExtra} so the
+ * SDK's concrete `AuthInfo` (whose `resource` is a `URL`) stays assignable.
+ */
+interface ListHandlerExtra {
+  authInfo?: { scopes?: string[] };
+  requestInfo?: RequestInfoLike;
+}
+
+/**
  * Registers custom list request handlers on the low-level SDK Server to
  * support cursor-based pagination. These override the SDK's default
  * list handlers that were auto-registered by registerTool/resource/prompt.
@@ -339,50 +391,69 @@ function registerListHandlers(
   options: McpModuleOptions,
   ctx: McpExecutionContext,
 ): void {
-  server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
-    const cursor = request.params?.cursor;
-    const clientContext = buildClientContext({
-      transport: ctx.transport,
-      request: ctx.request,
-    });
-    const result = await pipeline.listTools(cursor, clientContext);
-    return { tools: result.items, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
-  });
+  server.server.setRequestHandler(
+    ListToolsRequestSchema,
+    async (request, extra?: ListHandlerExtra) => {
+      const cursor = request.params?.cursor;
+      const clientContext = buildClientContext({
+        transport: ctx.transport,
+        request: extra?.requestInfo ?? ctx.request,
+      });
+      const result = await pipeline.listTools(cursor, clientContext, {
+        scopes: extra?.authInfo?.scopes,
+      });
+      return {
+        tools: result.items,
+        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+      };
+    },
+  );
 
   const hasResources =
     registry.hasResources || registry.hasResourceTemplates || !!options.capabilities?.resources;
 
   if (hasResources) {
-    server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
-      const cursor = request.params?.cursor;
-      const result = await pipeline.listResources(cursor);
-      return {
-        resources: result.items,
-        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-      };
-    });
+    server.server.setRequestHandler(
+      ListResourcesRequestSchema,
+      async (request, extra?: ListHandlerExtra) => {
+        const cursor = request.params?.cursor;
+        const result = await pipeline.listResources(cursor, { scopes: extra?.authInfo?.scopes });
+        return {
+          resources: result.items,
+          ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+        };
+      },
+    );
 
-    server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async (request) => {
-      const cursor = request.params?.cursor;
-      const result = await pipeline.listResourceTemplates(cursor);
-      return {
-        resourceTemplates: result.items,
-        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-      };
-    });
+    server.server.setRequestHandler(
+      ListResourceTemplatesRequestSchema,
+      async (request, extra?: ListHandlerExtra) => {
+        const cursor = request.params?.cursor;
+        const result = await pipeline.listResourceTemplates(cursor, {
+          scopes: extra?.authInfo?.scopes,
+        });
+        return {
+          resourceTemplates: result.items,
+          ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+        };
+      },
+    );
   }
 
   const hasPrompts = registry.hasPrompts || !!options.capabilities?.prompts;
 
   if (hasPrompts) {
-    server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
-      const cursor = request.params?.cursor;
-      const result = await pipeline.listPrompts(cursor);
-      return {
-        prompts: result.items,
-        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-      };
-    });
+    server.server.setRequestHandler(
+      ListPromptsRequestSchema,
+      async (request, extra?: ListHandlerExtra) => {
+        const cursor = request.params?.cursor;
+        const result = await pipeline.listPrompts(cursor, { scopes: extra?.authInfo?.scopes });
+        return {
+          prompts: result.items,
+          ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+        };
+      },
+    );
   }
 }
 

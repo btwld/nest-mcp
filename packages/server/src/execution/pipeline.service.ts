@@ -13,13 +13,13 @@ import type {
   ToolCallResult,
   ToolMetadata,
 } from '@nest-mcp/common';
-import type { McpGuard, McpGuardClass } from '@nest-mcp/common';
 import {
   MCP_OPTIONS,
   MCP_REQUEST_CANCELLED,
   McpError,
   McpTimeoutError,
   ToolExecutionError,
+  extractZodDescriptions,
   paginate,
 } from '@nest-mcp/common';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -32,8 +32,23 @@ import { MetricsService } from '../observability/metrics.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 import { RateLimiterService } from '../resilience/rate-limiter.service';
 import { RetryService } from '../resilience/retry.service';
+import { resolveGuard } from '../utils/resolve-guard.util';
 import { McpExecutorService } from './executor.service';
 import { McpRequestContextService } from './request-context.service';
+
+/** Caller identity used to scope-filter list results. */
+export interface ListAuthContext {
+  scopes?: string[];
+}
+
+/**
+ * Structural read of `requiredScopes` from a registry item. Resource and
+ * prompt metadata don't declare auth fields in their interfaces (yet), but
+ * the filter must honor them when present at runtime.
+ */
+function requiredScopesOf(item: object): string[] | undefined {
+  return (item as { requiredScopes?: string[] }).requiredScopes;
+}
 
 @Injectable()
 export class ExecutionPipelineService {
@@ -190,30 +205,94 @@ export class ExecutionPipelineService {
 
   // ---- List methods (delegate directly) ----
 
-  async listTools(cursor?: string, ctx?: ClientContext) {
-    // When a client context is supplied, apply the exposure strategy before
-    // paginating so filtered strategies (e.g. `lazy`) produce even page sizes.
-    if (!ctx) {
+  async listTools(cursor?: string, ctx?: ClientContext, auth?: ListAuthContext) {
+    const filterByScopes = this.options.filterListsByScopes === true;
+    if (!ctx && !filterByScopes) {
       return this.executor.listTools(cursor);
     }
+    // When a client context is supplied, apply the exposure strategy before
+    // paginating so filtered strategies (e.g. `lazy`) produce even page sizes.
     const entries = this.executor.buildToolEntries();
     const metaMap = new Map<string, ToolMetadata>(
       this.registry.getAllTools().map((t) => [t.name, t]),
     );
-    const shaped = this.exposure.applyStrategy(entries, metaMap, ctx);
-    return paginate(shaped, cursor, this.options.pagination?.defaultPageSize);
+    const shaped = ctx ? this.exposure.applyStrategy(entries, metaMap, ctx) : entries;
+    // Meta-tools injected by exposure strategies have no registry meta (and
+    // thus no requiredScopes), so they survive the scope filter.
+    const visible = filterByScopes
+      ? shaped.filter((entry) =>
+          this.hasRequiredScopes(metaMap.get(entry.name)?.requiredScopes, auth?.scopes),
+        )
+      : shaped;
+    return paginate(visible, cursor, this.options.pagination?.defaultPageSize);
   }
 
-  async listResources(cursor?: string) {
-    return this.executor.listResources(cursor);
+  async listResources(cursor?: string, auth?: ListAuthContext) {
+    if (!this.options.filterListsByScopes) {
+      return this.executor.listResources(cursor);
+    }
+    // Mirrors McpExecutorService.listResources, with scope filtering applied
+    // before pagination so pages stay evenly sized.
+    const entries = this.registry
+      .getAllResources()
+      .filter((r) => this.hasRequiredScopes(requiredScopesOf(r), auth?.scopes))
+      .map((r) => ({
+        uri: r.uri,
+        name: r.name,
+        ...(r.title != null ? { title: r.title } : {}),
+        ...(r.description ? { description: r.description } : {}),
+        ...(r.mimeType ? { mimeType: r.mimeType } : {}),
+        ...(r.icons ? { icons: r.icons } : {}),
+        ...(r._meta ? { _meta: r._meta } : {}),
+      }));
+    return paginate(entries, cursor, this.options.pagination?.defaultPageSize);
   }
 
-  async listResourceTemplates(cursor?: string) {
-    return this.executor.listResourceTemplates(cursor);
+  async listResourceTemplates(cursor?: string, auth?: ListAuthContext) {
+    if (!this.options.filterListsByScopes) {
+      return this.executor.listResourceTemplates(cursor);
+    }
+    // Mirrors McpExecutorService.listResourceTemplates with scope filtering.
+    const entries = this.registry
+      .getAllResourceTemplates()
+      .filter((t) => this.hasRequiredScopes(requiredScopesOf(t), auth?.scopes))
+      .map((t) => ({
+        uriTemplate: t.uriTemplate,
+        name: t.name,
+        ...(t.title != null ? { title: t.title } : {}),
+        ...(t.description ? { description: t.description } : {}),
+        ...(t.mimeType ? { mimeType: t.mimeType } : {}),
+        ...(t.icons ? { icons: t.icons } : {}),
+        ...(t._meta ? { _meta: t._meta } : {}),
+      }));
+    return paginate(entries, cursor, this.options.pagination?.defaultPageSize);
   }
 
-  async listPrompts(cursor?: string) {
-    return this.executor.listPrompts(cursor);
+  async listPrompts(cursor?: string, auth?: ListAuthContext) {
+    if (!this.options.filterListsByScopes) {
+      return this.executor.listPrompts(cursor);
+    }
+    // Mirrors McpExecutorService.listPrompts with scope filtering.
+    const entries = this.registry
+      .getAllPrompts()
+      .filter((p) => this.hasRequiredScopes(requiredScopesOf(p), auth?.scopes))
+      .map((p) => ({
+        name: p.name,
+        ...(p.title != null ? { title: p.title } : {}),
+        description: p.description,
+        ...(p.parameters
+          ? {
+              arguments: extractZodDescriptions(p.parameters).map((arg) => ({
+                name: arg.name,
+                description: arg.description,
+                required: arg.required,
+              })),
+            }
+          : {}),
+        ...(p.icons ? { icons: p.icons } : {}),
+        ...(p._meta ? { _meta: p._meta } : {}),
+      }));
+    return paginate(entries, cursor, this.options.pagination?.defaultPageSize);
   }
 
   // ---- Completions ----
@@ -238,7 +317,7 @@ export class ExecutionPipelineService {
     const guardContext = this.buildGuardContext(ctx, extra);
 
     for (const GuardClass of this.options.guards) {
-      const guard = this.resolveGuard(GuardClass);
+      const guard = resolveGuard(this.moduleRef, GuardClass);
 
       if (typeof guard.canActivate === 'function') {
         await guard.canActivate(guardContext);
@@ -251,13 +330,18 @@ export class ExecutionPipelineService {
     }
   }
 
-  private resolveGuard(GuardClass: McpGuardClass): McpGuard {
-    try {
-      return this.moduleRef.get(GuardClass, { strict: false });
-    } catch {
-      // Guard not in DI — instantiate directly (for simple guards)
-      return new (GuardClass as new () => McpGuard)();
-    }
+  /**
+   * True when the caller's granted scopes cover the item's required scopes.
+   * Items without required scopes are visible to everyone, including
+   * unauthenticated callers.
+   */
+  private hasRequiredScopes(
+    requiredScopes: string[] | undefined,
+    grantedScopes: string[] | undefined,
+  ): boolean {
+    if (!requiredScopes?.length) return true;
+    const granted = grantedScopes ?? [];
+    return requiredScopes.every((scope) => granted.includes(scope));
   }
 
   private buildExecutionChain(
@@ -319,6 +403,7 @@ export class ExecutionPipelineService {
       user: ctx.user,
       metadata: ctx.metadata,
       request: ctx.request,
+      authInfo: ctx.authInfo,
       ...extra,
     };
   }
