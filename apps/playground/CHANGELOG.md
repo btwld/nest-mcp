@@ -1,5 +1,13 @@
 # @nest-mcp/playground
 
+## 0.1.14
+
+### Patch Changes
+
+- Updated dependencies [f836e53]
+  - @nest-mcp/server@0.7.0
+  - @nest-mcp/common@0.5.0
+
 ## 0.1.13
 
 ### Patch Changes
