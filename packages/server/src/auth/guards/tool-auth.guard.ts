@@ -1,10 +1,14 @@
 import { AuthorizationError } from '@nest-mcp/common';
-import type { AuthorizableItem, McpGuard, McpGuardClass, McpGuardContext } from '@nest-mcp/common';
+import type { AuthorizableItem, McpGuardContext } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { resolveGuard } from '../../utils/resolve-guard.util';
 
 @Injectable()
 export class ToolAuthGuardService {
   private readonly logger = new Logger(ToolAuthGuardService.name);
+
+  constructor(private readonly moduleRef: ModuleRef) {}
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequential auth checks are inherently branchy
   async checkAuthorization(item: AuthorizableItem, context: McpGuardContext): Promise<void> {
@@ -36,7 +40,7 @@ export class ToolAuthGuardService {
     // Execute custom guards
     if (item.guards?.length) {
       for (const GuardClass of item.guards) {
-        const guard = new (GuardClass as unknown as new () => McpGuard)();
+        const guard = resolveGuard(this.moduleRef, GuardClass);
         if (typeof guard.canActivate === 'function') {
           const allowed = await guard.canActivate(context);
           if (!allowed) {

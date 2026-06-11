@@ -7,6 +7,16 @@ export class JwtAuthGuard implements McpGuard {
   constructor(private readonly jwtService: JwtTokenService) {}
 
   async canActivate(context: McpGuardContext): Promise<boolean> {
+    // Fast path: the HTTP edge already verified the bearer token and the SDK
+    // surfaced it per-request as authInfo — trust it instead of re-parsing.
+    if (context.authInfo) {
+      context.user = {
+        id: (context.authInfo.extra?.sub as string) ?? context.authInfo.clientId,
+        scopes: context.authInfo.scopes,
+      };
+      return true;
+    }
+
     const request = context.request as { headers?: { authorization?: string } } | undefined;
     if (!request?.headers?.authorization) return false;
 

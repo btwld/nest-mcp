@@ -6,9 +6,18 @@ import { ToolAuthGuardService } from './tool-auth.guard';
 
 describe('ToolAuthGuardService', () => {
   let guard: ToolAuthGuardService;
+  let moduleRef: { get: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    guard = new ToolAuthGuardService();
+    // Default: guards are not registered in DI — fall back to bare `new`.
+    moduleRef = {
+      get: vi.fn().mockImplementation(() => {
+        throw new Error('not found');
+      }),
+    };
+    guard = new ToolAuthGuardService(
+      moduleRef as unknown as ConstructorParameters<typeof ToolAuthGuardService>[0],
+    );
   });
 
   function makeContext(overrides: Partial<McpGuardContext> = {}): McpGuardContext {
@@ -190,6 +199,35 @@ describe('ToolAuthGuardService', () => {
       await guard.checkAuthorization(tool, context);
 
       expect(canActivate).toHaveBeenCalledWith(context);
+    });
+
+    it('resolves guards through DI when registered as providers', async () => {
+      const canActivate = vi.fn().mockResolvedValue(true);
+      class DiGuard {}
+      moduleRef.get.mockReturnValue({ canActivate });
+
+      const tool = makeTool({
+        guards: [DiGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
+      await guard.checkAuthorization(tool, makeContext());
+
+      expect(moduleRef.get).toHaveBeenCalledWith(DiGuard, { strict: false });
+      expect(canActivate).toHaveBeenCalled();
+    });
+
+    it('falls back to bare new when the guard is not in DI', async () => {
+      const canActivate = vi.fn().mockResolvedValue(true);
+      class PlainGuard {
+        canActivate = canActivate;
+      }
+
+      const tool = makeTool({
+        guards: [PlainGuard as unknown as abstract new (...a: unknown[]) => unknown],
+      });
+      await guard.checkAuthorization(tool, makeContext());
+
+      expect(moduleRef.get).toHaveBeenCalledWith(PlainGuard, { strict: false });
+      expect(canActivate).toHaveBeenCalled();
     });
   });
 });

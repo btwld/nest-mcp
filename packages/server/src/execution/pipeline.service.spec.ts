@@ -21,12 +21,14 @@ describe('ExecutionPipelineService', () => {
   let moduleRef: Record<string, ReturnType<typeof vi.fn>>;
   let options: McpModuleOptions;
   let requestContext: McpRequestContextService;
+  let exposure: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
     ctx = mockMcpContext();
 
     executor = {
       callTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] }),
+      buildToolEntries: vi.fn().mockReturnValue([]),
       listTools: vi.fn().mockResolvedValue([]),
       listResources: vi.fn().mockResolvedValue([]),
       listResourceTemplates: vi.fn().mockResolvedValue([]),
@@ -39,6 +41,10 @@ describe('ExecutionPipelineService', () => {
       getTool: vi.fn(),
       getResource: vi.fn(),
       getPrompt: vi.fn(),
+      getAllTools: vi.fn().mockReturnValue([]),
+      getAllResources: vi.fn().mockReturnValue([]),
+      getAllResourceTemplates: vi.fn().mockReturnValue([]),
+      getAllPrompts: vi.fn().mockReturnValue([]),
     };
 
     authGuard = {
@@ -70,6 +76,9 @@ describe('ExecutionPipelineService', () => {
 
     options = {} as McpModuleOptions;
     requestContext = new McpRequestContextService();
+    exposure = {
+      applyStrategy: vi.fn().mockImplementation((entries: unknown[]) => entries),
+    };
 
     pipeline = new ExecutionPipelineService(
       executor as unknown as ConstructorParameters<typeof ExecutionPipelineService>[0],
@@ -83,6 +92,7 @@ describe('ExecutionPipelineService', () => {
       options,
       moduleRef as unknown as ConstructorParameters<typeof ExecutionPipelineService>[9],
       requestContext,
+      exposure as unknown as ConstructorParameters<typeof ExecutionPipelineService>[11],
     );
   });
 
@@ -351,6 +361,33 @@ describe('ExecutionPipelineService', () => {
       );
     });
 
+    it('exposes authInfo on the guard context', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'test', isPublic: true });
+      const authInfo = { token: 't', clientId: 'client-1', scopes: ['tools:read'] };
+      const authedCtx = mockMcpContext({ authInfo });
+
+      await pipeline.callTool('test', {}, authedCtx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalledWith(expect.objectContaining({ authInfo }));
+    });
+
+    it('exposes authInfo on the tool-auth guard context', async () => {
+      registry.getTool.mockReturnValue({ name: 'priv', isPublic: false });
+      const authInfo = { token: 't', clientId: 'client-1', scopes: ['tools:read'] };
+      const authedCtx = mockMcpContext({ authInfo });
+
+      await pipeline.callTool('priv', {}, authedCtx);
+
+      expect(authGuard.checkAuthorization).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'priv' }),
+        expect.objectContaining({ authInfo }),
+      );
+    });
+
     it('instantiates guard directly when not found in DI', async () => {
       const canActivate = vi.fn().mockResolvedValue(true);
       const GuardClass = class SimpleGuard {
@@ -584,6 +621,194 @@ describe('ExecutionPipelineService', () => {
       const result = await pipeline.listPrompts();
 
       expect(result).toBe(expected);
+    });
+
+    it('listTools applies the exposure strategy when a client context is given', async () => {
+      const entries = [{ name: 'a' }];
+      executor.buildToolEntries.mockReturnValue(entries);
+      exposure.applyStrategy.mockReturnValue([{ name: 'a' }]);
+      const clientCtx = { transport: 'stdio' as never };
+
+      const result = await pipeline.listTools(undefined, clientCtx);
+
+      expect(exposure.applyStrategy).toHaveBeenCalledWith(entries, expect.any(Map), clientCtx);
+      expect(result.items).toEqual([{ name: 'a' }]);
+    });
+  });
+
+  // --- scope-filtered lists (filterListsByScopes) ---
+
+  describe('filterListsByScopes', () => {
+    beforeEach(() => {
+      options.filterListsByScopes = true;
+    });
+
+    describe('listTools', () => {
+      beforeEach(() => {
+        registry.getAllTools.mockReturnValue([
+          { name: 'open', description: 'Open' },
+          { name: 'scoped', description: 'Scoped', requiredScopes: ['admin'] },
+        ]);
+        executor.buildToolEntries.mockReturnValue([{ name: 'open' }, { name: 'scoped' }]);
+      });
+
+      it('hides tools whose required scopes are not covered', async () => {
+        const result = await pipeline.listTools(undefined, undefined, { scopes: ['user'] });
+
+        expect(result.items).toEqual([{ name: 'open' }]);
+        expect(executor.listTools).not.toHaveBeenCalled();
+      });
+
+      it('keeps scoped tools when the caller has all required scopes', async () => {
+        const result = await pipeline.listTools(undefined, undefined, { scopes: ['admin'] });
+
+        expect(result.items).toEqual([{ name: 'open' }, { name: 'scoped' }]);
+      });
+
+      it('shows only unscoped tools to unauthenticated callers', async () => {
+        const result = await pipeline.listTools();
+
+        expect(result.items).toEqual([{ name: 'open' }]);
+      });
+
+      it('keeps exposure meta-tools that have no registry meta', async () => {
+        exposure.applyStrategy.mockReturnValue([{ name: 'scoped' }, { name: 'search_tools' }]);
+        const clientCtx = { transport: 'stdio' as never };
+
+        const result = await pipeline.listTools(undefined, clientCtx, { scopes: [] });
+
+        expect(result.items).toEqual([{ name: 'search_tools' }]);
+      });
+    });
+
+    describe('listResources', () => {
+      beforeEach(() => {
+        registry.getAllResources.mockReturnValue([
+          { uri: 'file:///open', name: 'open' },
+          { uri: 'file:///secret', name: 'secret', requiredScopes: ['admin'] },
+        ]);
+      });
+
+      it('hides resources whose required scopes are not covered', async () => {
+        const result = await pipeline.listResources(undefined, { scopes: [] });
+
+        expect(result.items).toEqual([{ uri: 'file:///open', name: 'open' }]);
+        expect(executor.listResources).not.toHaveBeenCalled();
+      });
+
+      it('keeps scoped resources when the caller has all required scopes', async () => {
+        const result = await pipeline.listResources(undefined, { scopes: ['admin'] });
+
+        expect(result.items).toEqual([
+          { uri: 'file:///open', name: 'open' },
+          { uri: 'file:///secret', name: 'secret' },
+        ]);
+      });
+
+      it('mirrors the executor entry shape', async () => {
+        registry.getAllResources.mockReturnValue([
+          {
+            uri: 'file:///doc',
+            name: 'doc',
+            title: 'Doc',
+            description: 'A doc',
+            mimeType: 'text/plain',
+          },
+        ]);
+
+        const result = await pipeline.listResources(undefined, { scopes: [] });
+
+        expect(result.items).toEqual([
+          {
+            uri: 'file:///doc',
+            name: 'doc',
+            title: 'Doc',
+            description: 'A doc',
+            mimeType: 'text/plain',
+          },
+        ]);
+      });
+
+      it('delegates unchanged when the flag is off', async () => {
+        options.filterListsByScopes = false;
+        const expected = { items: [{ uri: 'x' }] };
+        executor.listResources.mockResolvedValue(expected);
+
+        const result = await pipeline.listResources(undefined, { scopes: [] });
+
+        expect(result).toBe(expected);
+        expect(executor.listResources).toHaveBeenCalledWith(undefined);
+      });
+    });
+
+    describe('listResourceTemplates', () => {
+      beforeEach(() => {
+        registry.getAllResourceTemplates.mockReturnValue([
+          { uriTemplate: 'data://open/{id}', name: 'open' },
+          { uriTemplate: 'data://secret/{id}', name: 'secret', requiredScopes: ['admin'] },
+        ]);
+      });
+
+      it('hides templates whose required scopes are not covered', async () => {
+        const result = await pipeline.listResourceTemplates(undefined, { scopes: [] });
+
+        expect(result.items).toEqual([{ uriTemplate: 'data://open/{id}', name: 'open' }]);
+        expect(executor.listResourceTemplates).not.toHaveBeenCalled();
+      });
+
+      it('keeps scoped templates when the caller has all required scopes', async () => {
+        const result = await pipeline.listResourceTemplates(undefined, { scopes: ['admin'] });
+
+        expect(result.items).toEqual([
+          { uriTemplate: 'data://open/{id}', name: 'open' },
+          { uriTemplate: 'data://secret/{id}', name: 'secret' },
+        ]);
+      });
+
+      it('delegates unchanged when the flag is off', async () => {
+        options.filterListsByScopes = false;
+        const expected = { items: [{ uriTemplate: 'x' }] };
+        executor.listResourceTemplates.mockResolvedValue(expected);
+
+        const result = await pipeline.listResourceTemplates(undefined, { scopes: [] });
+
+        expect(result).toBe(expected);
+      });
+    });
+
+    describe('listPrompts', () => {
+      beforeEach(() => {
+        registry.getAllPrompts.mockReturnValue([
+          { name: 'open', description: 'Open prompt' },
+          { name: 'secret', description: 'Secret prompt', requiredScopes: ['admin'] },
+        ]);
+      });
+
+      it('hides prompts whose required scopes are not covered', async () => {
+        const result = await pipeline.listPrompts(undefined, { scopes: [] });
+
+        expect(result.items).toEqual([{ name: 'open', description: 'Open prompt' }]);
+        expect(executor.listPrompts).not.toHaveBeenCalled();
+      });
+
+      it('keeps scoped prompts when the caller has all required scopes', async () => {
+        const result = await pipeline.listPrompts(undefined, { scopes: ['admin'] });
+
+        expect(result.items).toEqual([
+          { name: 'open', description: 'Open prompt' },
+          { name: 'secret', description: 'Secret prompt' },
+        ]);
+      });
+
+      it('delegates unchanged when the flag is off', async () => {
+        options.filterListsByScopes = false;
+        const expected = { items: [{ name: 'p' }] };
+        executor.listPrompts.mockResolvedValue(expected);
+
+        const result = await pipeline.listPrompts(undefined, { scopes: [] });
+
+        expect(result).toBe(expected);
+      });
     });
   });
 

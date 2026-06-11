@@ -449,6 +449,7 @@ describe('registerHandlers', () => {
     expect(mockPipeline.listTools).toHaveBeenCalledWith(
       'abc123',
       expect.objectContaining({ transport: ctx.transport }),
+      { scopes: undefined },
     );
     expect(result).toEqual({ tools: [{ name: 'tool-a' }], nextCursor: 'abc123' });
   });
@@ -489,7 +490,7 @@ describe('registerHandlers', () => {
     const handler = listResourcesCall?.[1];
     const result = await handler({ method: 'resources/list', params: { cursor: 'next' } });
 
-    expect(mockPipeline.listResources).toHaveBeenCalledWith('next');
+    expect(mockPipeline.listResources).toHaveBeenCalledWith('next', { scopes: undefined });
     expect(result).toEqual({ resources: [{ uri: 'file:///a' }], nextCursor: 'next' });
   });
 
@@ -509,8 +510,79 @@ describe('registerHandlers', () => {
     const handler = listPromptsCall?.[1];
     const result = await handler({ method: 'prompts/list', params: {} });
 
-    expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined);
+    expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined, { scopes: undefined });
     expect(result).toEqual({ prompts: [{ name: 'greet' }] });
+  });
+
+  // --- Per-request extra on list handlers ---
+
+  function findListHandler(method: string) {
+    const call = mockInnerServer.setRequestHandler.mock.calls.find(
+      (c: unknown[]) =>
+        (c[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value === method,
+    );
+    return call?.[1];
+  }
+
+  it('list tools handler builds client context from extra.requestInfo and passes scopes', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const handler = findListHandler('tools/list');
+    await handler(
+      { method: 'tools/list', params: {} },
+      {
+        authInfo: { scopes: ['tools:read'] },
+        requestInfo: { headers: { 'anthropic-beta': 'feature-x' } },
+      },
+    );
+
+    expect(mockPipeline.listTools).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ transport: ctx.transport, betaHeaders: ['feature-x'] }),
+      { scopes: ['tools:read'] },
+    );
+  });
+
+  it('list resources handler passes caller scopes from extra.authInfo', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const handler = findListHandler('resources/list');
+    await handler(
+      { method: 'resources/list', params: {} },
+      { authInfo: { scopes: ['resources:read'] } },
+    );
+
+    expect(mockPipeline.listResources).toHaveBeenCalledWith(undefined, {
+      scopes: ['resources:read'],
+    });
+  });
+
+  it('list resource templates handler passes caller scopes from extra.authInfo', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const handler = findListHandler('resources/templates/list');
+    await handler(
+      { method: 'resources/templates/list', params: { cursor: 'cur' } },
+      { authInfo: { scopes: ['templates:read'] } },
+    );
+
+    expect(mockPipeline.listResourceTemplates).toHaveBeenCalledWith('cur', {
+      scopes: ['templates:read'],
+    });
+  });
+
+  it('list prompts handler passes caller scopes from extra.authInfo', async () => {
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const handler = findListHandler('prompts/list');
+    await handler(
+      { method: 'prompts/list', params: {} },
+      { authInfo: { scopes: ['prompts:read'] } },
+    );
+
+    expect(mockPipeline.listPrompts).toHaveBeenCalledWith(undefined, {
+      scopes: ['prompts:read'],
+    });
   });
 
   // --- Completion ---
@@ -1113,6 +1185,78 @@ describe('registerToolOnServer', () => {
     await passedCtx.elicit(elicitParams as never, { signal: undefined });
     expect(elicitInput).toHaveBeenCalledWith(elicitParams, { signal: undefined });
   });
+
+  // --- Per-request auth context (stale-ctx fix) ---
+
+  it('tool callback overrides ctx.request/user/authInfo from extra', async () => {
+    ctx.request = { headers: { authorization: 'Bearer stale-init-token' } };
+    ctx.user = { id: 'stale-user' };
+    const tool = { name: 'secure', description: 'Secure', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const authInfo = {
+      token: 'fresh-token',
+      clientId: 'client-1',
+      scopes: ['tools:read'],
+      extra: { sub: 'user-9' },
+    };
+    const requestInfo = { headers: { authorization: 'Bearer fresh-token' } };
+    await callback(
+      {},
+      { signal: new AbortController().signal, requestId: 'req-auth-1', authInfo, requestInfo },
+    );
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.authInfo).toBe(authInfo);
+    expect(passedCtx.request).toBe(requestInfo);
+    expect(passedCtx.user).toEqual({ id: 'user-9', scopes: ['tools:read'] });
+  });
+
+  it('tool callback falls back to clientId when authInfo has no sub', async () => {
+    const tool = { name: 'secure', description: 'Secure', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const authInfo = { token: 't', clientId: 'client-2', scopes: [] };
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-auth-2', authInfo });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.user).toEqual({ id: 'client-2', scopes: [] });
+  });
+
+  it('tool callback keeps session user when extra has only requestInfo', async () => {
+    ctx.user = { id: 'session-user' };
+    const tool = { name: 'open', description: 'Open', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const requestInfo = { headers: { 'x-trace': 'abc' } };
+    await callback(
+      {},
+      { signal: new AbortController().signal, requestId: 'req-auth-3', requestInfo },
+    );
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.request).toBe(requestInfo);
+    expect(passedCtx.user).toBe(ctx.user);
+    expect(passedCtx.authInfo).toBeUndefined();
+  });
+
+  it('tool callback passes session context through unchanged when extra has no auth', async () => {
+    ctx.request = { headers: { authorization: 'Bearer session' } };
+    ctx.user = { id: 'session-user' };
+    const tool = { name: 'plain', description: 'Plain', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-auth-4' });
+
+    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.request).toBe(ctx.request);
+    expect(passedCtx.user).toBe(ctx.user);
+    expect(passedCtx.authInfo).toBeUndefined();
+  });
 });
 
 describe('registerResourceOnServer', () => {
@@ -1157,6 +1301,42 @@ describe('registerResourceOnServer', () => {
     const resourceFn = mockServer.resource as ReturnType<typeof vi.fn>;
     const [, , metadata] = resourceFn.mock.calls[0];
     expect(metadata).toEqual({ mimeType: 'application/json' });
+  });
+
+  it('resource callback applies per-request auth from extra', async () => {
+    const resource = { name: 'secure', uri: 'data://secure', mimeType: undefined };
+    registerResourceOnServer(mockServer as never, resource as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.resource as ReturnType<typeof vi.fn>).mock.calls[0][3];
+    const authInfo = { token: 't', clientId: 'client-1', scopes: ['r'], extra: { sub: 'user-1' } };
+    const requestInfo = { headers: { authorization: 'Bearer t' } };
+    await callback(new URL('data://secure'), {
+      signal: new AbortController().signal,
+      requestId: 'req-r-auth',
+      authInfo,
+      requestInfo,
+    });
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.authInfo).toBe(authInfo);
+    expect(passedCtx.request).toBe(requestInfo);
+    expect(passedCtx.user).toEqual({ id: 'user-1', scopes: ['r'] });
+  });
+
+  it('resource callback passes context through unchanged when extra has no auth', async () => {
+    ctx.user = { id: 'session-user' };
+    const resource = { name: 'plain', uri: 'data://plain', mimeType: undefined };
+    registerResourceOnServer(mockServer as never, resource as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.resource as ReturnType<typeof vi.fn>).mock.calls[0][3];
+    await callback(new URL('data://plain'), {
+      signal: new AbortController().signal,
+      requestId: 'req-r-plain',
+    });
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.user).toBe(ctx.user);
+    expect(passedCtx.authInfo).toBeUndefined();
   });
 });
 
@@ -1221,6 +1401,30 @@ describe('registerResourceTemplateOnServer', () => {
     expect(passedCtx.signal).toBeDefined();
     expect(passedCtx.signal?.aborted).toBe(false);
   });
+
+  it('resource template callback applies per-request auth from extra', async () => {
+    const template = { name: 'user', uriTemplate: 'data://users/{id}', mimeType: undefined };
+    registerResourceTemplateOnServer(
+      mockServer as never,
+      template as never,
+      mockPipeline as never,
+      ctx,
+    );
+
+    const callback = (mockServer.registerResource as ReturnType<typeof vi.fn>).mock.calls[0][3];
+    const authInfo = { token: 't', clientId: 'client-1', scopes: ['r'], extra: { sub: 'user-2' } };
+    const requestInfo = { headers: { authorization: 'Bearer t' } };
+    await callback(
+      new URL('data://users/1'),
+      {},
+      { signal: new AbortController().signal, requestId: 'req-t-auth', authInfo, requestInfo },
+    );
+
+    const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
+    expect(passedCtx.authInfo).toBe(authInfo);
+    expect(passedCtx.request).toBe(requestInfo);
+    expect(passedCtx.user).toEqual({ id: 'user-2', scopes: ['r'] });
+  });
 });
 
 describe('registerPromptOnServer', () => {
@@ -1268,5 +1472,36 @@ describe('registerPromptOnServer', () => {
     expect(name).toBe('greet');
     expect(config.description).toBe('Greet');
     expect(config.argsSchema).toBe(schema.shape);
+  });
+
+  it('prompt callback applies per-request auth from extra', async () => {
+    const prompt = { name: 'secure', description: 'Secure', parameters: null };
+    registerPromptOnServer(mockServer as never, prompt as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerPrompt as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const authInfo = { token: 't', clientId: 'client-1', scopes: ['p'], extra: { sub: 'user-3' } };
+    const requestInfo = { headers: { authorization: 'Bearer t' } };
+    await callback(
+      {},
+      { signal: new AbortController().signal, requestId: 'req-p-auth', authInfo, requestInfo },
+    );
+
+    const passedCtx = mockPipeline.getPrompt.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.authInfo).toBe(authInfo);
+    expect(passedCtx.request).toBe(requestInfo);
+    expect(passedCtx.user).toEqual({ id: 'user-3', scopes: ['p'] });
+  });
+
+  it('prompt callback passes context through unchanged when extra has no auth', async () => {
+    ctx.user = { id: 'session-user' };
+    const prompt = { name: 'plain', description: 'Plain', parameters: null };
+    registerPromptOnServer(mockServer as never, prompt as never, mockPipeline as never, ctx);
+
+    const callback = (mockServer.registerPrompt as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    await callback({}, { signal: new AbortController().signal, requestId: 'req-p-plain' });
+
+    const passedCtx = mockPipeline.getPrompt.mock.calls[0][2] as McpExecutionContext;
+    expect(passedCtx.user).toBe(ctx.user);
+    expect(passedCtx.authInfo).toBeUndefined();
   });
 });
