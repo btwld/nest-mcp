@@ -120,9 +120,15 @@ export class McpModule {
 
     // Streamable HTTP transport
     if (transports.includes(McpTransportType.STREAMABLE_HTTP)) {
-      const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+      const streamableHttp = options.transportOptions?.streamableHttp;
+      const endpoint = streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
-      controllers.push(createStreamableHttpController(endpoint));
+      controllers.push(
+        createStreamableHttpController(endpoint, {
+          guards: streamableHttp?.controllerGuards,
+          decorators: streamableHttp?.controllerDecorators,
+        }),
+      );
     }
 
     // SSE transport
@@ -194,11 +200,21 @@ export class McpModule {
 
     const transports = normalizeTransports(options.transport);
 
-    // Streamable HTTP transport
+    // Streamable HTTP transport.
+    // NOTE: controller shape (endpoint, controllerGuards, controllerDecorators)
+    // is read from the STATIC `transportOptions` on the async options object —
+    // controllers are created at module-definition time, before the factory
+    // runs. Runtime options resolved by `useFactory` flow through MCP_OPTIONS.
     if (transports.includes(McpTransportType.STREAMABLE_HTTP)) {
-      const endpoint = options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+      const streamableHttp = options.transportOptions?.streamableHttp;
+      const endpoint = streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
-      controllers.push(createStreamableHttpController(endpoint));
+      controllers.push(
+        createStreamableHttpController(endpoint, {
+          guards: streamableHttp?.controllerGuards,
+          decorators: streamableHttp?.controllerDecorators,
+        }),
+      );
     }
 
     // SSE transport

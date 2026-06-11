@@ -71,6 +71,52 @@ describe('JwtTokenService', () => {
       expect(decodedDefault.aud).toBe('mcp-client');
     });
 
+    it('binds aud to the requested resource (RFC 8707), beating options.audience', () => {
+      const service = createService({ audience: 'my-audience' });
+      const result = service.generateTokenPair(
+        'user-1',
+        'client-1',
+        'read',
+        'https://api.example.com/mcp',
+      );
+
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
+      expect(decoded.aud).toBe('https://api.example.com/mcp');
+    });
+
+    it('falls back to options.audience when no resource is requested', () => {
+      const service = createService({ audience: 'my-audience' });
+      const result = service.generateTokenPair('user-1', 'client-1', 'read', undefined);
+
+      const decoded = jwt.decode(result.access_token) as Record<string, unknown>;
+      expect(decoded.aud).toBe('my-audience');
+    });
+
+    it('does not enforce aud in validateToken (non-breaking)', () => {
+      const service = createService({ audience: 'expected-audience' });
+      const result = service.generateTokenPair(
+        'user-1',
+        'client-1',
+        'read',
+        'https://api.example.com/mcp',
+      );
+
+      // Token aud is the resource, not options.audience — still validates.
+      expect(() => service.validateToken(result.access_token)).not.toThrow();
+    });
+
+    it('sets a unique jti on access tokens', () => {
+      const service = createService();
+      const a = service.generateTokenPair('user-1', 'client-1');
+      const b = service.generateTokenPair('user-1', 'client-1');
+
+      const decodedA = jwt.decode(a.access_token) as Record<string, unknown>;
+      const decodedB = jwt.decode(b.access_token) as Record<string, unknown>;
+      expect(decodedA.jti).toEqual(expect.any(String));
+      expect(decodedB.jti).toEqual(expect.any(String));
+      expect(decodedA.jti).not.toBe(decodedB.jti);
+    });
+
     it('sets sub and azp on access token', () => {
       const service = createService();
       const result = service.generateTokenPair('user-42', 'client-99');

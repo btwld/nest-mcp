@@ -29,6 +29,117 @@ McpModule.forRoot({
 |--------|------|---------|-------------|
 | `endpoint` | `string` | `'/mcp'` | HTTP path for the MCP endpoint |
 | `stateless` | `boolean` | `false` | Stateless mode (no session tracking) |
+| `sessionIdGenerator` | `() => string` | `randomUUID` | Custom session-ID generator (ignored when `stateless`) |
+| `enableJsonResponse` | `boolean` | `false` | Respond with plain JSON instead of SSE streams |
+| `eventStore` | `McpEventStore` | — | Event store enabling resumability (reconnect + replay via `Last-Event-ID`) |
+| `onsessioninitialized` | `(sessionId) => void \| Promise<void>` | — | Callback when a new session is initialized |
+| `onsessionclosed` | `(sessionId) => void \| Promise<void>` | — | Callback when a session is closed |
+| `retryInterval` | `number` | — | `retry:` interval (ms) advertised on SSE streams |
+| `allowedHosts` | `string[]` | — | Hostnames accepted by DNS-rebinding protection |
+| `allowedOrigins` | `string[]` | — | Origins accepted by DNS-rebinding protection |
+| `enableDnsRebindingProtection` | `boolean` | `false` | Enable the SDK transport's DNS-rebinding protection |
+| `oauth` | `object` | — | Bearer-token gate for the endpoint (see below) |
+| `controllerGuards` | `unknown[]` | — | NestJS guards applied to the generated controller |
+| `controllerDecorators` | `ClassDecorator[]` | — | Class decorators applied to the generated controller |
+
+### OAuth Bearer Gate
+
+Setting `oauth.enabled: true` protects the streamable HTTP endpoint with a
+bearer-token check performed before any JSON-RPC processing. The gate is
+**inactive unless `enabled` is true**, so existing deployments are unaffected.
+
+```typescript
+transportOptions: {
+  streamableHttp: {
+    oauth: {
+      enabled: true,
+      required: true,                 // default true
+      // resourceMetadataUrl: 'https://api.example.com/.well-known/oauth-protected-resource/mcp',
+      bindSessionToUser: true,        // default true
+    },
+  },
+},
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | — | Activates the gate |
+| `required` | `boolean` | `true` | When `false`, requests without a valid token pass through anonymously |
+| `resourceMetadataUrl` | `string` | path-insertion URL | RFC 9728 metadata URL advertised in `WWW-Authenticate` |
+| `bindSessionToUser` | `boolean` | `true` | Bind each session to the principal that initialized it |
+
+Tokens are verified by the `MCP_BEARER_TOKEN_VERIFIER` provider. Importing
+`McpAuthModule.forRoot(...)` supplies the default JWT implementation; host
+apps can re-provide the token for opaque-token introspection (see
+[auth.md](./auth.md#custom-bearer-token-verification)).
+
+**401 discovery flow.** When a request has no valid token (and `required` is
+not `false`), the server responds `401` with a `WWW-Authenticate` challenge:
+
+```
+WWW-Authenticate: Bearer realm="mcp", resource_metadata="https://host/.well-known/oauth-protected-resource/mcp"
+```
+
+MCP clients follow `resource_metadata` to the RFC 9728 protected-resource
+document, discover the authorization server from `authorization_servers`,
+fetch its RFC 8414 metadata, run the OAuth flow, and retry with a Bearer
+token. The default `resource_metadata` URL uses the path-insertion form built
+from the request's `Host` header and the configured endpoint; set
+`resourceMetadataUrl` to override it.
+
+**Session binding.** With `bindSessionToUser` (default when oauth is
+enabled), the principal (`clientId` + `sub`) that initializes a stateful
+session is recorded, and every subsequent request for that `mcp-session-id`
+must present a token for the same principal — otherwise the server responds
+`403`. Binding only applies when `oauth.enabled` is true, so existing
+stateful servers never start rejecting requests; set
+`bindSessionToUser: false` to opt out. The verified identity is surfaced to
+handlers and guards as `ctx.authInfo`.
+
+### DNS-Rebinding Protection
+
+`allowedHosts`, `allowedOrigins`, and `enableDnsRebindingProtection` are
+forwarded to the SDK's `StreamableHTTPServerTransport`, which validates the
+`Host`/`Origin` headers of every request when protection is enabled:
+
+```typescript
+transportOptions: {
+  streamableHttp: {
+    enableDnsRebindingProtection: true,
+    allowedHosts: ['api.example.com'],
+    allowedOrigins: ['https://app.example.com'],
+  },
+},
+```
+
+### Controller Guards and Decorators
+
+`controllerGuards` and `controllerDecorators` are applied to the generated
+NestJS controller — useful to plug in existing HTTP guards (e.g. an
+organization-wide `AuthGuard`) or decorators like Swagger's `@ApiTags`:
+
+```typescript
+transportOptions: {
+  streamableHttp: {
+    controllerGuards: [MyHttpAuthGuard],
+    controllerDecorators: [ApiTags('mcp')],
+  },
+},
+```
+
+> **`forRootAsync` note:** the controller class is created when the module is
+> *defined*, before the async factory runs. Controller-shape configuration —
+> `endpoint`, `controllerGuards`, `controllerDecorators` — must therefore be
+> provided statically on the `forRootAsync` options object
+> (`transportOptions`), while all runtime options resolved by `useFactory`
+> flow through `MCP_OPTIONS`.
+
+### Resumability
+
+Provide an `eventStore` to let clients resume an interrupted SSE stream: the
+SDK assigns event IDs, and on reconnect (with `Last-Event-ID`) replays missed
+messages through `replayEventsAfter`. Any object matching the `McpEventStore`
+interface (structural mirror of the SDK `EventStore`) works.
 
 ### Endpoints
 

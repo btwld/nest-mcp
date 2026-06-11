@@ -105,4 +105,59 @@ describe('createStreamableHttpController', () => {
       expect(Reflect.getMetadata('path', CustomController)).toBe('/custom-mcp');
     });
   });
+
+  describe('guards and decorators', () => {
+    class FakeGuard {
+      canActivate(): boolean {
+        return true;
+      }
+    }
+
+    it('applies UseGuards metadata when guards are provided', () => {
+      const Guarded = createStreamableHttpController('/mcp', { guards: [FakeGuard] });
+      expect(Reflect.getMetadata('__guards__', Guarded)).toEqual([FakeGuard]);
+    });
+
+    it('applies no guard metadata when guards are omitted', () => {
+      const Plain = createStreamableHttpController('/mcp');
+      expect(Reflect.getMetadata('__guards__', Plain)).toBeUndefined();
+    });
+
+    it('applies no guard metadata when guards is an empty array', () => {
+      const Plain = createStreamableHttpController('/mcp', { guards: [] });
+      expect(Reflect.getMetadata('__guards__', Plain)).toBeUndefined();
+    });
+
+    it('applies each provided class decorator to the controller', () => {
+      const seen: unknown[] = [];
+      const tagDecorator: ClassDecorator = (target) => {
+        seen.push(target);
+        Reflect.defineMetadata('custom:tag', 'mcp', target);
+      };
+      const Decorated = createStreamableHttpController('/mcp', { decorators: [tagDecorator] });
+
+      expect(seen).toEqual([Decorated]);
+      expect(Reflect.getMetadata('custom:tag', Decorated)).toBe('mcp');
+    });
+
+    it('honors a decorator that replaces the class', () => {
+      const replaceDecorator = ((target: new (...args: unknown[]) => unknown) => {
+        return class Replaced extends target {};
+      }) as ClassDecorator;
+      const Replaced = createStreamableHttpController('/mcp', { decorators: [replaceDecorator] });
+
+      expect(Replaced.name).toBe('Replaced');
+      // Controller metadata is inherited through the prototype chain.
+      expect(Reflect.getMetadata('path', Replaced)).toBe('/mcp');
+    });
+
+    it('keeps guards applied alongside decorators', () => {
+      const noop: ClassDecorator = () => undefined;
+      const Combined = createStreamableHttpController('/mcp', {
+        guards: [FakeGuard],
+        decorators: [noop],
+      });
+      expect(Reflect.getMetadata('__guards__', Combined)).toEqual([FakeGuard]);
+    });
+  });
 });

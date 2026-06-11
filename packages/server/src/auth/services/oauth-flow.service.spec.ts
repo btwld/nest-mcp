@@ -13,6 +13,7 @@ function makeService(
     getClient: ReturnType<typeof vi.fn>;
     registerClient: ReturnType<typeof vi.fn>;
   }> = {},
+  storeOverrides: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const options: McpAuthModuleOptions = {
     jwtSecret: 'x'.repeat(32),
@@ -37,6 +38,7 @@ function makeService(
     getAuthCode: vi.fn().mockResolvedValue(null),
     removeAuthCode: vi.fn().mockResolvedValue(undefined),
     storeAuthCode: vi.fn().mockResolvedValue(undefined),
+    ...storeOverrides,
   };
 
   const clientService = {
@@ -379,6 +381,157 @@ describe('OAuthFlowService - refreshToken (refresh_token grant)', () => {
 
     expect(result.access_token).toBe('at');
     expect(store.revokeToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('OAuthFlowService - recordIssuedToken store hook', () => {
+  const accessPayload: Partial<TokenPayload> = {
+    sub: 'user-1',
+    type: 'access',
+    jti: 'access-jti',
+    scope: 'tools:read',
+    exp: 1_000,
+    iss: 'test',
+  };
+  const refreshPayload: Partial<TokenPayload> = {
+    sub: 'user-1',
+    type: 'refresh',
+    jti: 'refresh-jti',
+    exp: 2_000,
+    iss: 'test',
+  };
+
+  function makeRecordingService(
+    extraStoreOverrides: Record<string, ReturnType<typeof vi.fn>> = {},
+  ) {
+    return makeService(
+      {},
+      {},
+      { recordIssuedToken: vi.fn().mockResolvedValue(undefined), ...extraStoreOverrides },
+    );
+  }
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('records both minted tokens on the authorization_code grant', async () => {
+    const { service, jwtService, store } = makeRecordingService({
+      getAuthCode: vi.fn().mockResolvedValue({
+        code_challenge: 'exact-verifier',
+        code_challenge_method: 'plain',
+        redirect_uri: 'https://app/cb',
+        user_id: 'user-1',
+        client_id: 'client-1',
+        scope: 'tools:read',
+      }),
+    });
+    jwtService.validateToken.mockImplementation((token: string) =>
+      token === 'at' ? accessPayload : refreshPayload,
+    );
+
+    await service.exchangeCode({ code: 'c', code_verifier: 'exact-verifier' });
+
+    expect(store.recordIssuedToken).toHaveBeenCalledTimes(2);
+    expect(store.recordIssuedToken).toHaveBeenCalledWith({
+      jti: 'access-jti',
+      type: 'access',
+      clientId: 'client-1',
+      userId: 'user-1',
+      scope: 'tools:read',
+      expiresAt: 1_000_000,
+    });
+    expect(store.recordIssuedToken).toHaveBeenCalledWith({
+      jti: 'refresh-jti',
+      type: 'refresh',
+      clientId: 'client-1',
+      userId: 'user-1',
+      scope: undefined,
+      expiresAt: 2_000_000,
+    });
+  });
+
+  it('records both minted tokens on the refresh_token grant', async () => {
+    const { service, jwtService, store } = makeRecordingService();
+    jwtService.validateToken.mockImplementation((token: string) => {
+      if (token === 'valid-rt') {
+        return {
+          type: 'refresh',
+          jti: 'old-jti',
+          sub: 'user-1',
+          azp: 'client-1',
+          scope: 'tools:read',
+        };
+      }
+      return token === 'at' ? accessPayload : refreshPayload;
+    });
+
+    await service.refreshToken({ refresh_token: 'valid-rt' });
+
+    expect(store.recordIssuedToken).toHaveBeenCalledTimes(2);
+    expect(store.recordIssuedToken).toHaveBeenCalledWith(
+      expect.objectContaining({ jti: 'access-jti', type: 'access', clientId: 'client-1' }),
+    );
+    expect(store.recordIssuedToken).toHaveBeenCalledWith(
+      expect.objectContaining({ jti: 'refresh-jti', type: 'refresh', clientId: 'client-1' }),
+    );
+  });
+
+  it('does not record tokens when the presented refresh jti is revoked', async () => {
+    const { service, jwtService, store } = makeRecordingService({
+      isTokenRevoked: vi.fn().mockResolvedValue(true),
+    });
+    jwtService.validateToken.mockReturnValue({ type: 'refresh', jti: 'revoked-jti', sub: 'u' });
+
+    await expect(service.refreshToken({ refresh_token: 'revoked-rt' })).rejects.toMatchObject({
+      status: HttpStatus.UNAUTHORIZED,
+    });
+    expect(store.recordIssuedToken).not.toHaveBeenCalled();
+  });
+
+  it('skips minted tokens without a jti', async () => {
+    const { service, jwtService, store } = makeRecordingService({
+      getAuthCode: vi.fn().mockResolvedValue({
+        code_challenge: 'exact-verifier',
+        code_challenge_method: 'plain',
+        redirect_uri: 'https://app/cb',
+        user_id: 'user-1',
+        client_id: 'client-1',
+        scope: '',
+      }),
+    });
+    jwtService.validateToken.mockImplementation((token: string) =>
+      token === 'at' ? { ...accessPayload, jti: undefined } : refreshPayload,
+    );
+
+    await service.exchangeCode({ code: 'c', code_verifier: 'exact-verifier' });
+
+    expect(store.recordIssuedToken).toHaveBeenCalledTimes(1);
+    expect(store.recordIssuedToken).toHaveBeenCalledWith(
+      expect.objectContaining({ jti: 'refresh-jti', type: 'refresh' }),
+    );
+  });
+
+  it('is a no-op for stores without the hook (backward compatible)', async () => {
+    const { service, jwtService, store } = makeService(
+      {},
+      {},
+      {
+        getAuthCode: vi.fn().mockResolvedValue({
+          code_challenge: 'exact-verifier',
+          code_challenge_method: 'plain',
+          redirect_uri: 'https://app/cb',
+          user_id: 'user-1',
+          client_id: 'client-1',
+          scope: '',
+        }),
+      },
+    );
+
+    const result = await service.exchangeCode({ code: 'c', code_verifier: 'exact-verifier' });
+
+    expect(result.access_token).toBe('at');
+    expect('recordIssuedToken' in store).toBe(false);
+    // Minted tokens are never re-validated when no hook is present.
+    expect(jwtService.validateToken).not.toHaveBeenCalled();
   });
 });
 

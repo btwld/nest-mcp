@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { McpTransportType } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { McpModule } from './mcp.module';
@@ -44,6 +45,38 @@ describe('McpModule', () => {
         (p: Record<string, unknown>) => p.name ?? p.provide?.toString?.() ?? '',
       );
       expect(providerNames).toContain('StdioService');
+    });
+
+    it('applies controllerGuards to the streamable HTTP controller', () => {
+      class EdgeGuard {
+        canActivate(): boolean {
+          return true;
+        }
+      }
+      const mod = McpModule.forRoot({
+        name: 'test',
+        version: '1.0',
+        transport: McpTransportType.STREAMABLE_HTTP,
+        transportOptions: { streamableHttp: { controllerGuards: [EdgeGuard] } },
+      });
+
+      const [controller] = mod.controllers ?? [];
+      expect(Reflect.getMetadata('__guards__', controller)).toEqual([EdgeGuard]);
+    });
+
+    it('applies controllerDecorators to the streamable HTTP controller', () => {
+      const tag: ClassDecorator = (target) => {
+        Reflect.defineMetadata('custom:tag', 'from-forRoot', target);
+      };
+      const mod = McpModule.forRoot({
+        name: 'test',
+        version: '1.0',
+        transport: McpTransportType.STREAMABLE_HTTP,
+        transportOptions: { streamableHttp: { controllerDecorators: [tag] } },
+      });
+
+      const [controller] = mod.controllers ?? [];
+      expect(Reflect.getMetadata('custom:tag', controller)).toBe('from-forRoot');
     });
   });
 
@@ -130,6 +163,32 @@ describe('McpModule', () => {
       });
 
       expect(mod.controllers).toHaveLength(1);
+    });
+
+    it('applies static controllerGuards and controllerDecorators to the streamable HTTP controller', () => {
+      class EdgeGuard {
+        canActivate(): boolean {
+          return true;
+        }
+      }
+      const tag: ClassDecorator = (target) => {
+        Reflect.defineMetadata('custom:tag', 'from-forRootAsync', target);
+      };
+      const mod = McpModule.forRootAsync({
+        transport: McpTransportType.STREAMABLE_HTTP,
+        transportOptions: {
+          streamableHttp: { controllerGuards: [EdgeGuard], controllerDecorators: [tag] },
+        },
+        useFactory: () => ({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STREAMABLE_HTTP,
+        }),
+      });
+
+      const [controller] = mod.controllers ?? [];
+      expect(Reflect.getMetadata('__guards__', controller)).toEqual([EdgeGuard]);
+      expect(Reflect.getMetadata('custom:tag', controller)).toBe('from-forRootAsync');
     });
 
     it('passes through imports from async options', () => {

@@ -21,7 +21,10 @@ export class JwtTokenService {
     resource?: string,
   ): TokenResponse {
     const iss = this.options.issuer ?? this.options.serverUrl ?? 'http://localhost:3000';
-    const aud = this.options.audience ?? 'mcp-client';
+    // RFC 8707: when the client requested a specific resource, bind the token
+    // to it via `aud`. Note `validateToken` deliberately does NOT enforce
+    // `aud` (non-breaking); resource servers may verify it themselves.
+    const aud = resource ?? this.options.audience ?? 'mcp-client';
 
     const accessExpiresIn = parseDurationSeconds(this.options.accessTokenExpiresIn ?? '1d', 86400);
     const refreshExpiresIn = parseDurationSeconds(
@@ -37,6 +40,9 @@ export class JwtTokenService {
         scope,
         iss,
         aud,
+        // jti makes access tokens individually revocable and lets
+        // `IOAuthStore.recordIssuedToken` track them.
+        jti: randomUUID(),
       } as TokenPayload,
       this.options.jwtSecret,
       {
