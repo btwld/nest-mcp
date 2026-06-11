@@ -1,5 +1,25 @@
 export type McpGuardClass = abstract new (...args: unknown[]) => McpGuard;
 
+/**
+ * Verified bearer-token identity attached to a request. Structural mirror of
+ * the MCP SDK `AuthInfo` (`@nest-mcp/common` stays SDK-free); the SDK's
+ * concrete type is assignable to this one.
+ */
+export interface McpAuthInfo {
+  /** The raw access token as presented by the client. */
+  token: string;
+  /** OAuth client the token was issued to. */
+  clientId: string;
+  /** Scopes granted to the token. */
+  scopes: string[];
+  /** Expiry as a unix timestamp in seconds, when known. */
+  expiresAt?: number;
+  /** RFC 8707 resource the token is bound to, when known. */
+  resource?: string;
+  /** Extra verifier-specific claims (e.g. `sub`). */
+  extra?: Record<string, unknown>;
+}
+
 export interface McpAuthConfig {
   guards?: McpGuardClass[];
   allowUnauthenticatedAccess?: boolean;
@@ -36,6 +56,8 @@ export interface McpGuardContext {
     [key: string]: unknown;
   };
   request?: unknown;
+  /** Verified bearer-token identity, when HTTP edge auth is enabled. */
+  authInfo?: McpAuthInfo;
   metadata: Record<string, unknown>;
 }
 

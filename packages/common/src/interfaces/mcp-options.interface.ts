@@ -46,6 +46,12 @@ export interface McpModuleOptions {
   // Auth
   guards?: McpGuardClass[];
   allowUnauthenticatedAccess?: boolean;
+  /**
+   * When true, `tools/list`, `resources/list`, and `prompts/list` only return
+   * items whose required scopes are covered by the caller's token scopes.
+   * Default false (lists are not filtered).
+   */
+  filterListsByScopes?: boolean;
 
   // Resilience (global defaults)
   resilience?: {

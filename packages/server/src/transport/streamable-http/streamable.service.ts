@@ -3,10 +3,23 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { StreamableHTTPServerTransportOptions } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
+import type { McpAuthInfo, McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { MCP_OPTIONS } from '@nest-mcp/common';
 import { McpTransportType } from '@nest-mcp/common';
-import { Inject, Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+  Optional,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import {
+  type BearerTokenVerifier,
+  MCP_BEARER_TOKEN_VERIFIER,
+} from '../../auth/services/bearer-verifier.service';
+import { DEFAULT_MCP_ENDPOINT } from '../../constants/module.constants';
 import type {
   RegisteredPrompt,
   RegisteredResource,
@@ -32,6 +45,8 @@ import type { SdkHandle } from '../register-handlers';
 interface HttpRequest {
   headers?: Record<string, string | string[] | undefined>;
   headersSent?: boolean;
+  /** Verified bearer identity; the SDK transport reads this and surfaces it as `authInfo`. */
+  auth?: McpAuthInfo;
 }
 
 interface HttpResponse {
@@ -39,16 +54,24 @@ interface HttpResponse {
   status?: (code: number) => { json?: (body: unknown) => void; end?: () => void };
   code?: (code: number) => { send?: (body?: unknown) => void };
   on?: (event: string, cb: () => void) => void;
+  /** Express / Node `ServerResponse` header setter. */
+  setHeader?: (name: string, value: string) => unknown;
+  /** Fastify reply header setter. */
+  header?: (name: string, value: string) => unknown;
 }
 
 @Injectable()
-export class StreamableHttpService implements OnModuleDestroy {
+export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StreamableHttpService.name);
   private readonly transports = new Map<string, StreamableHTTPServerTransport>();
   private readonly servers = new Map<string, McpServer>();
   private readonly contexts = new Map<string, McpExecutionContext>();
   /** SDK handles per session, keyed by item name/uri for removal. */
   private readonly sdkHandles = new Map<string, Map<string, SdkHandle>>();
+  /** Principal each stateful session was initialized by (oauth session binding). */
+  private readonly sessionAuth = new Map<string, { sub?: string; clientId: string }>();
+  /** Lazily resolved bearer-token verifier (cached on first successful resolution). */
+  private bearerVerifier?: BearerTokenVerifier;
 
   private readonly registryListeners: Array<{
     event: string;
@@ -61,18 +84,49 @@ export class StreamableHttpService implements OnModuleDestroy {
     private readonly executor: McpExecutorService,
     private readonly pipeline: ExecutionPipelineService,
     private readonly contextFactory: McpContextFactory,
+    private readonly moduleRef: ModuleRef,
     @Optional() private readonly subscriptionManager?: ResourceSubscriptionManager,
     @Optional() private readonly taskManager?: TaskManager,
   ) {
     this.subscribeToRegistryEvents();
   }
 
+  onModuleInit(): void {
+    if (this.oauthOptions?.enabled && !this.resolveBearerVerifier()) {
+      this.logger.warn(
+        'streamableHttp.oauth.enabled is set but no MCP_BEARER_TOKEN_VERIFIER provider could be resolved. ' +
+          'Import McpAuthModule.forRoot(...) or provide MCP_BEARER_TOKEN_VERIFIER — requests will fail until then.',
+      );
+    }
+  }
+
   get isStateless(): boolean {
     return this.options.transportOptions?.streamableHttp?.stateless ?? false;
   }
 
+  private get oauthOptions() {
+    return this.options.transportOptions?.streamableHttp?.oauth;
+  }
+
+  private resolveBearerVerifier(): BearerTokenVerifier | undefined {
+    if (this.bearerVerifier) return this.bearerVerifier;
+    try {
+      this.bearerVerifier = this.moduleRef.get<BearerTokenVerifier>(MCP_BEARER_TOKEN_VERIFIER, {
+        strict: false,
+      });
+    } catch {
+      // Not registered — handled by the caller.
+    }
+    return this.bearerVerifier;
+  }
+
   async handlePostRequest(req: unknown, res: unknown): Promise<void> {
     try {
+      if (this.oauthOptions?.enabled) {
+        const auth = await this.authenticate(req, res);
+        if (auth === 'responded') return;
+      }
+
       if (this.isStateless) {
         await this.handleStatelessPost(req, res);
       } else {
@@ -90,6 +144,11 @@ export class StreamableHttpService implements OnModuleDestroy {
 
   async handleGetRequest(req: unknown, res: unknown): Promise<void> {
     const resObj = res as HttpResponse;
+    if (this.oauthOptions?.enabled) {
+      const auth = await this.authenticate(req, res);
+      if (auth === 'responded') return;
+    }
+
     if (this.isStateless) {
       resObj.status?.(405).json?.({ error: 'SSE not supported in stateless mode' }) ??
         resObj.code?.(405).send?.({ error: 'SSE not supported in stateless mode' });
@@ -104,6 +163,8 @@ export class StreamableHttpService implements OnModuleDestroy {
       return;
     }
 
+    if (!this.enforceSessionBinding(sessionId, req, res)) return;
+
     const transport = this.transports.get(sessionId);
     if (transport) {
       await transport.handleRequest(
@@ -116,8 +177,14 @@ export class StreamableHttpService implements OnModuleDestroy {
   async handleDeleteRequest(req: unknown, res: unknown): Promise<void> {
     const reqObj = req as HttpRequest;
     const resObj = res as HttpResponse;
+    if (this.oauthOptions?.enabled) {
+      const auth = await this.authenticate(req, res);
+      if (auth === 'responded') return;
+    }
+
     const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
     if (sessionId && this.transports.has(sessionId)) {
+      if (!this.enforceSessionBinding(sessionId, req, res)) return;
       await this.cleanupSession(sessionId);
       resObj.status?.(204).end?.() ?? resObj.code?.(204).send?.();
     } else {
@@ -137,7 +204,112 @@ export class StreamableHttpService implements OnModuleDestroy {
       onsessioninitialized: opts?.onsessioninitialized,
       onsessionclosed: opts?.onsessionclosed,
       retryInterval: opts?.retryInterval,
+      allowedHosts: opts?.allowedHosts,
+      allowedOrigins: opts?.allowedOrigins,
+      enableDnsRebindingProtection: opts?.enableDnsRebindingProtection,
     };
+  }
+
+  /**
+   * Bearer-token gate applied when `streamableHttp.oauth.enabled` is set.
+   *
+   * - valid token: attaches the identity to `req.auth` (the SDK transport
+   *   surfaces it as `authInfo`) and returns it.
+   * - missing/invalid token while auth is required: responds 401 with a
+   *   `WWW-Authenticate` challenge and returns `'responded'`.
+   * - no valid token while `required === false`: returns `undefined`
+   *   (anonymous passthrough).
+   */
+  private async authenticate(
+    req: unknown,
+    res: unknown,
+  ): Promise<McpAuthInfo | 'responded' | undefined> {
+    const oauth = this.oauthOptions;
+    if (!oauth?.enabled) return undefined;
+
+    const verifier = this.resolveBearerVerifier();
+    if (!verifier) {
+      throw new Error(
+        'StreamableHttpService: streamableHttp.oauth.enabled is set but no MCP_BEARER_TOKEN_VERIFIER ' +
+          'provider could be resolved. Import McpAuthModule.forRoot(...) or provide MCP_BEARER_TOKEN_VERIFIER.',
+      );
+    }
+
+    const reqObj = req as HttpRequest;
+    const rawHeader = reqObj.headers?.authorization;
+    const headerValue = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const [scheme, token] = headerValue?.split(' ') ?? [];
+
+    let authInfo: McpAuthInfo | null = null;
+    if (scheme?.toLowerCase() === 'bearer' && token) {
+      authInfo = await verifier.verify(token);
+    }
+
+    if (authInfo) {
+      reqObj.auth = authInfo;
+      return authInfo;
+    }
+
+    if (oauth.required === false) return undefined;
+
+    this.respondUnauthorized(req, res);
+    return 'responded';
+  }
+
+  private respondUnauthorized(req: unknown, res: unknown): void {
+    const resObj = res as HttpResponse;
+    if (resObj.headersSent) return;
+
+    const challenge = `Bearer realm="mcp", resource_metadata="${this.resourceMetadataUrl(req)}"`;
+    if (typeof resObj.setHeader === 'function') {
+      resObj.setHeader('WWW-Authenticate', challenge);
+    } else {
+      resObj.header?.('WWW-Authenticate', challenge);
+    }
+
+    const body = {
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Unauthorized' },
+      id: null,
+    };
+    resObj.status?.(401).json?.(body) ?? resObj.code?.(401).send?.(body);
+  }
+
+  /** RFC 9728 protected-resource metadata URL (path-insertion form by default). */
+  private resourceMetadataUrl(req: unknown): string {
+    const configured = this.oauthOptions?.resourceMetadataUrl;
+    if (configured) return configured;
+
+    const rawHost = (req as HttpRequest).headers?.host;
+    const host = (Array.isArray(rawHost) ? rawHost[0] : rawHost) ?? 'localhost';
+    const endpoint =
+      this.options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `https://${host}/.well-known/oauth-protected-resource${path}`;
+  }
+
+  /**
+   * Verifies the current request's principal matches the one the session was
+   * initialized by. Responds 403 and returns false on mismatch. No-op unless
+   * oauth is enabled, binding is on, and a binding was recorded.
+   */
+  private enforceSessionBinding(sessionId: string, req: unknown, res: unknown): boolean {
+    const oauth = this.oauthOptions;
+    if (!oauth?.enabled || oauth.bindSessionToUser === false) return true;
+
+    const bound = this.sessionAuth.get(sessionId);
+    if (!bound) return true;
+
+    const auth = (req as HttpRequest).auth;
+    const sub = auth?.extra?.sub as string | undefined;
+    if (auth && auth.clientId === bound.clientId && sub === bound.sub) return true;
+
+    const resObj = res as HttpResponse;
+    if (!resObj.headersSent) {
+      const body = { error: 'Session does not belong to this principal' };
+      resObj.status?.(403).json?.(body) ?? resObj.code?.(403).send?.(body);
+    }
+    return false;
   }
 
   private async handleStatelessPost(req: unknown, res: unknown): Promise<void> {
@@ -166,6 +338,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     const existingSessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
 
     if (existingSessionId && this.transports.has(existingSessionId)) {
+      if (!this.enforceSessionBinding(existingSessionId, req, res)) return;
       const transport = this.transports.get(existingSessionId);
       if (transport) {
         await transport.handleRequest(
@@ -195,6 +368,16 @@ export class StreamableHttpService implements OnModuleDestroy {
     if (sessionId) {
       this.transports.set(sessionId, transport);
       this.servers.set(sessionId, server);
+
+      const oauth = this.oauthOptions;
+      const auth = reqObj.auth;
+      if (oauth?.enabled && oauth.bindSessionToUser !== false && auth) {
+        this.sessionAuth.set(sessionId, {
+          sub: auth.extra?.sub as string | undefined,
+          clientId: auth.clientId,
+        });
+      }
+
       this.logger.log(`New session: ${sessionId}`);
     }
   }
@@ -381,6 +564,7 @@ export class StreamableHttpService implements OnModuleDestroy {
     this.servers.delete(sessionId);
     this.contexts.delete(sessionId);
     this.sdkHandles.delete(sessionId);
+    this.sessionAuth.delete(sessionId);
 
     if (transport) {
       await transport.close();

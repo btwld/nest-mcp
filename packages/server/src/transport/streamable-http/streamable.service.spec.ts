@@ -1,7 +1,69 @@
 import { EventEmitter } from 'node:events';
-import type { McpModuleOptions, StreamableHttpTransportOptions } from '@nest-mcp/common';
+import type {
+  McpAuthInfo,
+  McpModuleOptions,
+  StreamableHttpTransportOptions,
+} from '@nest-mcp/common';
 import { McpTransportType } from '@nest-mcp/common';
+import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StreamableHttpService } from './streamable.service';
+
+// ---------------------------------------------------------------------------
+// Module mocks so the real StreamableHttpService can run without the SDK
+// ---------------------------------------------------------------------------
+interface FakeTransportInstance {
+  options: Record<string, unknown>;
+  sessionId: string | undefined;
+  onclose?: () => void;
+  handleRequest: (...args: unknown[]) => Promise<void>;
+  close: () => Promise<void>;
+}
+
+const hoisted = vi.hoisted(() => ({
+  transports: [] as Array<{
+    options: Record<string, unknown>;
+    sessionId: string | undefined;
+    onclose?: () => void;
+    handleRequest: (...args: unknown[]) => Promise<void>;
+    close: () => Promise<void>;
+  }>,
+}));
+
+vi.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
+  class FakeStreamableTransport {
+    options: Record<string, unknown>;
+    sessionId: string | undefined;
+    onclose?: () => void;
+    handleRequest = vi.fn(async () => {
+      const generate = this.options.sessionIdGenerator as (() => string) | undefined;
+      if (generate && !this.sessionId) this.sessionId = generate();
+    });
+    close = vi.fn(async () => {});
+
+    constructor(options: Record<string, unknown>) {
+      this.options = options;
+      hoisted.transports.push(this as never);
+    }
+  }
+  return { StreamableHTTPServerTransport: FakeStreamableTransport };
+});
+
+vi.mock('../../server/server.factory', () => ({
+  createMcpServer: vi.fn(() => ({
+    connect: vi.fn(),
+    close: vi.fn(async () => {}),
+    server: { notification: vi.fn().mockResolvedValue(undefined) },
+  })),
+}));
+
+vi.mock('../register-handlers', () => ({
+  registerHandlers: vi.fn(),
+  registerToolOnServer: vi.fn(() => ({ remove: vi.fn() })),
+  registerResourceOnServer: vi.fn(() => ({ remove: vi.fn() })),
+  registerResourceTemplateOnServer: vi.fn(() => ({ remove: vi.fn() })),
+  registerPromptOnServer: vi.fn(() => ({ remove: vi.fn() })),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock register functions (stand-ins for register-handlers exports)
@@ -383,6 +445,9 @@ function buildTransportOptions(
     onsessioninitialized: opts?.onsessioninitialized,
     onsessionclosed: opts?.onsessionclosed,
     retryInterval: opts?.retryInterval,
+    allowedHosts: opts?.allowedHosts,
+    allowedOrigins: opts?.allowedOrigins,
+    enableDnsRebindingProtection: opts?.enableDnsRebindingProtection,
   };
 }
 
@@ -440,6 +505,20 @@ describe('buildTransportOptions logic', () => {
     expect(result.retryInterval).toBe(5000);
   });
 
+  it('passes DNS-rebinding protection options through', () => {
+    const result = buildTransportOptions(
+      makeOptions({
+        allowedHosts: ['localhost'],
+        allowedOrigins: ['https://app.example.com'],
+        enableDnsRebindingProtection: true,
+      }),
+      false,
+    );
+    expect(result.allowedHosts).toEqual(['localhost']);
+    expect(result.allowedOrigins).toEqual(['https://app.example.com']);
+    expect(result.enableDnsRebindingProtection).toBe(true);
+  });
+
   it('passes onsessioninitialized callback through', () => {
     const cb = vi.fn();
     const result = buildTransportOptions(makeOptions({ onsessioninitialized: cb }), false);
@@ -488,5 +567,426 @@ describe('buildTransportOptions logic', () => {
     expect(result.onsessioninitialized).toBe(onInit);
     expect(result.onsessionclosed).toBe(onClose);
     expect(result.retryInterval).toBe(3000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HTTP edge auth (oauth gate) + session-identity binding
+// ---------------------------------------------------------------------------
+
+function makeServiceOptions(streamableHttp?: StreamableHttpTransportOptions): McpModuleOptions {
+  return {
+    name: 'test-server',
+    version: '1.0.0',
+    transport: McpTransportType.STREAMABLE_HTTP,
+    transportOptions: {
+      streamableHttp: { sessionIdGenerator: () => 'sess-1', ...streamableHttp },
+    },
+  };
+}
+
+function makeService(options: McpModuleOptions, verifier?: { verify: ReturnType<typeof vi.fn> }) {
+  const registry = { events: new EventEmitter() };
+  const moduleRef = {
+    get: vi.fn(() => {
+      if (!verifier) throw new Error('MCP_BEARER_TOKEN_VERIFIER is not registered');
+      return verifier;
+    }),
+  };
+  const contextFactory = {
+    createContext: vi.fn((args: Record<string, unknown>) => ({ ...args, metadata: {} })),
+  };
+
+  const service = new StreamableHttpService(
+    options,
+    registry as never,
+    {} as never,
+    {} as never,
+    contextFactory as never,
+    moduleRef as never,
+    undefined,
+    undefined,
+  );
+  return { service, moduleRef };
+}
+
+interface RecordedResponse {
+  headersSent: boolean;
+  statusCode?: number;
+  body?: unknown;
+  on: ReturnType<typeof vi.fn>;
+}
+
+function makeExpressRes() {
+  const res: RecordedResponse & {
+    setHeader: ReturnType<typeof vi.fn>;
+    status: (code: number) => { json: (body: unknown) => void; end: () => void };
+  } = {
+    headersSent: false,
+    on: vi.fn(),
+    setHeader: vi.fn(),
+    status: (code: number) => {
+      res.statusCode = code;
+      return {
+        json: (body: unknown) => {
+          res.body = body;
+          res.headersSent = true;
+        },
+        end: () => {
+          res.headersSent = true;
+        },
+      };
+    },
+  };
+  return res;
+}
+
+function makeFastifyRes() {
+  const res: RecordedResponse & {
+    header: ReturnType<typeof vi.fn>;
+    code: (code: number) => { send: (body?: unknown) => void };
+  } = {
+    headersSent: false,
+    on: vi.fn(),
+    header: vi.fn(),
+    code: (code: number) => {
+      res.statusCode = code;
+      return {
+        send: (body?: unknown) => {
+          res.body = body;
+          res.headersSent = true;
+        },
+      };
+    },
+  };
+  return res;
+}
+
+function makeReq(headers: Record<string, string> = {}): {
+  headers: Record<string, string>;
+  auth?: McpAuthInfo;
+} {
+  return { headers: { host: 'api.example.com', ...headers } };
+}
+
+function makeAuthInfo(sub: string, clientId = 'client-1'): McpAuthInfo {
+  return { token: `token-${sub}`, clientId, scopes: ['read'], extra: { sub } };
+}
+
+function lastTransport(): FakeTransportInstance {
+  const transport = hoisted.transports.at(-1);
+  if (!transport) throw new Error('no transport was created');
+  return transport;
+}
+
+describe('StreamableHttpService oauth edge auth', () => {
+  beforeEach(() => {
+    hoisted.transports.length = 0;
+  });
+
+  it('responds 401 with the path-inserted WWW-Authenticate default (Express shim)', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }), verifier);
+    const res = makeExpressRes();
+
+    await service.handlePostRequest(makeReq(), res);
+
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'WWW-Authenticate',
+      'Bearer realm="mcp", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Unauthorized' },
+      id: null,
+    });
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(hoisted.transports).toHaveLength(0);
+  });
+
+  it('responds 401 via the Fastify shim (header + code().send())', async () => {
+    const verifier = { verify: vi.fn().mockResolvedValue(null) };
+    const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }), verifier);
+    const res = makeFastifyRes();
+
+    await service.handlePostRequest(makeReq({ authorization: 'Bearer bad-token' }), res);
+
+    expect(verifier.verify).toHaveBeenCalledWith('bad-token');
+    expect(res.header).toHaveBeenCalledWith(
+      'WWW-Authenticate',
+      'Bearer realm="mcp", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Unauthorized' },
+      id: null,
+    });
+  });
+
+  it('path-inserts a custom endpoint and honors an explicit resourceMetadataUrl', async () => {
+    const verifier = { verify: vi.fn() };
+
+    const { service: customEndpoint } = makeService(
+      makeServiceOptions({ endpoint: 'my/mcp', oauth: { enabled: true } }),
+      verifier,
+    );
+    const res1 = makeExpressRes();
+    await customEndpoint.handlePostRequest(makeReq(), res1);
+    expect(res1.setHeader).toHaveBeenCalledWith(
+      'WWW-Authenticate',
+      'Bearer realm="mcp", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/my/mcp"',
+    );
+
+    const { service: explicitUrl } = makeService(
+      makeServiceOptions({
+        oauth: { enabled: true, resourceMetadataUrl: 'https://meta.example.com/resource' },
+      }),
+      verifier,
+    );
+    const res2 = makeExpressRes();
+    await explicitUrl.handlePostRequest(makeReq(), res2);
+    expect(res2.setHeader).toHaveBeenCalledWith(
+      'WWW-Authenticate',
+      'Bearer realm="mcp", resource_metadata="https://meta.example.com/resource"',
+    );
+  });
+
+  it('sets req.auth on a valid bearer token and forwards to the transport', async () => {
+    const authInfo = makeAuthInfo('user-a');
+    const verifier = { verify: vi.fn().mockResolvedValue(authInfo) };
+    const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }), verifier);
+    const req = makeReq({ authorization: 'Bearer token-user-a' });
+    const res = makeExpressRes();
+
+    await service.handlePostRequest(req, res);
+
+    expect(verifier.verify).toHaveBeenCalledWith('token-user-a');
+    expect(req.auth).toBe(authInfo);
+    expect(lastTransport().handleRequest).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it('passes through anonymously when required is false and no token is sent', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service } = makeService(
+      makeServiceOptions({ oauth: { enabled: true, required: false } }),
+      verifier,
+    );
+    const req = makeReq();
+    const res = makeExpressRes();
+
+    await service.handlePostRequest(req, res);
+
+    expect(req.auth).toBeUndefined();
+    expect(res.statusCode).toBeUndefined();
+    expect(lastTransport().handleRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('responds 500 on first request when oauth is enabled but no verifier is resolvable', async () => {
+    const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }));
+    const res = makeExpressRes();
+
+    await service.handlePostRequest(makeReq({ authorization: 'Bearer t' }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(hoisted.transports).toHaveLength(0);
+  });
+
+  it('logs a bootstrap warning when oauth is enabled but no verifier is resolvable', () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    try {
+      const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }));
+      service.onModuleInit();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('MCP_BEARER_TOKEN_VERIFIER'));
+
+      warnSpy.mockClear();
+      const verifier = { verify: vi.fn() };
+      const { service: configured } = makeService(
+        makeServiceOptions({ oauth: { enabled: true } }),
+        verifier,
+      );
+      configured.onModuleInit();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not authenticate when oauth is not enabled', async () => {
+    const { service } = makeService(makeServiceOptions());
+    const req = makeReq();
+    const res = makeExpressRes();
+
+    await service.handlePostRequest(req, res);
+
+    expect(req.auth).toBeUndefined();
+    expect(res.statusCode).toBeUndefined();
+    expect(lastTransport().handleRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StreamableHttpService session-identity binding', () => {
+  beforeEach(() => {
+    hoisted.transports.length = 0;
+  });
+
+  /** Initializes session `sess-1` bound to the given principal. */
+  async function initializeSession(verifier: { verify: ReturnType<typeof vi.fn> }, sub = 'user-a') {
+    const { service } = makeService(makeServiceOptions({ oauth: { enabled: true } }), verifier);
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo(sub));
+    await service.handlePostRequest(
+      makeReq({ authorization: `Bearer token-${sub}` }),
+      makeExpressRes(),
+    );
+    return { service, transport: lastTransport() };
+  }
+
+  it('responds 403 on POST to a session owned by another principal', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service, transport } = await initializeSession(verifier);
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-b'));
+    const res = makeExpressRes();
+    await service.handlePostRequest(
+      makeReq({ authorization: 'Bearer token-user-b', 'mcp-session-id': 'sess-1' }),
+      res,
+    );
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: 'Session does not belong to this principal' });
+    expect(transport.handleRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('responds 403 on GET from another principal and allows the owner', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service, transport } = await initializeSession(verifier);
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-b'));
+    const forbidden = makeExpressRes();
+    await service.handleGetRequest(
+      makeReq({ authorization: 'Bearer token-user-b', 'mcp-session-id': 'sess-1' }),
+      forbidden,
+    );
+    expect(forbidden.statusCode).toBe(403);
+    expect(forbidden.body).toEqual({ error: 'Session does not belong to this principal' });
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-a'));
+    const allowed = makeExpressRes();
+    await service.handleGetRequest(
+      makeReq({ authorization: 'Bearer token-user-a', 'mcp-session-id': 'sess-1' }),
+      allowed,
+    );
+    expect(allowed.statusCode).toBeUndefined();
+    expect(transport.handleRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('responds 403 on DELETE from another principal without closing the session', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service, transport } = await initializeSession(verifier);
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-b'));
+    const forbidden = makeExpressRes();
+    await service.handleDeleteRequest(
+      makeReq({ authorization: 'Bearer token-user-b', 'mcp-session-id': 'sess-1' }),
+      forbidden,
+    );
+    expect(forbidden.statusCode).toBe(403);
+    expect(transport.close).not.toHaveBeenCalled();
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-a'));
+    const allowed = makeExpressRes();
+    await service.handleDeleteRequest(
+      makeReq({ authorization: 'Bearer token-user-a', 'mcp-session-id': 'sess-1' }),
+      allowed,
+    );
+    expect(allowed.statusCode).toBe(204);
+    expect(transport.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects requests from a different client of the same user', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service } = await initializeSession(verifier);
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-a', 'client-2'));
+    const res = makeExpressRes();
+    await service.handlePostRequest(
+      makeReq({ authorization: 'Bearer token-user-a', 'mcp-session-id': 'sess-1' }),
+      res,
+    );
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('skips binding entirely when oauth is not enabled', async () => {
+    const { service } = makeService(makeServiceOptions());
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+    const transport = lastTransport();
+
+    const res = makeExpressRes();
+    await service.handleGetRequest(makeReq({ 'mcp-session-id': 'sess-1' }), res);
+
+    expect(res.statusCode).toBeUndefined();
+    expect(transport.handleRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips binding when bindSessionToUser is false', async () => {
+    const verifier = { verify: vi.fn() };
+    const { service } = makeService(
+      makeServiceOptions({ oauth: { enabled: true, bindSessionToUser: false } }),
+      verifier,
+    );
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-a'));
+    await service.handlePostRequest(
+      makeReq({ authorization: 'Bearer token-user-a' }),
+      makeExpressRes(),
+    );
+    const transport = lastTransport();
+
+    verifier.verify.mockResolvedValueOnce(makeAuthInfo('user-b'));
+    const res = makeExpressRes();
+    await service.handlePostRequest(
+      makeReq({ authorization: 'Bearer token-user-b', 'mcp-session-id': 'sess-1' }),
+      res,
+    );
+
+    expect(res.statusCode).toBeUndefined();
+    expect(transport.handleRequest).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('StreamableHttpService DNS-rebinding option forwarding', () => {
+  beforeEach(() => {
+    hoisted.transports.length = 0;
+  });
+
+  it('forwards allowedHosts, allowedOrigins, and enableDnsRebindingProtection to the SDK transport', async () => {
+    const { service } = makeService(
+      makeServiceOptions({
+        allowedHosts: ['api.example.com'],
+        allowedOrigins: ['https://app.example.com'],
+        enableDnsRebindingProtection: true,
+      }),
+    );
+
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+
+    const transport = lastTransport();
+    expect(transport.options.allowedHosts).toEqual(['api.example.com']);
+    expect(transport.options.allowedOrigins).toEqual(['https://app.example.com']);
+    expect(transport.options.enableDnsRebindingProtection).toBe(true);
+  });
+
+  it('leaves DNS-rebinding options undefined when not configured', async () => {
+    const { service } = makeService(makeServiceOptions());
+
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+
+    const transport = lastTransport();
+    expect(transport.options.allowedHosts).toBeUndefined();
+    expect(transport.options.allowedOrigins).toBeUndefined();
+    expect(transport.options.enableDnsRebindingProtection).toBeUndefined();
   });
 });

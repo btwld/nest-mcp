@@ -5,6 +5,10 @@ import type {
   OAuthProviderAdapter,
   OAuthProviderUser,
 } from './interfaces/oauth-provider.interface';
+import {
+  JwtBearerTokenVerifier,
+  MCP_BEARER_TOKEN_VERIFIER,
+} from './services/bearer-verifier.service';
 import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
 import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
 import { MemoryOAuthStore } from './stores/memory-store.service';
@@ -79,6 +83,25 @@ describe('McpAuthModule', () => {
         validateUser: async () => null,
       });
       expect(result.exports).toContain(MCP_AUTH_OPTIONS);
+    });
+
+    it('provides JwtBearerTokenVerifier under MCP_BEARER_TOKEN_VERIFIER (overridable)', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      const verifierProvider = (result.providers as { provide: unknown; useClass: unknown }[]).find(
+        (p) => p.provide === MCP_BEARER_TOKEN_VERIFIER,
+      );
+      expect(verifierProvider?.useClass).toBe(JwtBearerTokenVerifier);
+    });
+
+    it('exports MCP_BEARER_TOKEN_VERIFIER', () => {
+      const result = McpAuthModule.forRoot({
+        jwtSecret: TEST_SECRET,
+        validateUser: async () => null,
+      });
+      expect(result.exports).toContain(MCP_BEARER_TOKEN_VERIFIER);
     });
 
     it('exports MCP_OAUTH_STORE', () => {

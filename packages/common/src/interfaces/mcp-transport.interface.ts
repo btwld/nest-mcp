@@ -38,6 +38,29 @@ export interface StreamableHttpTransportOptions {
   onsessionclosed?: (sessionId: string) => void | Promise<void>;
   /** Retry interval in milliseconds for SSE streams. */
   retryInterval?: number;
+  /** Hostnames allowed by the SDK transport's DNS-rebinding protection. */
+  allowedHosts?: string[];
+  /** Origins allowed by the SDK transport's DNS-rebinding protection. */
+  allowedOrigins?: string[];
+  /** Enable the SDK transport's DNS-rebinding protection (requires `allowedHosts` and/or `allowedOrigins`). */
+  enableDnsRebindingProtection?: boolean;
+  /**
+   * Bearer-token gate for the streamable HTTP endpoint. Inactive unless
+   * `enabled` is true, so existing deployments are unaffected.
+   */
+  oauth?: {
+    enabled: boolean;
+    /** When false, requests without a token pass through anonymously. Default true. */
+    required?: boolean;
+    /** RFC 9728 protected-resource metadata URL advertised in `WWW-Authenticate`. Defaults to path-insertion on the request host. */
+    resourceMetadataUrl?: string;
+    /** Bind each session to the principal that initialized it. Default true. */
+    bindSessionToUser?: boolean;
+  };
+  /** NestJS guards applied to the generated streamable HTTP controller. */
+  controllerGuards?: unknown[];
+  /** Class decorators applied to the generated streamable HTTP controller. */
+  controllerDecorators?: ClassDecorator[];
 }
 
 export interface SseTransportOptions {

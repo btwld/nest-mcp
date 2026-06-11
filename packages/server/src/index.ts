@@ -67,6 +67,11 @@ export { AuthAuditService } from './auth/services/auth-audit.service';
 export type { AuditLogEntry } from './auth/services/auth-audit.service';
 export { JwtTokenService, MCP_AUTH_OPTIONS } from './auth/services/jwt-token.service';
 export { OAuthClientService, MCP_OAUTH_STORE } from './auth/services/client.service';
+export {
+  JwtBearerTokenVerifier,
+  MCP_BEARER_TOKEN_VERIFIER,
+  type BearerTokenVerifier,
+} from './auth/services/bearer-verifier.service';
 export { MemoryOAuthStore } from './auth/stores/memory-store.service';
 export type { IOAuthStore } from './auth/stores/oauth-store.interface';
 export type { McpAuthModuleOptions } from './auth/interfaces/auth-module-options.interface';

@@ -7,6 +7,10 @@ import type { OAuthProviderAdapter } from './interfaces/oauth-provider.interface
 import { createOAuthController } from './oauth/oauth.controller';
 import { createWellKnownController } from './oauth/well-known.controller';
 import { AuthAuditService } from './services/auth-audit.service';
+import {
+  JwtBearerTokenVerifier,
+  MCP_BEARER_TOKEN_VERIFIER,
+} from './services/bearer-verifier.service';
 import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
 import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
 import { OAuthFlowService } from './services/oauth-flow.service';
@@ -31,6 +35,7 @@ export class McpAuthModule {
       providers: [
         { provide: MCP_AUTH_OPTIONS, useValue: options },
         { provide: MCP_OAUTH_STORE, useValue: store },
+        { provide: MCP_BEARER_TOKEN_VERIFIER, useClass: JwtBearerTokenVerifier },
         JwtTokenService,
         OAuthClientService,
         OAuthFlowService,
@@ -45,6 +50,7 @@ export class McpAuthModule {
         JwtAuthGuard,
         MCP_AUTH_OPTIONS,
         MCP_OAUTH_STORE,
+        MCP_BEARER_TOKEN_VERIFIER,
       ],
     };
   }
