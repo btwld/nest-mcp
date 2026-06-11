@@ -59,3 +59,7 @@ Streamable HTTP transport:
 
 Requires `@modelcontextprotocol/sdk` peer `^1.26.0` (per-request `authInfo`
 and `requestInfo` on `RequestHandlerExtra`).
+
+Fix: refresh tokens now carry the `scope` claim, so access tokens re-minted by
+the `refresh_token` grant preserve the originally granted scopes (previously
+they came back scope-less and failed every scope check).

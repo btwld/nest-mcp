@@ -3,6 +3,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { McpAuthModuleOptions } from '../interfaces/auth-module-options.interface';
 import type { AuthorizeQueryDto, TokenPayload } from '../interfaces/oauth-types.interface';
+import { JwtTokenService } from './jwt-token.service';
 import { OAuthFlowService } from './oauth-flow.service';
 
 // ─── Shared Setup ─────────────────────────────────────────────────────────────
@@ -367,6 +368,49 @@ describe('OAuthFlowService - refreshToken (refresh_token grant)', () => {
 
     expect(result.access_token).toBe('at');
     expect(store.revokeToken).toHaveBeenCalledWith('old-jti');
+  });
+
+  it('re-mints the access token with the scope carried on the refresh token', async () => {
+    jwtService.validateToken.mockReturnValue({
+      type: 'refresh',
+      jti: 'old-jti',
+      sub: 'user-1',
+      client_id: 'client-1',
+      scope: 'tools:read tools:write',
+    });
+
+    await service.refreshToken({ refresh_token: 'valid-rt' });
+
+    expect(jwtService.generateTokenPair).toHaveBeenCalledWith(
+      'user-1',
+      'client-1',
+      'tools:read tools:write',
+    );
+  });
+
+  it('preserves the original scope end-to-end with a real JwtTokenService', async () => {
+    // No jwt mocks here: mint a real pair, run the refresh grant, and verify
+    // the refreshed access token still carries the originally granted scope.
+    const options: McpAuthModuleOptions = { jwtSecret: 'x'.repeat(32) };
+    const realJwt = new JwtTokenService(options);
+    const realService = new OAuthFlowService(
+      options,
+      realJwt,
+      { getClient: vi.fn(), registerClient: vi.fn() } as never,
+      {
+        isTokenRevoked: vi.fn().mockResolvedValue(false),
+        revokeToken: vi.fn().mockResolvedValue(undefined),
+      } as never,
+    );
+
+    const original = realJwt.generateTokenPair('user-1', 'client-1', 'tools:read tools:write');
+    const refreshed = await realService.refreshToken({
+      refresh_token: original.refresh_token,
+    });
+
+    expect(realJwt.validateToken(refreshed.access_token).scope).toBe('tools:read tools:write');
+    // The new refresh token carries scope too, so chained refreshes keep it.
+    expect(realJwt.validateToken(refreshed.refresh_token).scope).toBe('tools:read tools:write');
   });
 
   it('skips revokeToken when refresh token has no jti', async () => {

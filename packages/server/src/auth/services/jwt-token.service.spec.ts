@@ -138,6 +138,14 @@ describe('JwtTokenService', () => {
       expect(decoded.jti).toEqual(expect.any(String));
     });
 
+    it('includes scope in the refresh token payload so the refresh grant can preserve it', () => {
+      const service = createService();
+      const result = service.generateTokenPair('user-1', 'client-1', 'read write');
+
+      const decoded = jwt.decode(result.refresh_token) as Record<string, unknown>;
+      expect(decoded.scope).toBe('read write');
+    });
+
     it('respects accessTokenExpiresIn option', () => {
       const service = createService({ accessTokenExpiresIn: '2h' });
       const result = service.generateTokenPair('user-1', 'client-1');

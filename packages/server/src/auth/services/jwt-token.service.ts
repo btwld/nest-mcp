@@ -56,6 +56,9 @@ export class JwtTokenService {
         sub: userId,
         client_id: clientId,
         type: 'refresh',
+        // Carry scope so the refresh grant can re-mint access tokens with the
+        // original scope (oauth-flow reads payload.scope on refresh).
+        scope,
         jti: randomUUID(),
         iss,
       } as TokenPayload,
