@@ -1,5 +1,16 @@
 # @nest-mcp/gateway
 
+## 0.2.11
+
+### Patch Changes
+
+- f836e53: chore: require `@modelcontextprotocol/sdk` peer `^1.26.0`, aligning with `@nest-mcp/server` (which needs the per-request `authInfo`/`requestInfo` surface introduced there).
+- Updated dependencies [f836e53]
+- Updated dependencies [f836e53]
+  - @nest-mcp/server@0.7.0
+  - @nest-mcp/common@0.5.0
+  - @nest-mcp/client@0.2.10
+
 ## 0.2.10
 
 ### Patch Changes
