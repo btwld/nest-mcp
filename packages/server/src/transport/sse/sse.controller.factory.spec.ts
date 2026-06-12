@@ -87,4 +87,49 @@ describe('createSseController', () => {
       expect(Reflect.getMetadata('path', msgCtl)).toBe('/custom-msg');
     });
   });
+
+  describe('guards option', () => {
+    class FakeGuard {
+      canActivate(): boolean {
+        return true;
+      }
+    }
+
+    it('applies provided guards to both controllers via __guards__ metadata', () => {
+      const [getCtl, msgCtl] = createSseController('/sse', '/messages', {
+        guards: [FakeGuard],
+      });
+
+      expect(Reflect.getMetadata('__guards__', getCtl)).toEqual([FakeGuard]);
+      expect(Reflect.getMetadata('__guards__', msgCtl)).toEqual([FakeGuard]);
+    });
+
+    it('preserves guard order when multiple guards are provided', () => {
+      class SecondGuard {
+        canActivate(): boolean {
+          return true;
+        }
+      }
+      const [getCtl, msgCtl] = createSseController('/sse', '/messages', {
+        guards: [FakeGuard, SecondGuard],
+      });
+
+      expect(Reflect.getMetadata('__guards__', getCtl)).toEqual([FakeGuard, SecondGuard]);
+      expect(Reflect.getMetadata('__guards__', msgCtl)).toEqual([FakeGuard, SecondGuard]);
+    });
+
+    it('defines no __guards__ metadata when the options object is omitted', () => {
+      const [getCtl, msgCtl] = createSseController('/sse', '/messages');
+
+      expect(Reflect.getMetadata('__guards__', getCtl)).toBeUndefined();
+      expect(Reflect.getMetadata('__guards__', msgCtl)).toBeUndefined();
+    });
+
+    it('defines no __guards__ metadata when guards is an empty array', () => {
+      const [getCtl, msgCtl] = createSseController('/sse', '/messages', { guards: [] });
+
+      expect(Reflect.getMetadata('__guards__', getCtl)).toBeUndefined();
+      expect(Reflect.getMetadata('__guards__', msgCtl)).toBeUndefined();
+    });
+  });
 });

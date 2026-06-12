@@ -1,13 +1,13 @@
 import {
-  JwtAuthGuard,
+  McpAuthenticatedGuard,
   McpAuthModule,
-  type McpGuardClass,
   McpModule,
   McpTransportType,
 } from '@nest-mcp/server';
 import { Module } from '@nestjs/common';
 import { AdminTools } from './admin.tools';
 import { AuthDemoController } from './auth-demo.controller';
+import { DemoTokenVerifier } from './demo-token.verifier';
 import { DynamicRegistrationService } from './dynamic-registration.service';
 import { FeatureModule } from './feature/feature.module';
 import { ApiKeyGuard } from './guards/api-key.guard';
@@ -26,6 +26,8 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
         streamableHttp: {
           endpoint: '/mcp',
           stateless: false,
+          // Bearer-token gate (McpBearerGuard); verifier comes from McpAuthModule below.
+          oauth: { enabled: true },
         },
       },
       capabilities: {
@@ -38,8 +40,8 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
         rateLimit: { max: 100, window: '1m' },
         retry: { maxAttempts: 1, backoff: 'fixed' },
       },
-      // Global guards (run JwtAuthGuard on every tool/resource/prompt call)
-      guards: [JwtAuthGuard as unknown as McpGuardClass],
+      // Global guards (require a verified principal on every non-public call)
+      guards: [McpAuthenticatedGuard],
       // Global middleware
       middleware: [loggingMiddleware],
       // Session management
@@ -55,15 +57,17 @@ import { AssistantPrompts, DataResources, WeatherTools } from './weather.tools';
       },
     }),
 
-    // OAuth2 / JWT authentication
+    // OAuth resource server: protected-resource metadata + token verification.
+    // The playground uses a static-token demo verifier so it works offline;
+    // real deployments point `jwks` or `introspection` at their IdP instead.
     McpAuthModule.forRoot({
-      jwtSecret: process.env.JWT_SECRET || 'playground-demo-secret-key-at-least-32chars!',
-      issuer: 'http://localhost:3000',
-      serverUrl: 'http://localhost:3000',
-      resourceUrl: 'http://localhost:3000/mcp',
-      enableDynamicRegistration: true,
-      scopes: ['tools:read', 'admin:read', 'analytics:read'],
-      validateUser: async () => ({ id: 'demo-user' }),
+      resource: 'http://localhost:3000/mcp',
+      authorizationServers: ['http://localhost:3000'],
+      scopesSupported: ['tools:read', 'admin:read', 'analytics:read'],
+      verifier: new DemoTokenVerifier(),
+      // Anonymous requests pass the transport gate; non-public tools still
+      // require a principal via McpAuthenticatedGuard above.
+      required: false,
     }),
 
     // Feature module

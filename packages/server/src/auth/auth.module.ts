@@ -1,114 +1,138 @@
+import { OAuthProtectedResourceMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { McpError } from '@nest-mcp/common';
-import { type DynamicModule, Module, type Provider } from '@nestjs/common';
-import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { type DynamicModule, Logger, Module, type Provider } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { MCP_BEARER_TOKEN_VERIFIER, MCP_RESOURCE_SERVER_OPTIONS } from './auth.constants';
+import { McpBearerGuard } from './guards/mcp-bearer.guard';
 import type {
-  McpAuthModuleAsyncOptions,
-  McpAuthModuleOptions,
-} from './interfaces/auth-module-options.interface';
-import type { OAuthProviderAdapter } from './interfaces/oauth-provider.interface';
-import { createOAuthController } from './oauth/oauth.controller';
-import { createWellKnownController } from './oauth/well-known.controller';
-import { AuthAuditService } from './services/auth-audit.service';
-import {
-  JwtBearerTokenVerifier,
-  MCP_BEARER_TOKEN_VERIFIER,
-} from './services/bearer-verifier.service';
-import { MCP_OAUTH_STORE, OAuthClientService } from './services/client.service';
-import { JwtTokenService, MCP_AUTH_OPTIONS } from './services/jwt-token.service';
-import { OAuthFlowService } from './services/oauth-flow.service';
-import { MemoryOAuthStore } from './stores/memory-store.service';
+  McpResourceServerAsyncOptions,
+  McpResourceServerOptions,
+} from './interfaces/resource-server-options.interface';
+import { canonicalizeResourceUri } from './utils/resource-url.util';
+import type { BearerTokenVerifier } from './verifiers/bearer-verifier.interface';
+import { IntrospectionVerifier } from './verifiers/introspection.verifier';
+import { JwksVerifier } from './verifiers/jwks.verifier';
+import { createWellKnownController } from './well-known.controller';
 
-function validateAuthOptions(options: McpAuthModuleOptions): McpAuthModuleOptions {
-  if (!options.jwtSecret || options.jwtSecret.length < 32) {
-    throw new McpError('McpAuthModule: jwtSecret must be at least 32 characters');
-  }
-  return options;
-}
+const logger = new Logger('McpAuthModule');
 
 /**
- * `MCP_OAUTH_STORE` factory: an explicitly configured `options.store` wins;
- * otherwise an in-memory store is created.
+ * Canonicalizes the resource URL, enforces the option invariants, and
+ * validates the resulting RFC 9728 document against the SDK schema so
+ * misconfiguration fails at bootstrap rather than at client discovery.
  */
-const storeProvider: Provider = {
-  provide: MCP_OAUTH_STORE,
-  useFactory: (options: McpAuthModuleOptions) => options.store ?? new MemoryOAuthStore(),
-  inject: [MCP_AUTH_OPTIONS],
+function validateAuthOptions(options: McpResourceServerOptions): McpResourceServerOptions {
+  const resource = canonicalizeResourceUri(options.resource);
+
+  if (!options.authorizationServers?.length) {
+    throw new McpError(
+      'McpAuthModule: authorizationServers must list at least one authorization server issuer URL',
+    );
+  }
+
+  const verifierSources = [options.verifier, options.jwks, options.introspection].filter(
+    (source) => source !== undefined,
+  );
+  if (verifierSources.length !== 1) {
+    throw new McpError(
+      'McpAuthModule: configure exactly one of "verifier", "jwks", or "introspection"',
+    );
+  }
+
+  if (options.validateAudience === false) {
+    logger.warn(
+      'validateAudience is disabled — the MCP spec requires servers to only accept tokens ' +
+        'issued specifically for them. Only do this when the verifier enforces audience itself.',
+    );
+  }
+
+  const parsed = OAuthProtectedResourceMetadataSchema.safeParse({
+    resource,
+    authorization_servers: options.authorizationServers,
+    scopes_supported: options.scopesSupported,
+    bearer_methods_supported: ['header'],
+    resource_name: options.resourceName,
+  });
+  if (!parsed.success) {
+    throw new McpError(
+      `McpAuthModule: invalid protected-resource metadata — ${parsed.error.message}`,
+    );
+  }
+
+  return { ...options, resource };
+}
+
+async function createVerifier(
+  options: McpResourceServerOptions,
+  moduleRef: ModuleRef,
+): Promise<BearerTokenVerifier> {
+  if (options.verifier) {
+    return typeof options.verifier === 'function'
+      ? moduleRef.create(options.verifier)
+      : options.verifier;
+  }
+
+  const validateAudience = options.validateAudience !== false;
+  if (options.jwks) {
+    return new JwksVerifier(options.jwks, options.resource, validateAudience);
+  }
+  if (options.introspection) {
+    return new IntrospectionVerifier(options.introspection, options.resource, validateAudience);
+  }
+  // Unreachable after validateAuthOptions; defensive for direct factory misuse.
+  throw new McpError('McpAuthModule: no token verifier configured');
+}
+
+const verifierProvider: Provider = {
+  provide: MCP_BEARER_TOKEN_VERIFIER,
+  useFactory: (options: McpResourceServerOptions, moduleRef: ModuleRef) =>
+    createVerifier(options, moduleRef),
+  inject: [MCP_RESOURCE_SERVER_OPTIONS, ModuleRef],
 };
 
-const sharedProviders: Provider[] = [
-  storeProvider,
-  { provide: MCP_BEARER_TOKEN_VERIFIER, useClass: JwtBearerTokenVerifier },
-  JwtTokenService,
-  OAuthClientService,
-  OAuthFlowService,
-  JwtAuthGuard,
-  AuthRateLimitGuard,
-  AuthAuditService,
-];
+const moduleExports = [MCP_RESOURCE_SERVER_OPTIONS, MCP_BEARER_TOKEN_VERIFIER, McpBearerGuard];
 
-const moduleExports = [
-  JwtTokenService,
-  OAuthClientService,
-  JwtAuthGuard,
-  MCP_AUTH_OPTIONS,
-  MCP_OAUTH_STORE,
-  MCP_BEARER_TOKEN_VERIFIER,
-];
-
+/**
+ * MCP resource-server module (MCP authorization spec 2025-06-18): serves
+ * RFC 9728 protected-resource metadata and provides the bearer-token
+ * verifier consumed by `McpBearerGuard` on the HTTP transports. Token
+ * issuance is the authorization server's job — bring an external IdP
+ * (Auth0, Keycloak, …) or your own AS and point `authorizationServers` at it.
+ */
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes
 export class McpAuthModule {
-  static forRoot(options: McpAuthModuleOptions): DynamicModule {
-    validateAuthOptions(options);
-
-    const oauthBasePath = options.serverUrl ? new URL(options.serverUrl).pathname : '';
-    const OAuthCtrl = createOAuthController(oauthBasePath);
-    const WellKnownCtrl = createWellKnownController();
+  static forRoot(options: McpResourceServerOptions): DynamicModule {
+    const normalized = validateAuthOptions(options);
 
     return {
       module: McpAuthModule,
-      providers: [{ provide: MCP_AUTH_OPTIONS, useValue: options }, ...sharedProviders],
-      controllers: [OAuthCtrl, WellKnownCtrl],
+      providers: [
+        { provide: MCP_RESOURCE_SERVER_OPTIONS, useValue: normalized },
+        verifierProvider,
+        McpBearerGuard,
+      ],
+      controllers: [createWellKnownController()],
       exports: moduleExports,
     };
   }
 
-  /**
-   * Async variant: options are produced by a DI-aware factory. Controllers
-   * are created from the STATIC `serverUrl` on the async options (controller
-   * shape cannot depend on the factory result); everything else flows through
-   * the resolved `MCP_AUTH_OPTIONS`.
-   */
-  static forRootAsync(options: McpAuthModuleAsyncOptions): DynamicModule {
-    const oauthBasePath = options.serverUrl ? new URL(options.serverUrl).pathname : '';
-    const OAuthCtrl = createOAuthController(oauthBasePath);
-    const WellKnownCtrl = createWellKnownController();
-
+  static forRootAsync(options: McpResourceServerAsyncOptions): DynamicModule {
     return {
       module: McpAuthModule,
       imports: options.imports ?? [],
       providers: [
         {
-          provide: MCP_AUTH_OPTIONS,
+          provide: MCP_RESOURCE_SERVER_OPTIONS,
           useFactory: async (...args: unknown[]) =>
             validateAuthOptions(await options.useFactory(...args)),
           inject: options.inject ?? [],
         },
-        ...sharedProviders,
+        verifierProvider,
+        McpBearerGuard,
       ],
-      controllers: [OAuthCtrl, WellKnownCtrl],
+      controllers: [createWellKnownController()],
       exports: moduleExports,
     };
-  }
-
-  static forProvider(
-    adapter: OAuthProviderAdapter,
-    options: Omit<McpAuthModuleOptions, 'validateUser'>,
-  ): DynamicModule {
-    return McpAuthModule.forRoot({
-      ...options,
-      validateUser: (req) => adapter.validateUser(req),
-    });
   }
 }

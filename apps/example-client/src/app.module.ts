@@ -20,7 +20,7 @@ import { NotificationHandler } from './notification.handler';
             url: config.get('PLAYGROUND_URL', 'http://localhost:3000/mcp'),
             auth: {
               type: 'bearer' as const,
-              token: config.get('PLAYGROUND_TOKEN', 'demo-bearer-token'),
+              token: config.get('PLAYGROUND_TOKEN', 'playground-demo-token'),
             },
             reconnect: { maxAttempts: 5, delay: 2000 },
           },

@@ -44,17 +44,17 @@ McpModule.forRoot({
 
 ### OAuth Bearer Gate
 
-Setting `oauth.enabled: true` protects the streamable HTTP endpoint with a
-bearer-token check performed before any JSON-RPC processing. The gate is
-**inactive unless `enabled` is true**, so existing deployments are unaffected.
+Setting `oauth.enabled: true` applies `McpBearerGuard` to the generated
+controller — a bearer-token check performed before any JSON-RPC processing.
+The gate is **inactive unless `enabled` is true**, so existing deployments are
+unaffected. The same gate is available for the SSE transport via
+`transportOptions.sse.oauth.enabled`.
 
 ```typescript
 transportOptions: {
   streamableHttp: {
     oauth: {
       enabled: true,
-      required: true,                 // default true
-      // resourceMetadataUrl: 'https://api.example.com/.well-known/oauth-protected-resource/mcp',
       bindSessionToUser: true,        // default true
     },
   },
@@ -64,28 +64,25 @@ transportOptions: {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | — | Activates the gate |
-| `required` | `boolean` | `true` | When `false`, requests without a valid token pass through anonymously |
-| `resourceMetadataUrl` | `string` | path-insertion URL | RFC 9728 metadata URL advertised in `WWW-Authenticate` |
 | `bindSessionToUser` | `boolean` | `true` | Bind each session to the principal that initialized it |
 
-Tokens are verified by the `MCP_BEARER_TOKEN_VERIFIER` provider. Importing
-`McpAuthModule.forRoot(...)` supplies the default JWT implementation; host
-apps can re-provide the token for opaque-token introspection (see
-[auth.md](./auth.md#custom-bearer-token-verification)).
+Everything else — the verifier, the advertised metadata, optional-auth mode
+(`required: false`), and required scopes — is configured on
+`McpAuthModule.forRoot(...)`; see [auth.md](./auth.md).
 
-**401 discovery flow.** When a request has no valid token (and `required` is
-not `false`), the server responds `401` with a `WWW-Authenticate` challenge:
+**401 discovery flow.** When a request has no valid token, the server
+responds `401` with an SDK-compatible `WWW-Authenticate` challenge:
 
 ```
-WWW-Authenticate: Bearer realm="mcp", resource_metadata="https://host/.well-known/oauth-protected-resource/mcp"
+WWW-Authenticate: Bearer error="invalid_token", error_description="Missing Authorization header", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
 ```
 
 MCP clients follow `resource_metadata` to the RFC 9728 protected-resource
 document, discover the authorization server from `authorization_servers`,
 fetch its RFC 8414 metadata, run the OAuth flow, and retry with a Bearer
-token. The default `resource_metadata` URL uses the path-insertion form built
-from the request's `Host` header and the configured endpoint; set
-`resourceMetadataUrl` to override it.
+token. The `resource_metadata` URL is derived from the `resource` configured
+on `McpAuthModule` (path-insertion form), so scheme and host never depend on
+request headers.
 
 **Session binding.** With `bindSessionToUser` (default when oauth is
 enabled), the principal (`clientId` + `sub`) that initializes a stateful
@@ -129,10 +126,12 @@ transportOptions: {
 
 > **`forRootAsync` note:** the controller class is created when the module is
 > *defined*, before the async factory runs. Controller-shape configuration —
-> `endpoint`, `controllerGuards`, `controllerDecorators` — must therefore be
-> provided statically on the `forRootAsync` options object
+> `endpoint`, `oauth.enabled`, `controllerGuards`, `controllerDecorators` —
+> must therefore be provided statically on the `forRootAsync` options object
 > (`transportOptions`), while all runtime options resolved by `useFactory`
-> flow through `MCP_OPTIONS`.
+> flow through `MCP_OPTIONS`. A mismatch between the static and resolved
+> `oauth.enabled` values fails the bootstrap with an error — the gate cannot
+> be toggled from the factory result.
 
 ### Resumability
 
@@ -181,6 +180,7 @@ McpModule.forRoot({
 | `endpoint` | `string` | `'/sse'` | SSE connection endpoint |
 | `messagesEndpoint` | `string` | `'/messages'` | JSON-RPC message endpoint |
 | `pingInterval` | `number` | `30000` | Ping interval in ms (0 to disable) |
+| `oauth` | `{ enabled: boolean }` | — | Apply `McpBearerGuard` to both SSE endpoints (see [auth.md](./auth.md)) |
 
 ### Endpoints
 

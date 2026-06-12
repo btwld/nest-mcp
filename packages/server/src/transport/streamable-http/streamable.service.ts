@@ -15,11 +15,8 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import {
-  type BearerTokenVerifier,
-  MCP_BEARER_TOKEN_VERIFIER,
-} from '../../auth/services/bearer-verifier.service';
-import { DEFAULT_MCP_ENDPOINT } from '../../constants/module.constants';
+import { MCP_BEARER_TOKEN_VERIFIER } from '../../auth/auth.constants';
+import type { BearerTokenVerifier } from '../../auth/verifiers/bearer-verifier.interface';
 import type {
   RegisteredPrompt,
   RegisteredResource,
@@ -95,7 +92,8 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
     if (this.oauthOptions?.enabled && !this.resolveBearerVerifier()) {
       this.logger.warn(
         'streamableHttp.oauth.enabled is set but no MCP_BEARER_TOKEN_VERIFIER provider could be resolved. ' +
-          'Import McpAuthModule.forRoot(...) or provide MCP_BEARER_TOKEN_VERIFIER — requests will fail until then.',
+          'Import McpAuthModule.forRoot({ resource, authorizationServers, jwks | introspection | verifier }) — ' +
+          'requests will fail until then.',
       );
     }
   }
@@ -122,11 +120,6 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
   async handlePostRequest(req: unknown, res: unknown): Promise<void> {
     try {
-      if (this.oauthOptions?.enabled) {
-        const auth = await this.authenticate(req, res);
-        if (auth === 'responded') return;
-      }
-
       if (this.isStateless) {
         await this.handleStatelessPost(req, res);
       } else {
@@ -144,11 +137,6 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
   async handleGetRequest(req: unknown, res: unknown): Promise<void> {
     const resObj = res as HttpResponse;
-    if (this.oauthOptions?.enabled) {
-      const auth = await this.authenticate(req, res);
-      if (auth === 'responded') return;
-    }
-
     if (this.isStateless) {
       resObj.status?.(405).json?.({ error: 'SSE not supported in stateless mode' }) ??
         resObj.code?.(405).send?.({ error: 'SSE not supported in stateless mode' });
@@ -177,11 +165,6 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   async handleDeleteRequest(req: unknown, res: unknown): Promise<void> {
     const reqObj = req as HttpRequest;
     const resObj = res as HttpResponse;
-    if (this.oauthOptions?.enabled) {
-      const auth = await this.authenticate(req, res);
-      if (auth === 'responded') return;
-    }
-
     const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
     if (sessionId && this.transports.has(sessionId)) {
       if (!this.enforceSessionBinding(sessionId, req, res)) return;
@@ -208,84 +191,6 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
       allowedOrigins: opts?.allowedOrigins,
       enableDnsRebindingProtection: opts?.enableDnsRebindingProtection,
     };
-  }
-
-  /**
-   * Bearer-token gate applied when `streamableHttp.oauth.enabled` is set.
-   *
-   * - valid token: attaches the identity to `req.auth` (the SDK transport
-   *   surfaces it as `authInfo`) and returns it.
-   * - missing/invalid token while auth is required: responds 401 with a
-   *   `WWW-Authenticate` challenge and returns `'responded'`.
-   * - no valid token while `required === false`: returns `undefined`
-   *   (anonymous passthrough).
-   */
-  private async authenticate(
-    req: unknown,
-    res: unknown,
-  ): Promise<McpAuthInfo | 'responded' | undefined> {
-    const oauth = this.oauthOptions;
-    if (!oauth?.enabled) return undefined;
-
-    const verifier = this.resolveBearerVerifier();
-    if (!verifier) {
-      throw new Error(
-        'StreamableHttpService: streamableHttp.oauth.enabled is set but no MCP_BEARER_TOKEN_VERIFIER ' +
-          'provider could be resolved. Import McpAuthModule.forRoot(...) or provide MCP_BEARER_TOKEN_VERIFIER.',
-      );
-    }
-
-    const reqObj = req as HttpRequest;
-    const rawHeader = reqObj.headers?.authorization;
-    const headerValue = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
-    const [scheme, token] = headerValue?.split(' ') ?? [];
-
-    let authInfo: McpAuthInfo | null = null;
-    if (scheme?.toLowerCase() === 'bearer' && token) {
-      authInfo = await verifier.verify(token);
-    }
-
-    if (authInfo) {
-      reqObj.auth = authInfo;
-      return authInfo;
-    }
-
-    if (oauth.required === false) return undefined;
-
-    this.respondUnauthorized(req, res);
-    return 'responded';
-  }
-
-  private respondUnauthorized(req: unknown, res: unknown): void {
-    const resObj = res as HttpResponse;
-    if (resObj.headersSent) return;
-
-    const challenge = `Bearer realm="mcp", resource_metadata="${this.resourceMetadataUrl(req)}"`;
-    if (typeof resObj.setHeader === 'function') {
-      resObj.setHeader('WWW-Authenticate', challenge);
-    } else {
-      resObj.header?.('WWW-Authenticate', challenge);
-    }
-
-    const body = {
-      jsonrpc: '2.0',
-      error: { code: -32001, message: 'Unauthorized' },
-      id: null,
-    };
-    resObj.status?.(401).json?.(body) ?? resObj.code?.(401).send?.(body);
-  }
-
-  /** RFC 9728 protected-resource metadata URL (path-insertion form by default). */
-  private resourceMetadataUrl(req: unknown): string {
-    const configured = this.oauthOptions?.resourceMetadataUrl;
-    if (configured) return configured;
-
-    const rawHost = (req as HttpRequest).headers?.host;
-    const host = (Array.isArray(rawHost) ? rawHost[0] : rawHost) ?? 'localhost';
-    const endpoint =
-      this.options.transportOptions?.streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
-    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return `https://${host}/.well-known/oauth-protected-resource${path}`;
   }
 
   /**

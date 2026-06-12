@@ -85,7 +85,7 @@ export class ToolsService {
 | [Auth Decorators](./auth-decorators.md) | `@Public`, `@Scopes`, `@Roles`, `@Guards` |
 | [Resilience Decorators](./resilience-decorators.md) | `@RateLimit`, `@Retry`, `@CircuitBreaker`, `@Timeout` |
 | [Transports](./transports.md) | SSE, Streamable HTTP, STDIO |
-| [Auth](./auth.md) | `McpAuthModule`, OAuth, JWT, guards |
+| [Auth](./auth.md) | `McpAuthModule`, OAuth resource server, verifiers, guards |
 | [Resilience](./resilience.md) | Rate limiter, circuit breaker, retry services |
 | [Middleware](./middleware.md) | `@UseMiddleware`, `MiddlewareService` |
 | [Dynamic Builders](./dynamic-builders.md) | `McpToolBuilder`, `McpResourceBuilder`, `McpPromptBuilder` |

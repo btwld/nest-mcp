@@ -1,7 +1,8 @@
 import 'reflect-metadata';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpError, type McpModuleOptions, McpTransportType } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
-import { McpModule } from './mcp.module';
+import { McpBearerGuard } from './auth/guards/mcp-bearer.guard';
+import { MCP_OAUTH_GATE_CHECK, McpModule, createOauthGateCheckProvider } from './mcp.module';
 
 describe('McpModule', () => {
   describe('forRoot', () => {
@@ -268,6 +269,271 @@ describe('McpModule', () => {
       );
       expect(providerNames).toContain('StreamableHttpService');
       expect(providerNames).toContain('SseService');
+    });
+  });
+
+  describe('oauth bearer guard wiring', () => {
+    class EdgeGuard {
+      canActivate(): boolean {
+        return true;
+      }
+    }
+
+    describe('forRoot — streamable HTTP', () => {
+      it('prepends McpBearerGuard to controllerGuards when oauth is enabled', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STREAMABLE_HTTP,
+          transportOptions: {
+            streamableHttp: { oauth: { enabled: true }, controllerGuards: [EdgeGuard] },
+          },
+        });
+
+        const [controller] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', controller)).toEqual([McpBearerGuard, EdgeGuard]);
+      });
+
+      it('applies only McpBearerGuard when oauth is enabled without controllerGuards', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STREAMABLE_HTTP,
+          transportOptions: {
+            streamableHttp: { oauth: { enabled: true } },
+          },
+        });
+
+        const [controller] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', controller)).toEqual([McpBearerGuard]);
+      });
+
+      it('does not prepend McpBearerGuard when oauth.enabled is false', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STREAMABLE_HTTP,
+          transportOptions: {
+            streamableHttp: { oauth: { enabled: false }, controllerGuards: [EdgeGuard] },
+          },
+        });
+
+        const [controller] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', controller)).toEqual([EdgeGuard]);
+      });
+    });
+
+    describe('forRoot — SSE', () => {
+      it('applies McpBearerGuard to both SSE controllers when sse.oauth is enabled', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+          transportOptions: {
+            sse: { oauth: { enabled: true } },
+          },
+        });
+
+        // Controller order: [streamable, sseGet, sseMessages]
+        const [streamable, sseGet, sseMessages] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', sseGet)).toEqual([McpBearerGuard]);
+        expect(Reflect.getMetadata('__guards__', sseMessages)).toEqual([McpBearerGuard]);
+        // streamable oauth gate is off → untouched
+        expect(Reflect.getMetadata('__guards__', streamable)).toBeUndefined();
+      });
+
+      it('leaves SSE controllers without __guards__ metadata when sse.oauth is not enabled', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.SSE,
+        });
+
+        const [sseGet, sseMessages] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', sseGet)).toBeUndefined();
+        expect(Reflect.getMetadata('__guards__', sseMessages)).toBeUndefined();
+      });
+    });
+
+    describe('forRootAsync', () => {
+      it('prepends McpBearerGuard from static transportOptions when oauth is enabled', () => {
+        const mod = McpModule.forRootAsync({
+          transport: McpTransportType.STREAMABLE_HTTP,
+          transportOptions: {
+            streamableHttp: { oauth: { enabled: true }, controllerGuards: [EdgeGuard] },
+          },
+          useFactory: () => ({
+            name: 'test',
+            version: '1.0',
+            transport: McpTransportType.STREAMABLE_HTTP,
+          }),
+        });
+
+        const [controller] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', controller)).toEqual([McpBearerGuard, EdgeGuard]);
+      });
+
+      it('applies only McpBearerGuard when oauth is enabled without controllerGuards', () => {
+        const mod = McpModule.forRootAsync({
+          transport: McpTransportType.STREAMABLE_HTTP,
+          transportOptions: {
+            streamableHttp: { oauth: { enabled: true } },
+          },
+          useFactory: () => ({
+            name: 'test',
+            version: '1.0',
+            transport: McpTransportType.STREAMABLE_HTTP,
+          }),
+        });
+
+        const [controller] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', controller)).toEqual([McpBearerGuard]);
+      });
+
+      it('applies McpBearerGuard to both SSE controllers from static transportOptions when sse.oauth is enabled', () => {
+        const mod = McpModule.forRootAsync({
+          transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+          transportOptions: {
+            sse: { oauth: { enabled: true } },
+          },
+          useFactory: () => ({
+            name: 'test',
+            version: '1.0',
+            transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
+          }),
+        });
+
+        // Controller order: [streamable, sseGet, sseMessages]
+        const [streamable, sseGet, sseMessages] = mod.controllers ?? [];
+        expect(Reflect.getMetadata('__guards__', sseGet)).toEqual([McpBearerGuard]);
+        expect(Reflect.getMetadata('__guards__', sseMessages)).toEqual([McpBearerGuard]);
+        // streamable oauth gate is off → untouched
+        expect(Reflect.getMetadata('__guards__', streamable)).toBeUndefined();
+      });
+    });
+
+    describe('providers', () => {
+      it('forRoot registers McpBearerGuard as a provider', () => {
+        const mod = McpModule.forRoot({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STDIO,
+        });
+
+        expect(mod.providers).toContain(McpBearerGuard);
+      });
+
+      it('forRootAsync registers McpBearerGuard as a provider', () => {
+        const mod = McpModule.forRootAsync({
+          transport: McpTransportType.STDIO,
+          useFactory: () => ({
+            name: 'test',
+            version: '1.0',
+            transport: McpTransportType.STDIO,
+          }),
+        });
+
+        expect(mod.providers).toContain(McpBearerGuard);
+      });
+    });
+  });
+
+  describe('oauth gate consistency check', () => {
+    const findGateCheckProvider = (mod: ReturnType<typeof McpModule.forRoot>) =>
+      (mod.providers as { provide?: unknown }[]).find((p) => p.provide === MCP_OAUTH_GATE_CHECK);
+
+    it('forRoot includes the MCP_OAUTH_GATE_CHECK provider', () => {
+      const mod = McpModule.forRoot({
+        name: 'test',
+        version: '1.0',
+        transport: McpTransportType.STDIO,
+      });
+
+      expect(findGateCheckProvider(mod)).toBeDefined();
+    });
+
+    it('forRootAsync includes the MCP_OAUTH_GATE_CHECK provider', () => {
+      const mod = McpModule.forRootAsync({
+        transport: McpTransportType.STDIO,
+        useFactory: () => ({
+          name: 'test',
+          version: '1.0',
+          transport: McpTransportType.STDIO,
+        }),
+      });
+
+      expect(findGateCheckProvider(mod)).toBeDefined();
+    });
+
+    describe('createOauthGateCheckProvider', () => {
+      const getFactory = (staticGates: { streamableHttp: boolean; sse: boolean }) => {
+        const provider = createOauthGateCheckProvider(staticGates) as {
+          provide: symbol;
+          useFactory: (options: McpModuleOptions) => boolean;
+          inject: unknown[];
+        };
+        expect(provider.provide).toBe(MCP_OAUTH_GATE_CHECK);
+        return provider.useFactory;
+      };
+
+      const baseOptions: McpModuleOptions = {
+        name: 'test',
+        version: '1.0',
+        transport: McpTransportType.STREAMABLE_HTTP,
+      };
+
+      it('returns true when resolved oauth gates match the static gates', () => {
+        const useFactory = getFactory({ streamableHttp: true, sse: false });
+
+        const result = useFactory({
+          ...baseOptions,
+          transportOptions: { streamableHttp: { oauth: { enabled: true } } },
+        });
+
+        expect(result).toBe(true);
+      });
+
+      it('throws McpError mentioning streamableHttp when oauth is enabled at runtime but was statically off', () => {
+        const useFactory = getFactory({ streamableHttp: false, sse: false });
+
+        const call = () =>
+          useFactory({
+            ...baseOptions,
+            transportOptions: { streamableHttp: { oauth: { enabled: true } } },
+          });
+
+        expect(call).toThrow(McpError);
+        expect(call).toThrow(/streamableHttp/);
+      });
+
+      it('throws when oauth was statically on but resolved options omit oauth entirely', () => {
+        const useFactory = getFactory({ streamableHttp: true, sse: false });
+
+        const call = () => useFactory(baseOptions);
+
+        expect(call).toThrow(McpError);
+        expect(call).toThrow(/streamableHttp/);
+      });
+
+      it('throws McpError mentioning sse on an SSE gate mismatch', () => {
+        const useFactory = getFactory({ streamableHttp: false, sse: false });
+
+        const call = () =>
+          useFactory({
+            ...baseOptions,
+            transport: McpTransportType.SSE,
+            transportOptions: { sse: { oauth: { enabled: true } } },
+          });
+
+        expect(call).toThrow(McpError);
+        expect(call).toThrow(/sse/);
+      });
+
+      it('returns true when oauth is configured nowhere and static gates are off', () => {
+        const useFactory = getFactory({ streamableHttp: false, sse: false });
+
+        expect(useFactory(baseOptions)).toBe(true);
+      });
     });
   });
 

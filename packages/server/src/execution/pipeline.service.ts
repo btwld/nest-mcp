@@ -14,6 +14,7 @@ import type {
   ToolMetadata,
 } from '@nest-mcp/common';
 import {
+  AuthorizationError,
   MCP_OPTIONS,
   MCP_REQUEST_CANCELLED,
   McpError,
@@ -82,8 +83,12 @@ export class ExecutionPipelineService {
         throw new ToolExecutionError(name, `Tool '${name}' not found`);
       }
 
-      // Global guards (populate user from token)
-      await this.applyGlobalGuards(ctx, { toolName: name, arguments: args });
+      // Global guards (populate user from token, deny non-public items)
+      await this.applyGlobalGuards(
+        ctx,
+        { toolName: name, arguments: args },
+        tool.isPublic ?? false,
+      );
 
       // Auth check
       if (!tool.isPublic) {
@@ -303,6 +308,11 @@ export class ExecutionPipelineService {
 
   // ---- Helpers ----
 
+  /**
+   * Runs the module-level guards. Guards always execute (they may enrich the
+   * context, e.g. populate `user`), but a `false` result only denies
+   * non-public items — `@Public` capabilities stay reachable anonymously.
+   */
   private async applyGlobalGuards(
     ctx: McpExecutionContext,
     extra: {
@@ -311,6 +321,7 @@ export class ExecutionPipelineService {
       promptName?: string;
       arguments?: Record<string, unknown>;
     },
+    itemIsPublic = false,
   ): Promise<void> {
     if (!this.options.guards?.length) return;
 
@@ -320,7 +331,10 @@ export class ExecutionPipelineService {
       const guard = resolveGuard(this.moduleRef, GuardClass);
 
       if (typeof guard.canActivate === 'function') {
-        await guard.canActivate(guardContext);
+        const allowed = await guard.canActivate(guardContext);
+        if (allowed === false && !itemIsPublic) {
+          throw new AuthorizationError(`Access denied by guard: ${GuardClass.name || 'anonymous'}`);
+        }
       }
     }
 

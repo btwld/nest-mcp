@@ -1,13 +1,25 @@
-# McpAuthModule
+# McpAuthModule — OAuth resource server
 
-The `McpAuthModule` provides OAuth 2.1 authentication with PKCE, JWT token management, dynamic client registration, and audit logging.
+`@nest-mcp/server` implements the **resource-server role** of the
+[MCP authorization spec (2025-06-18)](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization):
+
+- verifies externally issued bearer tokens (JWKS, RFC 7662 introspection, or a
+  custom verifier) with **audience validation on by default**,
+- serves RFC 9728 protected-resource metadata at
+  `/.well-known/oauth-protected-resource` (root and path-insertion variants),
+- challenges unauthenticated requests with an SDK-compatible
+  `WWW-Authenticate` header, and
+- binds stateful sessions to the principal that initialized them.
+
+Token **issuance** is the authorization server's job, not the MCP server's.
+Bring an external IdP (Auth0, Keycloak, WorkOS, Azure AD, …) or run your own
+AS — see the recipes below.
 
 ## Setup
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { McpModule, McpAuthModule } from '@nest-mcp/server';
-import { McpTransportType } from '@nest-mcp/common';
+import { McpAuthModule, McpModule, McpTransportType } from '@nest-mcp/server';
 
 @Module({
   imports: [
@@ -15,362 +27,284 @@ import { McpTransportType } from '@nest-mcp/common';
       name: 'my-server',
       version: '1.0.0',
       transport: McpTransportType.STREAMABLE_HTTP,
-      guards: [JwtAuthGuard], // apply JWT validation globally
+      transportOptions: {
+        streamableHttp: {
+          endpoint: '/mcp',
+          oauth: { enabled: true }, // apply McpBearerGuard to the endpoint
+        },
+      },
     }),
     McpAuthModule.forRoot({
-      jwtSecret: 'your-secret-key-at-least-32-chars-long',
-      issuer: 'https://my-server.example.com',
-      audience: 'mcp-client',
-      serverUrl: 'https://my-server.example.com',
-      scopes: ['tools:read', 'tools:write'],
-      validateUser: async (req) => {
-        // Extract and validate user from the authorization request
-        // Return { id: string, ... } or null to deny
-        return { id: 'user-1' };
+      resource: 'https://mcp.example.com/mcp',
+      authorizationServers: ['https://tenant.auth0.com'],
+      jwks: {
+        uri: 'https://tenant.auth0.com/.well-known/jwks.json',
+        issuer: 'https://tenant.auth0.com/',
+        audience: 'https://mcp.example.com/mcp',
       },
+      scopesSupported: ['tools:read', 'tools:write'],
     }),
   ],
 })
 export class AppModule {}
 ```
 
-## Async Setup (`forRootAsync`)
+That is the whole authorization surface. Clients discover the authorization
+server through the protected-resource metadata, obtain a token from it, and
+present it as `Authorization: Bearer <token>`.
 
-Use `McpAuthModule.forRootAsync` when options come from DI (e.g.
-`ConfigService`):
+## Options (`McpResourceServerOptions`)
 
-```typescript
-McpAuthModule.forRootAsync({
-  imports: [ConfigModule],
-  // Static: controllers are created at module-definition time, so the base
-  // path for /authorize, /token, ... must be known up front.
-  serverUrl: 'https://my-server.example.com',
-  inject: [ConfigService],
-  useFactory: (config: ConfigService) => ({
-    jwtSecret: config.getOrThrow('JWT_SECRET'),
-    serverUrl: config.getOrThrow('SERVER_URL'),
-    validateUser: async (req) => ({ id: 'user-1' }),
-  }),
-}),
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `resource` | `string` | — | Canonical URL of this MCP server (the RFC 8707 resource identifier). Set explicitly; never derived from request headers. Canonicalized at bootstrap. |
+| `authorizationServers` | `string[]` | — | Issuer URLs advertised in the protected-resource metadata. |
+| `jwks` | `object` | — | Built-in JWT verifier: `{ uri, issuer, audience?, algorithms? }`. Requires the optional `jose` peer dependency. |
+| `introspection` | `object` | — | Built-in RFC 7662 verifier: `{ endpoint, clientId, clientSecret, cacheTtlMs?, cacheMaxEntries? }`. |
+| `verifier` | class \| instance | — | Custom `BearerTokenVerifier`. Exactly one of `verifier`/`jwks`/`introspection` must be set. |
+| `required` | `boolean` | `true` | When `false`, requests without an `Authorization` header pass anonymously; a present-but-invalid token is still rejected. |
+| `requiredScopes` | `string[]` | `[]` | Scopes every request must carry; missing scopes yield `403 insufficient_scope`. |
+| `validateAudience` | `boolean` | `true` | Audience binding in the built-in verifiers. Disabling logs a warning — the MCP spec requires servers to only accept tokens issued for them. |
+| `scopesSupported` | `string[]` | — | Advertised in the metadata. |
+| `resourceName` | `string` | — | Advertised as `resource_name`. |
+| `legacyOAuthMetadata` | `object` | — | Optional RFC 8414 document mirrored at `/.well-known/oauth-authorization-server` for pre-2025-06-18 clients. |
+
+`forRootAsync({ imports, useFactory, inject })` is available when options come
+from DI (e.g. `ConfigService`).
+
+### Transport gate
+
+`transportOptions.streamableHttp.oauth = { enabled, bindSessionToUser? }` and
+`transportOptions.sse.oauth = { enabled }` apply `McpBearerGuard` to the
+generated controllers. With `bindSessionToUser` (default on), each stateful
+streamable session is bound to the `sub`/`client_id` that initialized it and
+other principals get `403` — sessions never substitute for authentication.
+
+### Wire behavior
+
+The guard's observable behavior matches the official SDK's `requireBearerAuth`
+middleware byte-for-byte, so every SDK-based client (Claude, MCP Inspector, …)
+parses it natively:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer error="invalid_token", error_description="Missing Authorization header", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
+Content-Type: application/json
+
+{"error":"invalid_token","error_description":"Missing Authorization header"}
 ```
 
-The factory result is validated the same way as `forRoot` (`jwtSecret` must
-be at least 32 characters; validation runs when the factory resolves). The
-static `serverUrl` only shapes controller paths — everything else, including
-the `serverUrl` used in metadata documents and token claims, comes from the
-resolved options.
+`403 insufficient_scope` is returned when `requiredScopes` are missing;
+verifier failures map to RFC 6749 error bodies.
 
-## McpAuthModuleOptions
+## Recipe A — external IdP via JWKS (Auth0, Keycloak, …)
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `jwtSecret` | `string` | Yes | Secret for signing JWTs (min 32 characters) |
-| `issuer` | `string` | No | JWT issuer claim (defaults to `serverUrl` or `http://localhost:3000`) |
-| `audience` | `string` | No | JWT audience claim (default: `'mcp-client'`) |
-| `accessTokenExpiresIn` | `string` | No | Access token lifetime (default: `'1d'`) |
-| `refreshTokenExpiresIn` | `string` | No | Refresh token lifetime (default: `'30d'`) |
-| `serverUrl` | `string` | No | Server base URL for OAuth endpoints |
-| `resourceUrl` | `string` | No | Resource URL for token scoping |
-| `enableDynamicRegistration` | `boolean` | No | Allow dynamic client registration (default: `true`) |
-| `store` | `IOAuthStore` | No | Custom store implementation (default: in-memory) |
-| `scopes` | `string[]` | No | Supported OAuth scopes |
-| `validateUser` | `(req: unknown) => Promise<{ id: string } \| null>` | No | User validation callback for authorization |
-| `authCodeExpiresIn` | `number` | No | Authorization code lifetime in seconds (default: 300) |
-| `authRateLimit` | `{ max: number; window: string }` | No | Rate limit for auth endpoints |
-
-## OAuth Endpoints
-
-When `McpAuthModule.forRoot` is imported, the following HTTP endpoints are registered:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/authorize` | OAuth authorization endpoint (PKCE required) |
-| POST | `/token` | Token exchange and refresh |
-| POST | `/revoke` | Token revocation |
-| POST | `/introspect` | Token introspection |
-| POST | `/register` | Dynamic client registration |
-| GET | `/.well-known/oauth-authorization-server` | RFC 8414 authorization-server metadata |
-| GET | `/.well-known/oauth-authorization-server/*` | RFC 8414 path-insertion variant (same metadata) |
-| GET | `/.well-known/oauth-protected-resource` | RFC 9728 protected-resource metadata |
-| GET | `/.well-known/oauth-protected-resource/*` | RFC 9728 path-insertion variant |
-
-The base path is derived from `serverUrl`. For example, if `serverUrl` is `https://example.com/api`, endpoints are at `/api/authorize`, `/api/token`, etc.
-
-### Discovery Metadata
-
-The authorization-server document advertises, among others,
-`authorization_endpoint`, `token_endpoint`, `registration_endpoint`,
-`revocation_endpoint` + `revocation_endpoint_auth_methods_supported`, and
-`introspection_endpoint` + `introspection_endpoint_auth_methods_supported`.
-
-The **path-insertion** routes serve clients that append the issuer/resource
-path to the well-known URL (RFC 8414 §3 / RFC 9728): a request to
-`/.well-known/oauth-protected-resource/mcp` returns the protected-resource
-document, with `resource` rebuilt as `serverUrl + '/<path>'` when the inserted
-path matches the configured resource path (`resourceUrl`'s path, default
-`/mcp`).
-
-### Audience Binding (RFC 8707)
-
-When the client passes a `resource` parameter during authorization, issued
-access tokens carry that resource as their `aud` claim
-(`aud = resource ?? audience ?? 'mcp-client'`). Note that `validateToken`
-deliberately does **not** enforce `aud` (non-breaking for existing
-deployments) — resource servers that need strict audience checks should
-verify the claim themselves (e.g. in a custom `BearerTokenVerifier`).
-
-## OAuth Flow
-
-The module implements the Authorization Code flow with PKCE:
-
-1. Client calls `GET /authorize` with `response_type=code`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method`, and `state`.
-2. Server validates the client, authenticates the user via `validateUser`, and returns an authorization code.
-3. Client exchanges the code at `POST /token` with `grant_type=authorization_code`, `code`, and `code_verifier`.
-4. Server validates the PKCE challenge and returns an access/refresh token pair.
-5. Client uses the access token as a Bearer token in subsequent MCP requests.
-
-## JwtAuthGuard
-
-The built-in `JwtAuthGuard` validates Bearer tokens and populates `ctx.user`:
+Install the optional verifier dependency once: `pnpm add jose`.
 
 ```typescript
-import { McpModule, McpAuthModule } from '@nest-mcp/server';
-import { JwtAuthGuard } from '@nest-mcp/server';
-
-McpModule.forRoot({
-  name: 'my-server',
-  version: '1.0.0',
-  transport: McpTransportType.STREAMABLE_HTTP,
-  guards: [JwtAuthGuard], // global guard
-});
-```
-
-After validation, `ctx.user` contains:
-
-```typescript
-{
-  id: string;       // from JWT 'sub' claim
-  scopes: string[]; // from JWT 'scope' claim (space-separated)
-}
-```
-
-## Scope-Filtered Lists (`filterListsByScopes`)
-
-By default, `tools/list`, `resources/list`, `resources/templates/list`, and
-`prompts/list` return every registered item regardless of the caller's token.
-Set `filterListsByScopes: true` on `McpModule.forRoot` to hide items whose
-`@Scopes(...)` requirements are not covered by the caller's verified token
-scopes (from the streamable HTTP OAuth gate's `authInfo`):
-
-```typescript
-McpModule.forRoot({
-  name: 'my-server',
-  version: '1.0.0',
-  transport: McpTransportType.STREAMABLE_HTTP,
-  filterListsByScopes: true,
-  transportOptions: { streamableHttp: { oauth: { enabled: true } } },
-});
-```
-
-Items without required scopes are always listed. Execution-time authorization
-still applies independently of list filtering.
-
-## Custom Bearer-Token Verification
-
-The streamable HTTP transport's [OAuth gate](./transports.md#oauth-bearer-gate)
-verifies tokens through the `MCP_BEARER_TOKEN_VERIFIER` provider.
-`McpAuthModule` registers a JWT implementation (`JwtBearerTokenVerifier`) by
-default; override it for opaque tokens, remote introspection, or external
-issuers:
-
-```typescript
-import {
-  MCP_BEARER_TOKEN_VERIFIER,
-  type BearerTokenVerifier,
-} from '@nest-mcp/server';
-import type { McpAuthInfo } from '@nest-mcp/common';
-
-class IntrospectingVerifier implements BearerTokenVerifier {
-  async verify(token: string): Promise<McpAuthInfo | null> {
-    const res = await fetch('https://idp.example.com/introspect', {
-      method: 'POST',
-      body: new URLSearchParams({ token }),
-    });
-    const data = await res.json();
-    if (!data.active) return null;
-    return {
-      token,
-      clientId: data.client_id,
-      scopes: (data.scope ?? '').split(' ').filter(Boolean),
-      expiresAt: data.exp,
-      extra: { sub: data.sub },
-    };
-  }
-}
-
-// In your AppModule:
-providers: [{ provide: MCP_BEARER_TOKEN_VERIFIER, useClass: IntrospectingVerifier }],
-```
-
-## Custom OAuth Store
-
-By default, tokens and clients are stored in memory. For production, implement the `IOAuthStore` interface. A Postgres-backed sketch:
-
-```typescript
-import type { IOAuthStore, IssuedTokenRecord } from '@nest-mcp/server';
-import { Injectable } from '@nestjs/common';
-
-@Injectable()
-class PostgresOAuthStore implements IOAuthStore {
-  constructor(private readonly db: DatabaseService) {}
-
-  async storeClient(client) {
-    await this.db.query(
-      `INSERT INTO oauth_clients (client_id, data) VALUES ($1, $2)
-       ON CONFLICT (client_id) DO UPDATE SET data = $2`,
-      [client.client_id, client],
-    );
-    return client;
-  }
-  async getClient(clientId) {
-    const row = await this.db.queryOne(
-      'SELECT data FROM oauth_clients WHERE client_id = $1', [clientId]);
-    return row?.data;
-  }
-  async storeAuthCode(code) { /* INSERT INTO oauth_codes ... */ }
-  async getAuthCode(code) { /* SELECT ... WHERE expires_at > now() */ }
-  async removeAuthCode(code) { /* DELETE FROM oauth_codes ... */ }
-  async revokeToken(jti) { /* INSERT INTO revoked_tokens (jti) ... */ }
-  async isTokenRevoked(jti) { /* SELECT EXISTS(...) */ }
-
-  // Optional issuance hook — see below.
-  async recordIssuedToken(rec: IssuedTokenRecord) {
-    await this.db.query(
-      `INSERT INTO issued_tokens (jti, type, client_id, user_id, scope, expires_at)
-       VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0))`,
-      [rec.jti, rec.type, rec.clientId, rec.userId, rec.scope, rec.expiresAt],
-    );
-  }
-}
-
+// Auth0
 McpAuthModule.forRoot({
-  jwtSecret: '...',
-  store: new PostgresOAuthStore(db),
-  // ...
+  resource: 'https://mcp.example.com/mcp',
+  authorizationServers: ['https://tenant.auth0.com'],
+  jwks: {
+    uri: 'https://tenant.auth0.com/.well-known/jwks.json',
+    issuer: 'https://tenant.auth0.com/',
+    audience: 'https://mcp.example.com/mcp', // the API identifier you created in Auth0
+  },
 });
-```
 
-With `forRootAsync`, return the store from the factory — a store provided
-there wins over the in-memory default:
-
-```typescript
-McpAuthModule.forRootAsync({
-  imports: [DatabaseModule],
-  inject: [DatabaseService],
-  useFactory: (db: DatabaseService) => ({
-    jwtSecret: process.env.JWT_SECRET!,
-    store: new PostgresOAuthStore(db),
-  }),
-});
-```
-
-### IOAuthStore Interface
-
-| Method | Description |
-|--------|-------------|
-| `storeClient(client)` | Persist an OAuth client |
-| `getClient(clientId)` | Retrieve a client by ID |
-| `storeAuthCode(code)` | Store an authorization code |
-| `getAuthCode(code)` | Retrieve an authorization code |
-| `removeAuthCode(code)` | Delete an authorization code (after exchange) |
-| `revokeToken(jti)` | Mark a token as revoked by its JTI |
-| `isTokenRevoked(jti)` | Check if a token JTI has been revoked |
-| `recordIssuedToken(rec)?` | *Optional.* Called whenever a token is minted |
-
-### Token-Issuance Hook (`recordIssuedToken`)
-
-When the store implements the optional `recordIssuedToken`, it is invoked for
-**both** the access and the refresh token on every mint — the initial
-authorization-code grant and each refresh grant. This lets host apps track
-issued tokens and revoke whole refresh chains. Each call receives an
-`IssuedTokenRecord`:
-
-```typescript
-{
-  jti: string;                  // JWT ID of the minted token
-  type: 'access' | 'refresh';
-  clientId: string;
-  userId?: string;
-  scope?: string;
-  expiresAt: number;            // unix epoch milliseconds
-}
-```
-
-On the refresh path, the presented refresh token's `jti` is checked against
-`isTokenRevoked` before it is honored, and is revoked once rotated — a stolen
-older refresh token cannot be replayed.
-
-## OAuthProviderAdapter
-
-For integrating external identity providers (Auth0, Clerk, etc.), use `McpAuthModule.forProvider`:
-
-```typescript
-import type { OAuthProviderAdapter, OAuthProviderUser } from '@nest-mcp/server';
-
-class Auth0Adapter implements OAuthProviderAdapter {
-  readonly name = 'Auth0';
-
-  async validateUser(req: unknown): Promise<OAuthProviderUser | null> {
-    // Validate the request and return user info
-    return { id: 'user-1', email: 'user@example.com' };
-  }
-}
-
-McpAuthModule.forProvider(new Auth0Adapter(), {
-  jwtSecret: '...',
-  serverUrl: 'https://my-server.example.com',
-});
-```
-
-### OAuthProviderAdapter Interface
-
-| Method | Required | Description |
-|--------|----------|-------------|
-| `validateUser(req)` | Yes | Validate a request and extract user info |
-| `exchangeToken(code, redirectUri)` | No | Exchange a provider token for user info |
-| `getAuthorizationUrl(state, redirectUri)` | No | Return the provider's authorization URL |
-
-## Auth Rate Limiting
-
-The `AuthRateLimitGuard` is automatically applied to OAuth endpoints to prevent brute-force attacks:
-
-```typescript
+// Keycloak (realm "mcp")
 McpAuthModule.forRoot({
-  jwtSecret: '...',
-  authRateLimit: {
-    max: 20,       // max requests per window (default: 20)
-    window: '1m',  // time window (default: '1m')
+  resource: 'https://mcp.example.com/mcp',
+  authorizationServers: ['https://keycloak.example.com/realms/mcp'],
+  jwks: {
+    uri: 'https://keycloak.example.com/realms/mcp/protocol/openid-connect/certs',
+    issuer: 'https://keycloak.example.com/realms/mcp',
   },
 });
 ```
 
-Rate limiting is per-IP. When exceeded, a `429 Too Many Requests` response is returned with a `retry_after` value.
+When `audience` is omitted, the token's `aud` claim must identify the
+configured `resource` exactly (case/trailing-slash differences are
+tolerated via canonicalization). A broader audience — e.g. the bare origin
+for a pathful resource — is rejected: the MCP spec requires servers to only
+accept tokens issued specifically for them. If your authorization server
+uses a different audience convention, set `audience` explicitly. Symmetric
+algorithms (`HS*`) are never accepted by the JWKS verifier — that is what
+custom verifiers are for. JWKS/introspection *infrastructure* failures
+(network errors, AS outages) surface as `500 server_error` rather than
+`401`, so clients retry instead of discarding their tokens.
 
-## Audit Logging
+For opaque tokens, use introspection instead of `jwks`:
 
-The `AuthAuditService` logs authentication events as structured JSON:
+```typescript
+McpAuthModule.forRoot({
+  resource: 'https://mcp.example.com/mcp',
+  authorizationServers: ['https://as.example.com'],
+  introspection: {
+    endpoint: 'https://as.example.com/oauth/introspect',
+    clientId: 'mcp-resource-server',
+    clientSecret: process.env.INTROSPECTION_SECRET!,
+  },
+});
+```
 
-- `token_issued` -- JWT token pair generated
-- `token_revoked` -- Token revoked
-- `client_registered` -- New OAuth client registered
-- `authorization_granted` -- Authorization code issued
-- `authorization_denied` -- Authorization request denied
-- `rate_limited` -- Auth rate limit exceeded
+## Recipe B — custom verifier
 
-Logs include timestamps, client IDs, user IDs, and IP addresses when available.
+Anything implementing `BearerTokenVerifier` can be plugged in — as an instance
+or a DI-instantiated class. Return `null` for invalid tokens, or throw an
+`OAuthError` subclass from `@modelcontextprotocol/sdk/server/auth/errors.js`
+to control the exact error response.
 
-## See Also
+```typescript
+import type { BearerTokenVerifier, McpAuthInfo } from '@nest-mcp/server';
+import { jwtVerify } from 'jose';
 
-- [Auth Decorators](./auth-decorators.md) -- Per-handler `@Public`, `@Scopes`, `@Roles`, `@Guards`
-- [Execution Pipeline](./execution-pipeline.md) -- How auth fits in the request lifecycle
-- [Module](./module.md) -- Global guard configuration
+/** Example: HS256 shared-secret JWTs issued by an in-house service. */
+class SharedSecretVerifier implements BearerTokenVerifier {
+  private readonly key = new TextEncoder().encode(process.env.TOKEN_SECRET!);
+
+  async verify(token: string): Promise<McpAuthInfo | null> {
+    try {
+      const { payload } = await jwtVerify(token, this.key, {
+        issuer: 'https://auth.internal.example.com',
+        audience: 'https://mcp.example.com/mcp',
+        algorithms: ['HS256'],
+      });
+      return {
+        token,
+        clientId: (payload.azp as string) ?? '',
+        scopes: typeof payload.scope === 'string' ? payload.scope.split(' ') : [],
+        expiresAt: payload.exp,
+        extra: { ...payload },
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+McpAuthModule.forRoot({
+  resource: 'https://mcp.example.com/mcp',
+  authorizationServers: ['https://auth.internal.example.com'],
+  verifier: new SharedSecretVerifier(), // or the class itself for DI construction
+});
+```
+
+
+## Recipe C — your own authorization server (user-land)
+
+The MCP server stays a pure resource server even when *you* operate the AS.
+Run the AS as its own controllers in the same Nest app (or a separate
+service), point the metadata at it, and verify your own tokens:
+
+```typescript
+McpAuthModule.forRoot({
+  resource: 'https://mcp.example.com/mcp',
+  // your AS — its RFC 8414 metadata lives at
+  // https://mcp.example.com/.well-known/oauth-authorization-server
+  authorizationServers: ['https://mcp.example.com'],
+  jwks: {
+    uri: 'https://mcp.example.com/oauth/jwks.json',
+    issuer: 'https://mcp.example.com',
+  },
+  // serve the AS metadata mirror for pre-2025-06-18 clients
+  legacyOAuthMetadata: {
+    issuer: 'https://mcp.example.com',
+    authorization_endpoint: 'https://mcp.example.com/oauth/authorize',
+    token_endpoint: 'https://mcp.example.com/oauth/token',
+    registration_endpoint: 'https://mcp.example.com/oauth/register',
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
+    code_challenge_methods_supported: ['S256'],
+    token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+  },
+});
+```
+
+For the AS implementation itself the official SDK ships RFC-correct building
+blocks — `mcpAuthRouter` (Express), the `OAuthServerProvider` contract, and
+`ProxyOAuthServerProvider` for fronting an upstream IdP (see
+`@modelcontextprotocol/sdk/server/auth/router.js`). Mount it under your Nest
+app's Express adapter, or implement the endpoints as regular Nest controllers.
+Checklist for MCP clients to work: S256-only PKCE, RFC 7591 dynamic client
+registration, RFC 6749 error bodies, and `aud` set to the MCP `resource`.
+
+## Recipe D — optional auth + per-tool authorization
+
+With `required: false`, anonymous requests reach the MCP layer without
+`authInfo`. Combine with the per-item authorization layer to keep specific
+capabilities members-only — enforcement happens at call time, and with
+`filterListsByScopes: true` (default `false`) list responses only show items
+the caller's scopes allow:
+
+```typescript
+import { McpAuthenticatedGuard, Public, Scopes, Tool } from '@nest-mcp/server';
+
+McpModule.forRoot({
+  // ...
+  guards: [McpAuthenticatedGuard], // a false return denies every non-@Public item
+  filterListsByScopes: true,       // hide items the caller's scopes don't cover
+});
+
+@Tool({ name: 'status' })
+@Public() // anonymous OK — global guards run but cannot deny @Public items
+getStatus() { /* ... */ }
+
+@Tool({ name: 'reports' })
+@Scopes(['reports:read']) // needs a token with this scope
+getReports() { /* ... */ }
+```
+
+The verified identity is available to handlers and guards as
+`ctx.authInfo` (raw `McpAuthInfo`) and `ctx.user` (mapped principal). See
+[auth decorators](./auth-decorators.md) for `@Public`, `@Scopes`, `@Roles`,
+and custom `@Guards`.
+
+> The raw bearer token is exposed on `ctx.authInfo.token` for parity with the
+> SDK's `AuthInfo`. Never forward it to upstream services — the MCP spec
+> forbids token passthrough; obtain downstream credentials with a separate
+> grant instead.
+
+## Discovery endpoints
+
+| Endpoint | Contents |
+| --- | --- |
+| `GET /.well-known/oauth-protected-resource` | RFC 9728 metadata for the configured `resource` |
+| `GET /.well-known/oauth-protected-resource/<resource-path>` | Path-insertion variant — served only for the configured resource's path (404 otherwise) |
+| `GET /.well-known/oauth-authorization-server` | The `legacyOAuthMetadata` mirror, when configured (else 404) |
+
+Responses are cacheable (`Cache-Control: public, max-age=3600`) and
+CORS-readable (`Access-Control-Allow-Origin: *`), and the protected-resource
+document is validated against the SDK's RFC 9728 schema at bootstrap.
+Configure clients with the canonical resource URL (no trailing slash) —
+strict RFC 9728 clients verify the document's `resource` is identical to the
+identifier they queried.
+
+## Verifying a setup
+
+```bash
+# 1. Metadata is served and points at your AS
+curl -s http://localhost:3000/.well-known/oauth-protected-resource/mcp | jq
+
+# 2. Unauthenticated requests get a parseable challenge
+curl -si -X POST http://localhost:3000/mcp | grep -i www-authenticate
+
+# 3. A token from your AS is accepted
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) runs
+the full discovery + OAuth flow against the server and is the quickest
+end-to-end check.
+
+## Migrating from the embedded authorization server (≤0.7.x)
+
+Versions up to 0.7.x shipped a built-in OAuth authorization server
+(`/authorize`, `/token`, `/register`, `/revoke`, `/introspect`, JWT issuance,
+GitHub/Azure provider adapters). It was removed in favor of the
+resource-server model above; see the 0.8.0 changeset for the full
+removed-export → replacement table.
