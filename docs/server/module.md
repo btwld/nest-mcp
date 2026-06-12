@@ -29,11 +29,13 @@ export class AppModule {}
 |--------|------|----------|-------------|
 | `name` | `string` | Yes | Server name reported to clients |
 | `version` | `string` | Yes | Server version |
-| `description` | `string` | No | Server description |
+| `description` | `string` | No | Server description (human-facing metadata) |
+| `instructions` | `string` | No | LLM guidance returned verbatim on `initialize`. Falls back to `description` when omitted |
 | `transport` | `McpTransportType \| McpTransportType[]` | Yes | One or more transports to enable |
 | `transportOptions` | `TransportOptions` | No | Per-transport configuration |
 | `guards` | `McpGuardClass[]` | No | Global guards applied to all requests |
 | `allowUnauthenticatedAccess` | `boolean` | No | Skip auth for all handlers |
+| `advertiseSecuritySchemes` | `boolean` | No | Advertise per-tool auth requirements in `tools/list` `_meta.securitySchemes` (`noauth` for `@Public` tools, `oauth2` + scopes for `@Scopes` tools). Default `false` |
 | `resilience` | `object` | No | Global resilience defaults |
 | `resilience.timeout` | `number` | No | Global timeout in ms |
 | `resilience.rateLimit` | `RateLimitConfig` | No | Global rate limit config |
@@ -125,8 +127,42 @@ export class AppModule {}
 | `imports` | `any[]` | No | Modules to import for dependency injection |
 | `transport` | `McpTransportType \| McpTransportType[]` | Yes | Transports to enable |
 | `transportOptions` | `TransportOptions` | No | Per-transport configuration |
-| `useFactory` | `(...args: any[]) => McpModuleOptions \| Promise<McpModuleOptions>` | Yes | Factory function |
+| `useFactory` | `(...args: any[]) => McpModuleOptions \| Promise<McpModuleOptions>` | One of | Factory function |
+| `useClass` | `Type<McpOptionsFactory>` | One of | Class instantiated by the module; its `createMcpOptions()` builds the options |
+| `useExisting` | `Type<McpOptionsFactory>` | One of | Existing provider (from `imports`) implementing `McpOptionsFactory` |
 | `inject` | `any[]` | No | Injection tokens for the factory |
+| `extraProviders` | `Provider[]` | No | Additional providers registered alongside the module's own |
+
+One of `useFactory`, `useClass`, or `useExisting` is required. With
+`useClass`/`useExisting`, implement the `McpOptionsFactory` interface:
+
+```typescript
+import type { McpModuleOptions, McpOptionsFactory } from '@nest-mcp/common';
+
+@Injectable()
+class McpConfig implements McpOptionsFactory {
+  constructor(private readonly config: ConfigService) {}
+
+  createMcpOptions(): McpModuleOptions {
+    return {
+      name: this.config.get('MCP_SERVER_NAME', 'my-server'),
+      version: '1.0.0',
+      transport: McpTransportType.STREAMABLE_HTTP,
+    };
+  }
+}
+
+McpModule.forRootAsync({
+  imports: [ConfigModule],
+  transport: McpTransportType.STREAMABLE_HTTP,
+  useClass: McpConfig,
+});
+```
+
+Note: `transport` and the controller-shaping parts of `transportOptions`
+(endpoint, oauth gate, controller guards/decorators) are read statically from
+the async options object — controllers are created at module-definition time,
+before any factory runs.
 
 ## McpModule.forFeature
 
@@ -198,8 +234,26 @@ Both `forRoot` and `forRootAsync` register the module as global, so you do not n
 - `ResourceSubscriptionManager`
 - `TaskManager`
 
+## Logging
+
+Internal module logging follows standard NestJS conventions:
+
+- **HTTP transports** (Streamable HTTP, SSE): control verbosity at bootstrap
+  with `app.useLogger(['error', 'warn'])` or any custom `LoggerService` —
+  this governs every `@nest-mcp/server` internal logger along with the rest
+  of your app.
+- **STDIO**: stdout belongs to the JSON-RPC protocol, so logs must go to
+  stderr. `bootstrapStdioApp()` installs a stderr logger automatically and
+  honors the `logging` module option (`LogLevel[]` to filter, `false` to
+  silence) as its fallback when `StdioBootstrapOptions.logLevels` is not set.
+
+Messages sent to the **client** via `ctx.log.*` are independent of the above:
+they are `notifications/message` MCP notifications, filtered per session by
+the level the client sets with `logging/setLevel`.
+
 ## See Also
 
 - [Getting Started](./getting-started.md) -- Minimal working example
+- [Dependency Injection](./dependency-injection.md) -- Provider scopes, `REQUEST` injection
 - [Transports](./transports.md) -- Transport-specific configuration
 - [Resilience](./resilience.md) -- Resilience configuration details

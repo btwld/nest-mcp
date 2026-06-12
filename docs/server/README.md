@@ -39,7 +39,8 @@ import { ToolsService } from './tools.service';
 class AppModule {}
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bodyParser: false — the MCP transports read the raw request stream
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   await app.listen(3000);
 }
 bootstrap();
@@ -81,6 +82,7 @@ export class ToolsService {
 |-------|-------------|
 | [Getting Started](./getting-started.md) | Minimal working example |
 | [Module](./module.md) | `McpModule.forRoot` / `forRootAsync` / `forFeature` |
+| [Dependency Injection](./dependency-injection.md) | Singleton vs request-scoped providers, `REQUEST` injection |
 | [Decorators](./decorators.md) | `@Tool`, `@Resource`, `@ResourceTemplate`, `@Prompt`, `@Completion` |
 | [Auth Decorators](./auth-decorators.md) | `@Public`, `@Scopes`, `@Roles`, `@Guards` |
 | [Resilience Decorators](./resilience-decorators.md) | `@RateLimit`, `@Retry`, `@CircuitBreaker`, `@Timeout` |
@@ -88,6 +90,8 @@ export class ToolsService {
 | [Auth](./auth.md) | `McpAuthModule`, OAuth resource server, verifiers, guards |
 | [Resilience](./resilience.md) | Rate limiter, circuit breaker, retry services |
 | [Middleware](./middleware.md) | `@UseMiddleware`, `MiddlewareService` |
+| [Elicitation](./elicitation.md) | `ctx.elicit` protocol elicitation, `McpElicitationModule` HTTP fallback |
+| [Exposure](./exposure.md) | Catalog presentation: eager/search/lazy strategies, per-client resolvers |
 | [Dynamic Builders](./dynamic-builders.md) | `McpToolBuilder`, `McpResourceBuilder`, `McpPromptBuilder` |
 | [Execution Pipeline](./execution-pipeline.md) | Request lifecycle |
 | [Sessions](./sessions.md) | `SessionManager`, `ResourceSubscriptionManager`, `TaskManager` |

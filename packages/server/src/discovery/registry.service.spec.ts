@@ -903,4 +903,24 @@ describe('McpRegistryService', () => {
       );
     });
   });
+
+  describe('registerProviderClass', () => {
+    it('registers decorated methods bound to the class instead of an instance', () => {
+      const reg = new McpRegistryService();
+      reg.registerProviderClass(TestTools);
+
+      const tool = reg.getTool('myTool');
+      expect(tool).toBeDefined();
+      expect(tool?.instance).toBeUndefined();
+      expect(tool?.scopedTarget).toBe(TestTools);
+    });
+
+    it('ignores values that are not classes', () => {
+      const reg = new McpRegistryService();
+      reg.registerProviderClass(undefined as unknown as new () => unknown);
+      reg.registerProviderClass({} as unknown as new () => unknown);
+
+      expect(reg.getAllTools()).toHaveLength(0);
+    });
+  });
 });

@@ -25,6 +25,14 @@ export interface McpAuthConfig {
   allowUnauthenticatedAccess?: boolean;
 }
 
+/**
+ * Per-tool auth requirement advertised to clients in `tools/list` `_meta`
+ * (`_meta.securitySchemes`). Not yet part of the MCP spec — mirrors the
+ * `securitySchemes` draft shape also emitted by other MCP server libraries
+ * so clients can discover auth requirements before calling a tool.
+ */
+export type McpSecurityScheme = { type: 'noauth' } | { type: 'oauth2'; scopes?: string[] };
+
 export interface AuthorizableItem {
   name: string;
   isPublic?: boolean;
