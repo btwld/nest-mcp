@@ -33,7 +33,11 @@ export function createMcpServer(
     },
     {
       capabilities: capabilities as ServerOptions['capabilities'],
-      ...(options.description ? { instructions: options.description } : {}),
+      // `instructions` is LLM guidance on initialize; falls back to
+      // `description` for backwards compatibility with pre-`instructions` configs.
+      ...(options.instructions || options.description
+        ? { instructions: options.instructions ?? options.description }
+        : {}),
       ...(taskManager
         ? {
             taskStore: taskManager.store,

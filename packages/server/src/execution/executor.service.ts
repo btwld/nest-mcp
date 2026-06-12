@@ -6,6 +6,7 @@ import {
   McpError,
   type McpExecutionContext,
   type McpModuleOptions,
+  type McpSecurityScheme,
   type PaginatedResult,
   type PromptGetResult,
   type ResourceReadResult,
@@ -18,10 +19,11 @@ import {
   paginate,
   zodToJsonSchema,
 } from '@nest-mcp/common';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { ZodEnum, ZodObject, type ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
-import type { RegisteredTool } from '../discovery/registry.service';
+import type { ProviderBinding, RegisteredTool } from '../discovery/registry.service';
 import { isPlainRecord } from '../utils/coerce';
 import { type FilterTarget, McpExceptionFilterRunner } from './exception-filter.runner';
 
@@ -71,13 +73,49 @@ function extractStructuredCandidate(result: unknown): Record<string, unknown> | 
 export class McpExecutorService {
   private readonly logger = new Logger(McpExecutorService.name);
   private readonly pageSize: number | undefined;
+  private readonly advertiseSecuritySchemes: boolean;
+  private readonly moduleRequiresAuth: boolean;
 
   constructor(
     private readonly registry: McpRegistryService,
     private readonly exceptionFilters: McpExceptionFilterRunner,
     @Inject(MCP_OPTIONS) options: McpModuleOptions,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {
     this.pageSize = options.pagination?.defaultPageSize;
+    this.advertiseSecuritySchemes = options.advertiseSecuritySchemes ?? false;
+    this.moduleRequiresAuth =
+      Boolean(options.guards?.length) ||
+      Boolean(options.transportOptions?.streamableHttp?.oauth?.enabled) ||
+      Boolean(options.transportOptions?.sse?.oauth?.enabled);
+  }
+
+  /**
+   * Resolve the provider object to invoke a capability on. Singleton
+   * providers carry a live `instance` from scan time; request/transient-scoped
+   * providers carry a `scopedTarget` class resolved fresh per call. When the
+   * execution context has an HTTP request, it is registered on the context id
+   * so `@Inject(REQUEST)` works inside scoped providers.
+   */
+  private async resolveBinding(
+    binding: ProviderBinding,
+    label: string,
+    ctx?: McpExecutionContext,
+  ): Promise<Record<string, unknown>> {
+    if (binding.instance) return binding.instance;
+    if (binding.scopedTarget && this.moduleRef) {
+      const contextId = ContextIdFactory.create();
+      if (ctx?.request) {
+        this.moduleRef.registerRequestByContextId(ctx.request, contextId);
+      }
+      return this.moduleRef.resolve(binding.scopedTarget, contextId, { strict: false });
+    }
+    throw new ToolExecutionError(
+      label,
+      binding.scopedTarget
+        ? `Cannot resolve request-scoped provider '${binding.scopedTarget.name}' without a ModuleRef`
+        : `No provider bound for '${label}'`,
+    );
   }
 
   // ---- Tools ----
@@ -97,6 +135,9 @@ export class McpExecutorService {
       const outputSchema = tool.outputSchema
         ? (zodToJsonSchema(tool.outputSchema) as Record<string, unknown>)
         : tool.rawOutputSchema;
+      const meta = this.advertiseSecuritySchemes
+        ? { ...(tool._meta ?? {}), securitySchemes: this.buildSecuritySchemes(tool) }
+        : tool._meta;
       return {
         name: tool.name,
         ...(tool.title != null ? { title: tool.title } : {}),
@@ -106,9 +147,27 @@ export class McpExecutorService {
         ...(tool.annotations ? { annotations: tool.annotations } : {}),
         ...(tool.icons ? { icons: tool.icons } : {}),
         ...(tool.execution ? { execution: tool.execution } : {}),
-        ...(tool._meta ? { _meta: tool._meta } : {}),
+        ...(meta ? { _meta: meta } : {}),
       };
     });
+  }
+
+  /**
+   * Derive the advertised auth requirements for a tool from its `@Public` /
+   * `@Scopes` metadata. `oauth2` without scopes means "any authenticated
+   * caller" and is emitted when the module itself gates requests (guards or
+   * an OAuth-enabled transport) and the tool isn't public.
+   */
+  private buildSecuritySchemes(tool: RegisteredTool): McpSecurityScheme[] {
+    const schemes: McpSecurityScheme[] = [];
+    if (tool.isPublic) schemes.push({ type: 'noauth' });
+    if (tool.requiredScopes?.length) {
+      schemes.push({ type: 'oauth2', scopes: tool.requiredScopes });
+    } else if (this.moduleRequiresAuth && !tool.isPublic) {
+      schemes.push({ type: 'oauth2' });
+    }
+    if (schemes.length === 0) schemes.push({ type: 'noauth' });
+    return schemes;
   }
 
   async listTools(cursor?: string): Promise<PaginatedResult<ToolListEntry>> {
@@ -143,10 +202,11 @@ export class McpExecutorService {
     }
 
     try {
-      const handler = tool.instance[tool.methodName] as
+      const instance = await this.resolveBinding(tool, name, ctx);
+      const handler = instance[tool.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      const result = await handler.call(tool.instance, validatedArgs, ctx);
+      const result = await handler.call(instance, validatedArgs, ctx);
       return this.normalizeToolResult(result, tool);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
@@ -259,10 +319,11 @@ export class McpExecutorService {
     const resource = this.registry.getResource(uri);
     if (resource) {
       try {
-        const handler = resource.instance[resource.methodName] as
+        const instance = await this.resolveBinding(resource, uri, ctx);
+        const handler = instance[resource.methodName] as
           // biome-ignore lint/complexity/noBannedTypes: dynamic method call
           Function;
-        const result = await handler.call(resource.instance, new URL(uri), ctx);
+        const result = await handler.call(instance, new URL(uri), ctx);
         return this.normalizeResourceResult(result, uri);
       } catch (error) {
         throw this.processCapabilityError(error, resource, ctx);
@@ -274,10 +335,11 @@ export class McpExecutorService {
       const match = matchUriTemplate(template.uriTemplate, uri);
       if (match) {
         try {
-          const handler = template.instance[template.methodName] as
+          const instance = await this.resolveBinding(template, uri, ctx);
+          const handler = instance[template.methodName] as
             // biome-ignore lint/complexity/noBannedTypes: dynamic method call
             Function;
-          const result = await handler.call(template.instance, new URL(uri), match.params, ctx);
+          const result = await handler.call(instance, new URL(uri), match.params, ctx);
           return this.normalizeResourceResult(result, uri);
         } catch (error) {
           throw this.processCapabilityError(error, template, ctx);
@@ -356,10 +418,11 @@ export class McpExecutorService {
 
     let result: unknown;
     try {
-      const handler = prompt.instance[prompt.methodName] as
+      const instance = await this.resolveBinding(prompt, name, ctx);
+      const handler = instance[prompt.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
-      result = await handler.call(prompt.instance, validatedArgs, ctx);
+      result = await handler.call(instance, validatedArgs, ctx);
     } catch (error) {
       throw this.processCapabilityError(error, prompt, ctx);
     }
@@ -378,11 +441,12 @@ export class McpExecutorService {
     const handler = this.registry.getCompletionHandler(request.ref.type, refName);
 
     if (handler) {
-      const fn = handler.instance[handler.methodName] as
+      const instance = await this.resolveBinding(handler, `completion ${refName}`);
+      const fn = instance[handler.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;
       const result = await fn.call(
-        handler.instance,
+        instance,
         request.argument.name,
         request.argument.value,
         request.context,

@@ -52,16 +52,40 @@ describe('createMcpServer', () => {
     expect(server).toBeInstanceOf(McpServer);
   });
 
-  it('includes instructions when description is provided', () => {
-    // If description is absent, no throw; if present, it is forwarded.
-    // We verify the factory does not throw in either case.
-    expect(() =>
-      createMcpServer(makeRegistry(), { ...baseOptions, description: 'A helpful server' }),
-    ).not.toThrow();
+  // Pins the SDK Server's private `_instructions` field — the value returned
+  // verbatim on `initialize`.
+  function getInstructions(server: McpServer): string | undefined {
+    return (server.server as unknown as { _instructions?: string })._instructions;
+  }
+
+  it('uses the dedicated instructions option when provided', () => {
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      instructions: 'Use the search tool first.',
+    });
+    expect(getInstructions(server)).toBe('Use the search tool first.');
   });
 
-  it('does not throw when description is absent', () => {
-    expect(() => createMcpServer(makeRegistry(), baseOptions)).not.toThrow();
+  it('prefers instructions over description when both are provided', () => {
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      description: 'A helpful server',
+      instructions: 'Use the search tool first.',
+    });
+    expect(getInstructions(server)).toBe('Use the search tool first.');
+  });
+
+  it('falls back to description as instructions for backwards compatibility', () => {
+    const server = createMcpServer(makeRegistry(), {
+      ...baseOptions,
+      description: 'A helpful server',
+    });
+    expect(getInstructions(server)).toBe('A helpful server');
+  });
+
+  it('omits instructions when neither instructions nor description is set', () => {
+    const server = createMcpServer(makeRegistry(), baseOptions);
+    expect(getInstructions(server)).toBeUndefined();
   });
 
   it('passes taskStore and taskMessageQueue when taskManager is provided', () => {
