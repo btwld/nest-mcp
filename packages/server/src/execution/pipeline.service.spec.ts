@@ -1,5 +1,10 @@
 import 'reflect-metadata';
-import { MCP_OPTIONS, McpTimeoutError, ToolExecutionError } from '@nest-mcp/common';
+import {
+  AuthorizationError,
+  MCP_OPTIONS,
+  McpTimeoutError,
+  ToolExecutionError,
+} from '@nest-mcp/common';
 import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { mockMcpContext } from '../testing/mock-context';
 import { ExecutionPipelineService } from './pipeline.service';
@@ -472,6 +477,71 @@ describe('ExecutionPipelineService', () => {
       expect(mockGuard.canActivate).toHaveBeenCalledWith(
         expect.objectContaining({ promptName: 'greet' }),
       );
+    });
+
+    it('rejects callTool on a non-public tool when a guard returns false', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(false) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      const GuardClass = class DenyGuard {} as any;
+      options.guards = [GuardClass];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'priv', isPublic: false });
+
+      await expect(pipeline.callTool('priv', {}, ctx)).rejects.toThrow(AuthorizationError);
+      await expect(pipeline.callTool('priv', {}, ctx)).rejects.toThrow(
+        'Access denied by guard: DenyGuard',
+      );
+      expect(executor.callTool).not.toHaveBeenCalled();
+    });
+
+    it('still executes a public tool when a guard returns false', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(false) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class DenyGuard {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'pub', isPublic: true });
+
+      const result = await pipeline.callTool('pub', {}, ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalled();
+      expect(executor.callTool).toHaveBeenCalledWith('pub', {}, ctx);
+      expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+    });
+
+    it('proceeds with callTool when a guard returns true', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(true) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class AllowGuard {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getTool.mockReturnValue({ name: 'priv', isPublic: false });
+
+      const result = await pipeline.callTool('priv', {}, ctx);
+
+      expect(mockGuard.canActivate).toHaveBeenCalled();
+      expect(executor.callTool).toHaveBeenCalledWith('priv', {}, ctx);
+      expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+    });
+
+    it('rejects readResource when a guard returns false', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(false) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class DenyGuard {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getResource.mockReturnValue(undefined);
+
+      await expect(pipeline.readResource('file:///x', ctx)).rejects.toThrow(AuthorizationError);
+      expect(executor.readResource).not.toHaveBeenCalled();
+    });
+
+    it('rejects getPrompt when a guard returns false', async () => {
+      const mockGuard = { canActivate: vi.fn().mockResolvedValue(false) };
+      // biome-ignore lint/suspicious/noExplicitAny: test mock
+      options.guards = [class DenyGuard {} as any];
+      moduleRef.get.mockReturnValue(mockGuard);
+      registry.getPrompt.mockReturnValue(undefined);
+
+      await expect(pipeline.getPrompt('greet', {}, ctx)).rejects.toThrow(AuthorizationError);
+      expect(executor.getPrompt).not.toHaveBeenCalled();
     });
 
     it('runs multiple guards in order', async () => {

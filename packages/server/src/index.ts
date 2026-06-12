@@ -59,47 +59,25 @@ export { RetryService } from './resilience/retry.service';
 // Middleware
 export { MiddlewareService } from './middleware/middleware.service';
 
-// Auth
+// Auth (resource-server role — MCP authorization spec 2025-06-18)
 export { ToolAuthGuardService } from './auth/guards/tool-auth.guard';
 export { McpAuthModule } from './auth/auth.module';
-export { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-export { AuthRateLimitGuard } from './auth/guards/auth-rate-limit.guard';
-export { AuthAuditService } from './auth/services/auth-audit.service';
-export type { AuditLogEntry } from './auth/services/auth-audit.service';
-export { JwtTokenService, MCP_AUTH_OPTIONS } from './auth/services/jwt-token.service';
-export { OAuthClientService, MCP_OAUTH_STORE } from './auth/services/client.service';
 export {
-  JwtBearerTokenVerifier,
   MCP_BEARER_TOKEN_VERIFIER,
-  type BearerTokenVerifier,
-} from './auth/services/bearer-verifier.service';
-export { MemoryOAuthStore } from './auth/stores/memory-store.service';
-export type { IOAuthStore, IssuedTokenRecord } from './auth/stores/oauth-store.interface';
+  MCP_RESOURCE_SERVER_OPTIONS,
+} from './auth/auth.constants';
+export { McpBearerGuard } from './auth/guards/mcp-bearer.guard';
+export { McpAuthenticatedGuard } from './auth/guards/authenticated.guard';
+export { JwksVerifier } from './auth/verifiers/jwks.verifier';
+export { IntrospectionVerifier } from './auth/verifiers/introspection.verifier';
+export type { BearerTokenVerifier } from './auth/verifiers/bearer-verifier.interface';
 export type {
-  McpAuthModuleAsyncOptions,
-  McpAuthModuleOptions,
-} from './auth/interfaces/auth-module-options.interface';
-export type {
-  OAuthProviderAdapter,
-  OAuthProviderUser,
-} from './auth/interfaces/oauth-provider.interface';
-export {
-  AzureAdProvider,
-  type AzureAdProviderConfig,
-  type AzureAdUser,
-  GitHubProvider,
-  type GitHubProviderConfig,
-  type GitHubUser,
-  OAuthCodeExchangeProvider,
-  type OAuthTokenResponse,
-} from './auth/providers';
-export type {
-  OAuthClient,
-  AuthorizationCode,
-  TokenPayload,
-  TokenResponse,
-  TokenIntrospectionResponse,
-} from './auth/interfaces/oauth-types.interface';
+  IntrospectionVerifierOptions,
+  JwksVerifierOptions,
+  McpResourceServerAsyncOptions,
+  McpResourceServerOptions,
+} from './auth/interfaces/resource-server-options.interface';
+export { canonicalizeResourceUri } from './auth/utils/resource-url.util';
 
 // Session
 export { SessionManager } from './session/session.manager';

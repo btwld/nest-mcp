@@ -1,5 +1,5 @@
 import type { McpModuleAsyncOptions, McpModuleOptions } from '@nest-mcp/common';
-import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpError, McpTransportType } from '@nest-mcp/common';
 import {
   type DynamicModule,
   Logger,
@@ -53,6 +53,7 @@ import { RetryService } from './resilience/retry.service';
 import { MiddlewareService } from './middleware/middleware.service';
 
 // Auth
+import { McpBearerGuard } from './auth/guards/mcp-bearer.guard';
 import { ToolAuthGuardService } from './auth/guards/tool-auth.guard';
 
 // Session
@@ -85,6 +86,47 @@ function normalizeTransports(transport: McpTransportType | McpTransportType[]): 
   return Array.isArray(transport) ? transport : [transport];
 }
 
+/** Prepends `McpBearerGuard` to user guards when the transport's oauth gate is on. */
+function withBearerGuard(oauthEnabled: boolean | undefined, guards?: unknown[]): unknown[] {
+  return oauthEnabled ? [McpBearerGuard, ...(guards ?? [])] : (guards ?? []);
+}
+
+/** Token for the bootstrap oauth-gate consistency check (eagerly instantiated). */
+export const MCP_OAUTH_GATE_CHECK = Symbol('MCP_OAUTH_GATE_CHECK');
+
+/**
+ * `McpBearerGuard` is attached to the generated controllers at
+ * module-definition time from the STATIC transport options, while runtime
+ * options may come from a `forRootAsync` factory. An `oauth.enabled` mismatch
+ * between the two would either silently disable edge auth (fail-open) or
+ * silently disable session binding — fail the bootstrap instead.
+ *
+ * Exported for tests only.
+ */
+export function createOauthGateCheckProvider(staticGates: {
+  streamableHttp: boolean;
+  sse: boolean;
+}): Provider {
+  return {
+    provide: MCP_OAUTH_GATE_CHECK,
+    useFactory: (options: McpModuleOptions) => {
+      const resolved = {
+        streamableHttp: Boolean(options.transportOptions?.streamableHttp?.oauth?.enabled),
+        sse: Boolean(options.transportOptions?.sse?.oauth?.enabled),
+      };
+      for (const transport of ['streamableHttp', 'sse'] as const) {
+        if (resolved[transport] !== staticGates[transport]) {
+          throw new McpError(
+            `McpModule: transportOptions.${transport}.oauth.enabled resolved to ${resolved[transport]} at runtime but was ${staticGates[transport]} on the static forRootAsync options. The bearer-token gate is attached to controllers at module-definition time, so oauth.enabled must be set statically on the forRootAsync options object (mirroring it in the factory result is fine).`,
+          );
+        }
+      }
+      return true;
+    },
+    inject: [MCP_OPTIONS],
+  };
+}
+
 @Module({})
 // biome-ignore lint/complexity/noStaticOnlyClass: NestJS requires module classes
 export class McpModule {
@@ -114,6 +156,7 @@ export class McpModule {
       MetricsService,
       ResourceSubscriptionManager,
       TaskManager,
+      McpBearerGuard,
     ];
 
     const transports = normalizeTransports(options.transport);
@@ -125,7 +168,7 @@ export class McpModule {
       providers.push(StreamableHttpService);
       controllers.push(
         createStreamableHttpController(endpoint, {
-          guards: streamableHttp?.controllerGuards,
+          guards: withBearerGuard(streamableHttp?.oauth?.enabled, streamableHttp?.controllerGuards),
           decorators: streamableHttp?.controllerDecorators,
         }),
       );
@@ -133,17 +176,28 @@ export class McpModule {
 
     // SSE transport
     if (transports.includes(McpTransportType.SSE)) {
-      const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
-      const messagesEndpoint =
-        options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
+      const sse = options.transportOptions?.sse;
+      const sseEndpoint = sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+      const messagesEndpoint = sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
       providers.push(SseService);
-      controllers.push(...createSseController(sseEndpoint, messagesEndpoint));
+      controllers.push(
+        ...createSseController(sseEndpoint, messagesEndpoint, {
+          guards: withBearerGuard(sse?.oauth?.enabled),
+        }),
+      );
     }
 
     // STDIO transport
     if (transports.includes(McpTransportType.STDIO)) {
       providers.push(StdioService);
     }
+
+    providers.push(
+      createOauthGateCheckProvider({
+        streamableHttp: Boolean(options.transportOptions?.streamableHttp?.oauth?.enabled),
+        sse: Boolean(options.transportOptions?.sse?.oauth?.enabled),
+      }),
+    );
 
     return {
       module: McpModule,
@@ -196,22 +250,24 @@ export class McpModule {
       MetricsService,
       ResourceSubscriptionManager,
       TaskManager,
+      McpBearerGuard,
     ];
 
     const transports = normalizeTransports(options.transport);
 
     // Streamable HTTP transport.
-    // NOTE: controller shape (endpoint, controllerGuards, controllerDecorators)
-    // is read from the STATIC `transportOptions` on the async options object —
-    // controllers are created at module-definition time, before the factory
-    // runs. Runtime options resolved by `useFactory` flow through MCP_OPTIONS.
+    // NOTE: controller shape (endpoint, oauth gate, controllerGuards,
+    // controllerDecorators) is read from the STATIC `transportOptions` on the
+    // async options object — controllers are created at module-definition
+    // time, before the factory runs. Runtime options resolved by `useFactory`
+    // flow through MCP_OPTIONS.
     if (transports.includes(McpTransportType.STREAMABLE_HTTP)) {
       const streamableHttp = options.transportOptions?.streamableHttp;
       const endpoint = streamableHttp?.endpoint ?? DEFAULT_MCP_ENDPOINT;
       providers.push(StreamableHttpService);
       controllers.push(
         createStreamableHttpController(endpoint, {
-          guards: streamableHttp?.controllerGuards,
+          guards: withBearerGuard(streamableHttp?.oauth?.enabled, streamableHttp?.controllerGuards),
           decorators: streamableHttp?.controllerDecorators,
         }),
       );
@@ -219,17 +275,28 @@ export class McpModule {
 
     // SSE transport
     if (transports.includes(McpTransportType.SSE)) {
-      const sseEndpoint = options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
-      const messagesEndpoint =
-        options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
+      const sse = options.transportOptions?.sse;
+      const sseEndpoint = sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+      const messagesEndpoint = sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
       providers.push(SseService);
-      controllers.push(...createSseController(sseEndpoint, messagesEndpoint));
+      controllers.push(
+        ...createSseController(sseEndpoint, messagesEndpoint, {
+          guards: withBearerGuard(sse?.oauth?.enabled),
+        }),
+      );
     }
 
     // STDIO transport
     if (transports.includes(McpTransportType.STDIO)) {
       providers.push(StdioService);
     }
+
+    providers.push(
+      createOauthGateCheckProvider({
+        streamableHttp: Boolean(options.transportOptions?.streamableHttp?.oauth?.enabled),
+        sse: Boolean(options.transportOptions?.sse?.oauth?.enabled),
+      }),
+    );
 
     return {
       module: McpModule,

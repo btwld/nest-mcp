@@ -45,15 +45,14 @@ export interface StreamableHttpTransportOptions {
   /** Enable the SDK transport's DNS-rebinding protection (requires `allowedHosts` and/or `allowedOrigins`). */
   enableDnsRebindingProtection?: boolean;
   /**
-   * Bearer-token gate for the streamable HTTP endpoint. Inactive unless
-   * `enabled` is true, so existing deployments are unaffected.
+   * Bearer-token gate for the streamable HTTP endpoint (applies
+   * `McpBearerGuard` to the generated controller). Inactive unless `enabled`
+   * is true, so existing deployments are unaffected. Verifier, challenge
+   * metadata, and the optional-auth mode are configured on
+   * `McpAuthModule.forRoot(...)`.
    */
   oauth?: {
     enabled: boolean;
-    /** When false, requests without a token pass through anonymously. Default true. */
-    required?: boolean;
-    /** RFC 9728 protected-resource metadata URL advertised in `WWW-Authenticate`. Defaults to path-insertion on the request host. */
-    resourceMetadataUrl?: string;
     /** Bind each session to the principal that initialized it. Default true. */
     bindSessionToUser?: boolean;
   };
@@ -67,6 +66,13 @@ export interface SseTransportOptions {
   endpoint?: string;
   messagesEndpoint?: string;
   pingInterval?: number;
+  /**
+   * Bearer-token gate for the SSE endpoints (applies `McpBearerGuard` to the
+   * generated controllers). Configuration lives on `McpAuthModule.forRoot(...)`.
+   */
+  oauth?: {
+    enabled: boolean;
+  };
 }
 
 // biome-ignore lint/complexity/noBannedTypes: empty options interface for future extensibility

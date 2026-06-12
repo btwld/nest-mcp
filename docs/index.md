@@ -174,7 +174,7 @@ See [gateway/getting-started.md](./gateway/getting-started.md) for the full walk
 | [Auth Decorators](./server/auth-decorators.md) | `@Public`, `@Scopes`, `@Roles`, `@Guards` |
 | [Resilience Decorators](./server/resilience-decorators.md) | `@RateLimit`, `@Retry`, `@CircuitBreaker`, `@Timeout` |
 | [Transports](./server/transports.md) | Streamable HTTP, SSE, STDIO config |
-| [Auth](./server/auth.md) | `McpAuthModule`, OAuth 2.1, JWT, custom stores |
+| [Auth](./server/auth.md) | `McpAuthModule`, OAuth resource server, token verifiers |
 | [Resilience](./server/resilience.md) | `RateLimiterService`, `CircuitBreakerService`, `RetryService` |
 | [Middleware](./server/middleware.md) | `@UseMiddleware`, `McpMiddleware`, `MiddlewareService` |
 | [Dynamic Builders](./server/dynamic-builders.md) | `McpToolBuilder`, `McpResourceBuilder`, `McpPromptBuilder` |
