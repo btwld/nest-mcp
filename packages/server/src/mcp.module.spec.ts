@@ -1,8 +1,13 @@
 import 'reflect-metadata';
-import { McpError, type McpModuleOptions, McpTransportType } from '@nest-mcp/common';
+import { MCP_OPTIONS, McpError, type McpModuleOptions, McpTransportType } from '@nest-mcp/common';
 import { describe, expect, it } from 'vitest';
 import { McpBearerGuard } from './auth/guards/mcp-bearer.guard';
-import { MCP_OAUTH_GATE_CHECK, McpModule, createOauthGateCheckProvider } from './mcp.module';
+import {
+  MCP_OAUTH_GATE_CHECK,
+  McpModule,
+  createAsyncOptionsProviders,
+  createOauthGateCheckProvider,
+} from './mcp.module';
 
 describe('McpModule', () => {
   describe('forRoot', () => {
@@ -681,6 +686,87 @@ describe('McpModule', () => {
 
         expect(getToken(mod1)).not.toBe(getToken(mod2));
       });
+    });
+  });
+
+  describe('createAsyncOptionsProviders', () => {
+    const baseOptions: McpModuleOptions = {
+      name: 'async-test',
+      version: '1.0.0',
+      transport: McpTransportType.STDIO,
+    };
+
+    class TestOptionsFactory {
+      createMcpOptions(): McpModuleOptions {
+        return baseOptions;
+      }
+    }
+
+    it('builds a factory provider from useFactory with inject tokens', () => {
+      const useFactory = () => baseOptions;
+      const providers = createAsyncOptionsProviders({
+        transport: McpTransportType.STDIO,
+        useFactory,
+        inject: ['DEP'],
+      });
+
+      expect(providers).toHaveLength(1);
+      expect(providers[0]).toMatchObject({ provide: MCP_OPTIONS, useFactory, inject: ['DEP'] });
+    });
+
+    it('builds providers from useClass: registers the class and delegates to createMcpOptions', async () => {
+      const providers = createAsyncOptionsProviders({
+        transport: McpTransportType.STDIO,
+        useClass: TestOptionsFactory,
+      });
+
+      expect(providers).toHaveLength(2);
+      expect(providers[0]).toMatchObject({
+        provide: TestOptionsFactory,
+        useClass: TestOptionsFactory,
+      });
+      const optionsProvider = providers[1] as {
+        provide: unknown;
+        useFactory: (f: TestOptionsFactory) => McpModuleOptions | Promise<McpModuleOptions>;
+        inject: unknown[];
+      };
+      expect(optionsProvider.provide).toBe(MCP_OPTIONS);
+      expect(optionsProvider.inject).toEqual([TestOptionsFactory]);
+      expect(await optionsProvider.useFactory(new TestOptionsFactory())).toEqual(baseOptions);
+    });
+
+    it('builds a single provider from useExisting without re-registering the class', () => {
+      const providers = createAsyncOptionsProviders({
+        transport: McpTransportType.STDIO,
+        useExisting: TestOptionsFactory,
+      });
+
+      expect(providers).toHaveLength(1);
+      expect(providers[0]).toMatchObject({ provide: MCP_OPTIONS, inject: [TestOptionsFactory] });
+    });
+
+    it('throws when none of useFactory/useClass/useExisting is provided', () => {
+      expect(() =>
+        createAsyncOptionsProviders({ transport: McpTransportType.STDIO }),
+      ).toThrow(McpError);
+    });
+  });
+
+  describe('forRootAsync extraProviders', () => {
+    it('registers extraProviders alongside module providers', () => {
+      const extra = { provide: 'EXTRA_DEP', useValue: 42 };
+      const mod = McpModule.forRootAsync({
+        transport: McpTransportType.STDIO,
+        useFactory: (dep: number) => ({
+          name: `test-${dep}`,
+          version: '1.0',
+          transport: McpTransportType.STDIO,
+        }),
+        inject: ['EXTRA_DEP'],
+        extraProviders: [extra],
+      });
+
+      expect(mod.providers).toContain(extra);
     });
   });
 });

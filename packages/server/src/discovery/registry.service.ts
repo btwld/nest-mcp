@@ -27,6 +27,7 @@ import {
   MCP_TOOL_METADATA,
 } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
+import type { Type } from '@nestjs/common';
 import type { CompletionMetadata } from '../decorators/completion.decorator';
 
 /**
@@ -41,27 +42,29 @@ export interface TaskHandlerConfig {
   getTaskPayload(taskId: string): Promise<GetTaskPayloadResult>;
 }
 
-export interface RegisteredTool extends ToolMetadata {
-  instance: Record<string, unknown>;
+/**
+ * How a registered capability binds to its provider. Singleton providers are
+ * captured as a live `instance` at scan time; request/transient-scoped
+ * providers have no boot-time instance, so the provider class is kept as
+ * `scopedTarget` and resolved per call by the executor (`ModuleRef.resolve`).
+ */
+export interface ProviderBinding {
+  instance?: Record<string, unknown>;
+  scopedTarget?: Type<unknown>;
 }
 
-export interface RegisteredResource extends ResourceMetadata {
-  instance: Record<string, unknown>;
-}
+export interface RegisteredTool extends ToolMetadata, ProviderBinding {}
 
-export interface RegisteredResourceTemplate extends ResourceTemplateMetadata {
-  instance: Record<string, unknown>;
-}
+export interface RegisteredResource extends ResourceMetadata, ProviderBinding {}
 
-export interface RegisteredPrompt extends PromptMetadata {
-  instance: Record<string, unknown>;
-}
+export interface RegisteredResourceTemplate extends ResourceTemplateMetadata, ProviderBinding {}
 
-export interface RegisteredCompletion {
+export interface RegisteredPrompt extends PromptMetadata, ProviderBinding {}
+
+export interface RegisteredCompletion extends ProviderBinding {
   refType: 'ref/prompt' | 'ref/resource';
   refName: string;
   methodName: string;
-  instance: Record<string, unknown>;
 }
 
 @Injectable()
@@ -120,22 +123,37 @@ export class McpRegistryService {
   registerProvider(instance: unknown): void {
     if (!instance || !(instance as Record<string, unknown>).constructor) return;
 
-    const prototype = Object.getPrototypeOf(instance);
+    this.scanPrototype(Object.getPrototypeOf(instance), {
+      instance: instance as Record<string, unknown>,
+    });
+  }
+
+  /**
+   * Register a request/transient-scoped provider class. No instance exists at
+   * boot, so capabilities are bound to the class and resolved per call by the
+   * executor via `ModuleRef.resolve`.
+   */
+  registerProviderClass(target: Type<unknown>): void {
+    if (typeof target !== 'function' || !target.prototype) return;
+    this.scanPrototype(target.prototype, { scopedTarget: target });
+  }
+
+  private scanPrototype(prototype: Record<string, unknown>, binding: ProviderBinding): void {
     const methodNames = Object.getOwnPropertyNames(prototype).filter(
       (name) => name !== 'constructor' && typeof prototype[name] === 'function',
     );
 
     for (const methodName of methodNames) {
-      this.scanToolMetadata(instance as Record<string, unknown>, prototype, methodName);
-      this.scanResourceMetadata(instance as Record<string, unknown>, prototype, methodName);
-      this.scanResourceTemplateMetadata(instance as Record<string, unknown>, prototype, methodName);
-      this.scanPromptMetadata(instance as Record<string, unknown>, prototype, methodName);
-      this.scanCompletionMetadata(instance as Record<string, unknown>, prototype, methodName);
+      this.scanToolMetadata(binding, prototype, methodName);
+      this.scanResourceMetadata(binding, prototype, methodName);
+      this.scanResourceTemplateMetadata(binding, prototype, methodName);
+      this.scanPromptMetadata(binding, prototype, methodName);
+      this.scanCompletionMetadata(binding, prototype, methodName);
     }
   }
 
   private scanToolMetadata(
-    instance: Record<string, unknown>,
+    binding: ProviderBinding,
     prototype: object,
     methodName: string,
   ): void {
@@ -149,7 +167,7 @@ export class McpRegistryService {
     // Merge auth/resilience decorators
     const enriched: RegisteredTool = {
       ...metadata,
-      instance,
+      ...binding,
       isPublic: Reflect.getMetadata(MCP_PUBLIC_METADATA, prototype, methodName) ?? false,
       requiredScopes: Reflect.getMetadata(MCP_SCOPES_METADATA, prototype, methodName),
       requiredRoles: Reflect.getMetadata(MCP_ROLES_METADATA, prototype, methodName),
@@ -171,7 +189,7 @@ export class McpRegistryService {
   }
 
   private scanResourceMetadata(
-    instance: Record<string, unknown>,
+    binding: ProviderBinding,
     prototype: object,
     methodName: string,
   ): void {
@@ -182,14 +200,14 @@ export class McpRegistryService {
     );
     if (!metadata) return;
 
-    const registered: RegisteredResource = { ...metadata, instance };
+    const registered: RegisteredResource = { ...metadata, ...binding };
     this.warnIfMissingDescription('Resource', registered.name, registered.description);
     this.resources.set(registered.uri, registered);
     this.logger.log(`Registered resource: ${registered.uri}`);
   }
 
   private scanResourceTemplateMetadata(
-    instance: Record<string, unknown>,
+    binding: ProviderBinding,
     prototype: object,
     methodName: string,
   ): void {
@@ -200,14 +218,14 @@ export class McpRegistryService {
     );
     if (!metadata) return;
 
-    const registered: RegisteredResourceTemplate = { ...metadata, instance };
+    const registered: RegisteredResourceTemplate = { ...metadata, ...binding };
     this.warnIfMissingDescription('ResourceTemplate', registered.name, registered.description);
     this.resourceTemplates.set(registered.uriTemplate, registered);
     this.logger.log(`Registered resource template: ${registered.uriTemplate}`);
   }
 
   private scanPromptMetadata(
-    instance: Record<string, unknown>,
+    binding: ProviderBinding,
     prototype: object,
     methodName: string,
   ): void {
@@ -218,14 +236,14 @@ export class McpRegistryService {
     );
     if (!metadata) return;
 
-    const registered: RegisteredPrompt = { ...metadata, instance };
+    const registered: RegisteredPrompt = { ...metadata, ...binding };
     this.warnIfMissingDescription('Prompt', registered.name, registered.description);
     this.prompts.set(registered.name, registered);
     this.logger.log(`Registered prompt: ${registered.name}`);
   }
 
   private scanCompletionMetadata(
-    instance: Record<string, unknown>,
+    binding: ProviderBinding,
     prototype: object,
     methodName: string,
   ): void {
@@ -241,7 +259,7 @@ export class McpRegistryService {
       refType: metadata.refType,
       refName: metadata.refName,
       methodName: metadata.methodName,
-      instance,
+      ...binding,
     };
 
     this.completionHandlers.set(key, registered);

@@ -54,6 +54,13 @@ export interface McpModuleOptions {
   guards?: McpGuardClass[];
   allowUnauthenticatedAccess?: boolean;
   /**
+   * When true, each `tools/list` entry advertises its auth requirements in
+   * `_meta.securitySchemes` (`noauth` for `@Public` tools, `oauth2` with the
+   * tool's `@Scopes`). Lets clients discover per-tool auth needs before
+   * calling. Default false.
+   */
+  advertiseSecuritySchemes?: boolean;
+  /**
    * When true, `tools/list`, `resources/list`, and `prompts/list` only return
    * items whose required scopes are covered by the caller's token scopes.
    * Default false (lists are not filtered).
@@ -119,13 +126,35 @@ export interface McpModuleOptions {
   exposure?: ExposureStrategy | ExposureStrategyResolver;
 }
 
+/**
+ * Options-factory contract for `McpModule.forRootAsync({ useClass | useExisting })`,
+ * mirroring the standard NestJS async-module convention.
+ */
+export interface McpOptionsFactory {
+  createMcpOptions(): McpModuleOptions | Promise<McpModuleOptions>;
+}
+
 export interface McpModuleAsyncOptions {
   // biome-ignore lint/suspicious/noExplicitAny: NestJS DynamicModule requires broad module types
   imports?: any[];
   transport: McpTransportType | McpTransportType[];
   transportOptions?: TransportOptions;
+  /** Build options from injected dependencies. One of `useFactory` / `useClass` / `useExisting` is required. */
   // biome-ignore lint/suspicious/noExplicitAny: NestJS factory pattern requires broad parameter types
-  useFactory: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;
+  useFactory?: (...args: any[]) => McpModuleOptions | Promise<McpModuleOptions>;
+  /** Instantiate this class (registered as a provider) and call `createMcpOptions()`. */
+  useClass?: new (
+    // biome-ignore lint/suspicious/noExplicitAny: NestJS DI constructors have broad parameter types
+    ...args: any[]
+  ) => McpOptionsFactory;
+  /** Reuse an existing provider implementing `McpOptionsFactory`. */
+  useExisting?: new (
+    // biome-ignore lint/suspicious/noExplicitAny: NestJS DI constructors have broad parameter types
+    ...args: any[]
+  ) => McpOptionsFactory;
   // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens have broad types
   inject?: any[];
+  /** Additional providers registered alongside the module's own (e.g. deps of `useFactory`). */
+  // biome-ignore lint/suspicious/noExplicitAny: NestJS Provider type lives in @nestjs/common
+  extraProviders?: any[];
 }
