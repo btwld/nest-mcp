@@ -1,6 +1,6 @@
 ---
-'@nest-mcp/server': minor
-'@nest-mcp/common': minor
+'@nest-mcp/server': patch
+'@nest-mcp/common': patch
 ---
 
 **BREAKING: auth layer is now resource-server-only (MCP authorization spec 2025-06-18).**
