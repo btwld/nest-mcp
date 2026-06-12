@@ -1,0 +1,15 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "nest-mcp",
+  "description": "NestJS packages for the Model Context Protocol: @nest-mcp/server (decorator-based MCP servers with auth, resilience, exposure strategies), @nest-mcp/client (MCP client for NestJS), @nest-mcp/gateway (MCP aggregator/router), @nest-mcp/common (shared interfaces).",
+  "folders": ["docs", "packages/server/src", "packages/client/src", "packages/gateway/src", "packages/common/src"],
+  "excludeFolders": ["node_modules", "dist", "references", "internal-docs"],
+  "excludeFiles": ["*.spec.ts"],
+  "rules": [
+    "Create MCP servers with McpModule.forRoot and the @Tool/@Resource/@ResourceTemplate/@Prompt/@Completion decorators",
+    "Bootstrap HTTP transports with NestFactory.create(AppModule, { bodyParser: false }) — transports read the raw request stream",
+    "Auth is resource-server-only: bring an external IdP via the jwks or introspection verifier options on McpAuthModule.forRoot",
+    "Use bootstrapStdioApp() for STDIO servers so logs go to stderr",
+    "Tool handlers receive (args, ctx: McpExecutionContext); per-request data (user, headers, signal) comes from ctx"
+  ]
+}
