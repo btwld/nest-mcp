@@ -6,6 +6,7 @@ import { MCP_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import { Inject, Injectable, Logger, type OnModuleDestroy, Optional } from '@nestjs/common';
 import {
   DEFAULT_PING_INTERVAL,
+  DEFAULT_SSE_ENDPOINT,
   DEFAULT_SSE_MESSAGES_ENDPOINT,
 } from '../../constants/module.constants';
 import type {
@@ -30,6 +31,34 @@ import {
   registerToolOnServer,
 } from '../register-handlers';
 import type { SdkHandle } from '../register-handlers';
+
+/**
+ * Derive the messages-endpoint path advertised to the client in the SSE
+ * `endpoint` event. When the app mounts controllers behind a path prefix
+ * (`app.setGlobalPrefix`, `RouterModule`), the incoming SSE request path
+ * carries that prefix — the advertised messages path must carry it too or
+ * clients POST their JSON-RPC messages to the unprefixed (404) route.
+ *
+ * Exported for tests.
+ */
+export function resolveMessagesPath(
+  req: unknown,
+  sseEndpoint: string,
+  messagesEndpoint: string,
+): string {
+  const messagesPath = messagesEndpoint.startsWith('/') ? messagesEndpoint : `/${messagesEndpoint}`;
+  const r = req as
+    | { originalUrl?: string; url?: string; raw?: { originalUrl?: string; url?: string } }
+    | undefined;
+  const rawUrl = r?.originalUrl ?? r?.raw?.originalUrl ?? r?.url ?? r?.raw?.url;
+  if (typeof rawUrl !== 'string' || rawUrl.length === 0) return messagesPath;
+
+  const path = rawUrl.split('?')[0].replace(/\/+$/, '');
+  const ssePath = sseEndpoint.startsWith('/') ? sseEndpoint : `/${sseEndpoint}`;
+  if (path === ssePath || !path.endsWith(ssePath)) return messagesPath;
+
+  return `${path.slice(0, -ssePath.length)}${messagesPath}`;
+}
 
 @Injectable()
 export class SseService implements OnModuleDestroy {
@@ -61,8 +90,10 @@ export class SseService implements OnModuleDestroy {
   async createConnection(req: unknown, res: unknown): Promise<void> {
     const messagesEndpoint =
       this.options.transportOptions?.sse?.messagesEndpoint ?? DEFAULT_SSE_MESSAGES_ENDPOINT;
+    const sseEndpoint = this.options.transportOptions?.sse?.endpoint ?? DEFAULT_SSE_ENDPOINT;
+    const advertisedPath = resolveMessagesPath(req, sseEndpoint, messagesEndpoint);
 
-    const transport = new SSEServerTransport(messagesEndpoint, res as unknown as ServerResponse);
+    const transport = new SSEServerTransport(advertisedPath, res as unknown as ServerResponse);
     const sessionId = transport.sessionId;
 
     const server = createMcpServer(this.registry, this.options, this.taskManager);

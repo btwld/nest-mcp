@@ -992,4 +992,152 @@ describe('McpExecutorService', () => {
       expect(third.nextCursor).toBeUndefined();
     });
   });
+
+  // --- request-scoped provider resolution ---
+
+  describe('scoped provider resolution', () => {
+    class ScopedTool {
+      greet(args: Record<string, unknown>) {
+        return `hello ${args.name}`;
+      }
+    }
+
+    function makeScopedExecutor(moduleRef?: {
+      resolve: ReturnType<typeof vi.fn>;
+      registerRequestByContextId: ReturnType<typeof vi.fn>;
+    }) {
+      const exec = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+        moduleRef as unknown as import('@nestjs/core').ModuleRef,
+      );
+      registry.registerTool({
+        name: 'scoped-greet',
+        description: 'Scoped tool',
+        methodName: 'greet',
+        target: ScopedTool,
+        scopedTarget: ScopedTool,
+      } as RegisteredTool);
+      return exec;
+    }
+
+    it('resolves a fresh instance per call via ModuleRef', async () => {
+      const moduleRef = {
+        resolve: vi.fn(async () => new ScopedTool()),
+        registerRequestByContextId: vi.fn(),
+      };
+      const exec = makeScopedExecutor(moduleRef);
+
+      const result = await exec.callTool('scoped-greet', { name: 'ada' }, ctx);
+      expect(result.content).toEqual([{ type: 'text', text: 'hello ada' }]);
+      expect(moduleRef.resolve).toHaveBeenCalledWith(ScopedTool, expect.anything(), {
+        strict: false,
+      });
+
+      await exec.callTool('scoped-greet', { name: 'bob' }, ctx);
+      expect(moduleRef.resolve).toHaveBeenCalledTimes(2);
+    });
+
+    it('registers the request on the context id so @Inject(REQUEST) works', async () => {
+      const moduleRef = {
+        resolve: vi.fn(async () => new ScopedTool()),
+        registerRequestByContextId: vi.fn(),
+      };
+      const exec = makeScopedExecutor(moduleRef);
+      const request = { headers: { 'x-tenant': 'acme' } };
+
+      await exec.callTool('scoped-greet', { name: 'ada' }, mockMcpContext({ request }));
+      expect(moduleRef.registerRequestByContextId).toHaveBeenCalledWith(
+        request,
+        expect.anything(),
+      );
+    });
+
+    it('does not register a request when the context has none', async () => {
+      const moduleRef = {
+        resolve: vi.fn(async () => new ScopedTool()),
+        registerRequestByContextId: vi.fn(),
+      };
+      const exec = makeScopedExecutor(moduleRef);
+
+      await exec.callTool('scoped-greet', { name: 'ada' }, ctx);
+      expect(moduleRef.registerRequestByContextId).not.toHaveBeenCalled();
+    });
+
+    it('throws ToolExecutionError when a scoped tool has no ModuleRef available', async () => {
+      const exec = makeScopedExecutor(undefined);
+
+      await expect(exec.callTool('scoped-greet', { name: 'ada' }, ctx)).rejects.toThrow(
+        ToolExecutionError,
+      );
+    });
+  });
+
+  // --- securitySchemes advertisement ---
+
+  describe('securitySchemes advertisement', () => {
+    function makeAdvertisingExecutor(options: Partial<McpModuleOptions> = {}) {
+      return new McpExecutorService(registry, new McpExceptionFilterRunner(new Reflector()), {
+        ...defaultOptions,
+        advertiseSecuritySchemes: true,
+        ...options,
+      });
+    }
+
+    function registerTool(extra: Partial<RegisteredTool> = {}) {
+      registry.registerTool({
+        name: 'a-tool',
+        description: 'A tool',
+        methodName: 'run',
+        target: Object,
+        instance: { run: vi.fn() },
+        ...extra,
+      } as RegisteredTool);
+    }
+
+    it('does not emit securitySchemes by default', async () => {
+      registerTool({ requiredScopes: ['read:data'] });
+      const result = await executor.listTools();
+      expect(result.items[0]._meta).toBeUndefined();
+    });
+
+    it('emits oauth2 with scopes for tools with @Scopes metadata', async () => {
+      registerTool({ requiredScopes: ['read:data', 'write:data'] });
+      const result = await makeAdvertisingExecutor().listTools();
+      expect(result.items[0]._meta).toEqual({
+        securitySchemes: [{ type: 'oauth2', scopes: ['read:data', 'write:data'] }],
+      });
+    });
+
+    it('emits noauth for public tools', async () => {
+      registerTool({ isPublic: true });
+      const result = await makeAdvertisingExecutor().listTools();
+      expect(result.items[0]._meta).toEqual({ securitySchemes: [{ type: 'noauth' }] });
+    });
+
+    it('emits bare oauth2 for unmarked tools when the module gates requests', async () => {
+      registerTool();
+      const exec = makeAdvertisingExecutor({
+        transportOptions: { streamableHttp: { oauth: { enabled: true } } },
+      });
+      const result = await exec.listTools();
+      expect(result.items[0]._meta).toEqual({ securitySchemes: [{ type: 'oauth2' }] });
+    });
+
+    it('emits noauth for unmarked tools when nothing gates requests', async () => {
+      registerTool();
+      const result = await makeAdvertisingExecutor().listTools();
+      expect(result.items[0]._meta).toEqual({ securitySchemes: [{ type: 'noauth' }] });
+    });
+
+    it('merges securitySchemes into existing _meta', async () => {
+      registerTool({ isPublic: true, _meta: { vendor: 'x' } });
+      const result = await makeAdvertisingExecutor().listTools();
+      expect(result.items[0]._meta).toEqual({
+        vendor: 'x',
+        securitySchemes: [{ type: 'noauth' }],
+      });
+    });
+  });
 });

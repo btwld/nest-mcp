@@ -1,4 +1,4 @@
-import type { McpModuleAsyncOptions, McpModuleOptions } from '@nest-mcp/common';
+import type { McpModuleAsyncOptions, McpModuleOptions, McpOptionsFactory } from '@nest-mcp/common';
 import { MCP_OPTIONS, McpError, McpTransportType } from '@nest-mcp/common';
 import {
   type DynamicModule,
@@ -93,6 +93,41 @@ function withBearerGuard(oauthEnabled: boolean | undefined, guards?: unknown[]):
 
 /** Token for the bootstrap oauth-gate consistency check (eagerly instantiated). */
 export const MCP_OAUTH_GATE_CHECK = Symbol('MCP_OAUTH_GATE_CHECK');
+
+/**
+ * Build the MCP_OPTIONS provider(s) for `forRootAsync` from whichever of
+ * `useFactory` / `useClass` / `useExisting` the caller supplied (standard
+ * NestJS async-module convention).
+ *
+ * Exported for tests only.
+ */
+export function createAsyncOptionsProviders(options: McpModuleAsyncOptions): Provider[] {
+  if (options.useFactory) {
+    return [
+      {
+        provide: MCP_OPTIONS,
+        useFactory: options.useFactory,
+        inject: options.inject ?? [],
+      },
+    ];
+  }
+
+  const factoryToken = options.useExisting ?? options.useClass;
+  if (!factoryToken) {
+    throw new McpError(
+      'McpModule.forRootAsync requires one of useFactory, useClass, or useExisting',
+    );
+  }
+
+  return [
+    ...(options.useClass ? [{ provide: options.useClass, useClass: options.useClass }] : []),
+    {
+      provide: MCP_OPTIONS,
+      useFactory: (factory: McpOptionsFactory) => factory.createMcpOptions(),
+      inject: [factoryToken],
+    },
+  ];
+}
 
 /**
  * `McpBearerGuard` is attached to the generated controllers at
@@ -225,11 +260,8 @@ export class McpModule {
   static forRootAsync(options: McpModuleAsyncOptions): DynamicModule {
     const controllers: Type[] = [];
     const providers: Provider[] = [
-      {
-        provide: MCP_OPTIONS,
-        useFactory: options.useFactory,
-        inject: options.inject ?? [],
-      },
+      ...createAsyncOptionsProviders(options),
+      ...(options.extraProviders ?? []),
       McpRegistryService,
       McpScannerService,
       McpExceptionFilterRunner,

@@ -370,3 +370,43 @@ describe('SseService dynamic registration event handlers', () => {
     expect(mockRegisterTool).toHaveBeenCalledOnce();
   });
 });
+
+describe('resolveMessagesPath', () => {
+  const resolve = async () => (await import('./sse.service')).resolveMessagesPath;
+
+  it('returns the messages endpoint unchanged when the request has no prefix', async () => {
+    const fn = await resolve();
+    expect(fn({ originalUrl: '/sse' }, '/sse', '/messages')).toBe('/messages');
+  });
+
+  it('carries the global prefix from the request path into the messages path', async () => {
+    const fn = await resolve();
+    expect(fn({ originalUrl: '/api/sse' }, '/sse', '/messages')).toBe('/api/messages');
+  });
+
+  it('handles nested prefixes and query strings', async () => {
+    const fn = await resolve();
+    expect(fn({ originalUrl: '/api/v2/sse?foo=1' }, '/sse', '/messages')).toBe('/api/v2/messages');
+  });
+
+  it('reads the URL from fastify-style raw requests', async () => {
+    const fn = await resolve();
+    expect(fn({ raw: { url: '/api/sse' } }, '/sse', '/messages')).toBe('/api/messages');
+  });
+
+  it('normalizes endpoints without leading slashes', async () => {
+    const fn = await resolve();
+    expect(fn({ originalUrl: '/api/sse' }, 'sse', 'messages')).toBe('/api/messages');
+  });
+
+  it('falls back to the configured endpoint when the request is unreadable', async () => {
+    const fn = await resolve();
+    expect(fn(undefined, '/sse', '/messages')).toBe('/messages');
+    expect(fn({}, '/sse', 'messages')).toBe('/messages');
+  });
+
+  it('falls back when the request path does not end with the SSE endpoint', async () => {
+    const fn = await resolve();
+    expect(fn({ originalUrl: '/healthz' }, '/sse', '/messages')).toBe('/messages');
+  });
+});

@@ -51,16 +51,21 @@ class PlainClass {
 
 // --- Helpers ---
 
+interface WrapperMock {
+  instance: unknown;
+  metatype?: unknown;
+}
+
 function makeModulesContainer(
   modules: Array<{
-    providers: Array<{ key: string | symbol; instance: unknown }>;
+    providers: Array<{ key: string | symbol; instance: unknown; metatype?: unknown }>;
   }>,
-): Map<string, { providers: Map<string | symbol, { instance: unknown }> }> {
-  const container = new Map<string, { providers: Map<string | symbol, { instance: unknown }> }>();
+): Map<string, { providers: Map<string | symbol, WrapperMock> }> {
+  const container = new Map<string, { providers: Map<string | symbol, WrapperMock> }>();
   for (let i = 0; i < modules.length; i++) {
-    const providerMap = new Map<string | symbol, { instance: unknown }>();
+    const providerMap = new Map<string | symbol, WrapperMock>();
     for (const p of modules[i].providers) {
-      providerMap.set(p.key, { instance: p.instance });
+      providerMap.set(p.key, { instance: p.instance, metatype: p.metatype });
     }
     container.set(`module-${i}`, { providers: providerMap });
   }
@@ -284,6 +289,50 @@ describe('McpScannerService', () => {
       scanner.onModuleInit();
 
       expect(registry.getAllResources()).toHaveLength(0);
+    });
+  });
+
+  describe('request-scoped providers (no boot-time instance)', () => {
+    it('registers a decorated provider class via its metatype when no instance exists', () => {
+      const container = makeModulesContainer([
+        { providers: [{ key: WeatherTool, instance: undefined, metatype: WeatherTool }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      const tool = registry.getTool('getWeather');
+      expect(tool).toBeDefined();
+      expect(tool?.instance).toBeUndefined();
+      expect(tool?.scopedTarget).toBe(WeatherTool);
+    });
+
+    it('ignores instance-less wrappers whose metatype has no MCP decorators', () => {
+      const container = makeModulesContainer([
+        { providers: [{ key: PlainClass, instance: undefined, metatype: PlainClass }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllTools()).toHaveLength(0);
+    });
+
+    it('applies forFeature server targeting to scoped provider classes', () => {
+      const registration = { serverName: 'other-server', providerTokens: [AdminTool] };
+      const container = makeModulesContainer([
+        {
+          providers: [
+            { key: AdminTool, instance: undefined, metatype: AdminTool },
+            { key: `${MCP_FEATURE_REGISTRATION}_3`, instance: registration },
+          ],
+        },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'my-server', registry);
+      scanner.onModuleInit();
+
+      expect(registry.getAllTools()).toHaveLength(0);
     });
   });
 });
