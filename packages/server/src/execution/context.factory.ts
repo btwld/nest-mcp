@@ -25,6 +25,10 @@ export class McpContextFactory {
     const logger = new Logger(`MCP:${options.sessionId.slice(0, 8)}`);
     const loggerName = `MCP:${options.sessionId.slice(0, 8)}`;
     const server = options.mcpServer;
+    // `logging/setLevel` stores the client's level keyed by the TRANSPORT
+    // session id (SDK `Server`). Pass the same key on every message or the
+    // SDK's per-session level filtering never applies.
+    const transportSessionId = () => server?.server?.transport?.sessionId;
 
     return {
       sessionId: options.sessionId,
@@ -57,41 +61,53 @@ export class McpContextFactory {
         debug: (message, data) => {
           logger.debug(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'debug',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'debug',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         info: (message, data) => {
           logger.log(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'info',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'info',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         warn: (message, data) => {
           logger.warn(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'warning',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'warning',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         error: (message, data) => {
           logger.error(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'error',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'error',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
       },
