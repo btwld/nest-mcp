@@ -201,11 +201,14 @@ describe('McpContextFactory', () => {
 
       ctx.log.debug('test message');
 
-      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
-        level: 'debug',
-        logger: 'MCP:sess-abc',
-        data: 'test message',
-      });
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        {
+          level: 'debug',
+          logger: 'MCP:sess-abc',
+          data: 'test message',
+        },
+        undefined,
+      );
     });
 
     it('calls sendLoggingMessage on info', () => {
@@ -220,11 +223,14 @@ describe('McpContextFactory', () => {
 
       ctx.log.info('info message');
 
-      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
-        level: 'info',
-        logger: 'MCP:sess-abc',
-        data: 'info message',
-      });
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        {
+          level: 'info',
+          logger: 'MCP:sess-abc',
+          data: 'info message',
+        },
+        undefined,
+      );
     });
 
     it('maps warn to MCP warning level', () => {
@@ -239,11 +245,14 @@ describe('McpContextFactory', () => {
 
       ctx.log.warn('warn message');
 
-      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
-        level: 'warning',
-        logger: 'MCP:sess-abc',
-        data: 'warn message',
-      });
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        {
+          level: 'warning',
+          logger: 'MCP:sess-abc',
+          data: 'warn message',
+        },
+        undefined,
+      );
     });
 
     it('calls sendLoggingMessage on error', () => {
@@ -258,11 +267,14 @@ describe('McpContextFactory', () => {
 
       ctx.log.error('error message');
 
-      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
-        level: 'error',
-        logger: 'MCP:sess-abc',
-        data: 'error message',
-      });
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        {
+          level: 'error',
+          logger: 'MCP:sess-abc',
+          data: 'error message',
+        },
+        undefined,
+      );
     });
 
     it('includes data in sendLoggingMessage when provided', () => {
@@ -277,11 +289,33 @@ describe('McpContextFactory', () => {
 
       ctx.log.info('with data', { key: 'value' });
 
-      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith({
-        level: 'info',
-        logger: 'MCP:sess-abc',
-        data: { message: 'with data', key: 'value' },
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        {
+          level: 'info',
+          logger: 'MCP:sess-abc',
+          data: { message: 'with data', key: 'value' },
+        },
+        undefined,
+      );
+    });
+
+    it('passes the transport session id so logging/setLevel filtering applies', () => {
+      const mockServer = {
+        server: { transport: { sessionId: 'transport-sess-1' } },
+        sendLoggingMessage: vi.fn().mockResolvedValue(undefined),
+      };
+      const ctx = factory.createContext({
+        sessionId: 'sess-abcd1234',
+        transport: McpTransportType.STREAMABLE_HTTP,
+        mcpServer: mockServer as never,
       });
+
+      ctx.log.info('routed message');
+
+      expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'info' }),
+        'transport-sess-1',
+      );
     });
 
     it('swallows rejected sendLoggingMessage promise', () => {

@@ -220,7 +220,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   private async handleStatelessPost(req: unknown, res: unknown): Promise<void> {
     const transport = new StreamableHTTPServerTransport(this.buildTransportOptions(true));
 
-    const server = this.createAndConnectServer(
+    const { server } = this.createAndConnectServer(
       transport,
       `stateless-${randomUUID().slice(0, 8)}`,
       req,
@@ -262,7 +262,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
       if (sid) this.cleanupSession(sid);
     };
 
-    const server = this.createAndConnectServer(transport, 'pending', req);
+    const { server, ctx } = this.createAndConnectServer(transport, 'pending', req);
 
     await transport.handleRequest(
       req as unknown as IncomingMessage,
@@ -271,8 +271,11 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
     const sessionId = transport.sessionId;
     if (sessionId) {
+      ctx.sessionId = sessionId;
       this.transports.set(sessionId, transport);
       this.servers.set(sessionId, server);
+      this.contexts.set(sessionId, ctx);
+      this.sdkHandles.set(sessionId, new Map());
 
       const oauth = this.oauthOptions;
       const auth = reqObj.auth;
@@ -291,7 +294,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
     transport: StreamableHTTPServerTransport,
     label: string,
     req?: unknown,
-  ): McpServer {
+  ): { server: McpServer; ctx: McpExecutionContext } {
     const server = createMcpServer(this.registry, this.options, this.taskManager);
     const subMgr = this.subscriptionManager;
     const ctx = this.contextFactory.createContext({
@@ -311,14 +314,12 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
       this.subscriptionManager,
     );
 
-    // Only store context/handles for stateful sessions (label !== stateless-*)
-    if (!label.startsWith('stateless-')) {
-      this.contexts.set(label, ctx);
-      this.sdkHandles.set(label, new Map());
-    }
-
     server.connect(transport);
-    return server;
+    // The caller stores ctx under the real session id once the transport
+    // assigns one — stateful session ids only exist after the initialize
+    // request is handled, so keying here (under a placeholder label) would
+    // orphan the entry and break registry-event propagation to the session.
+    return { server, ctx };
   }
 
   private subscribeToRegistryEvents(): void {
