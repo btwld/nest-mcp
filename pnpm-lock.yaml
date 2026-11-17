@@ -36,8 +36,8 @@ importers:
   apps/example-browser-mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@mozilla/readability':
         specifier: ^0.5.0
         version: 0.5.0
@@ -91,8 +91,8 @@ importers:
   apps/example-client:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -128,8 +128,8 @@ importers:
   apps/example-gateway:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -165,8 +165,8 @@ importers:
   apps/example-postgres-mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -205,8 +205,8 @@ importers:
   apps/example-sse-server:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -242,8 +242,8 @@ importers:
   apps/example-stdio:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -273,8 +273,8 @@ importers:
   apps/playground:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.10.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nest-mcp/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -314,8 +314,8 @@ importers:
         version: link:../common
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.26.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -372,8 +372,8 @@ importers:
         version: link:../server
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.26.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -403,8 +403,8 @@ importers:
         version: link:../common
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.26.0
-        version: 1.26.0(zod@4.3.6)
+        specifier: ^1.32.0
+        version: 1.32.2(zod@4.3.6)
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.14(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -958,8 +958,8 @@ packages:
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
 
-  '@modelcontextprotocol/sdk@1.26.0':
-    resolution: {integrity: sha512-Y5RmPncpiDtTXDbLKswIJzTqu2hyBKxTNsgKqKclDbhIgg1wgtf1fRuvxgTnRfcnxtvvgbIEcqUOzZrJ6iSReg==}
+  '@modelcontextprotocol/sdk@1.32.2':
+    resolution: {integrity: sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -3335,7 +3335,7 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.26.0(zod@4.3.6)':
+  '@modelcontextprotocol/sdk@1.32.2(zod@4.3.6)':
     dependencies:
       '@hono/node-server': 1.19.9(hono@4.12.1)
       ajv: 8.18.0
