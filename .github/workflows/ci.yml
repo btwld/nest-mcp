@@ -28,10 +28,11 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @nest-mcp/server test:e2e
       - run: pnpm build
 
   nest-12-compat:
-    name: Nest 12 alpha / Node 24 / TypeScript 6 ESM
+    name: Nest 12 / Node 24 / TypeScript 6 ESM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
