@@ -37,7 +37,8 @@ export function createStandardSchemaDto<const Schema extends StandardSchemaV1<un
 		static readonly schema = schema;
 	}
 
-	// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+	// The instance type is the schema output, which the class body cannot express.
+	// oxlint-disable-next-line typescript/no-unsafe-type-assertion, typescript/no-unnecessary-type-assertion
 	return StandardSchemaDto as StandardSchemaDtoClass<Schema>;
 }
 

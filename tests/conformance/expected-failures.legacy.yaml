@@ -1,12 +1,12 @@
-# Baseline of scenarios the official MCP conformance suite currently fails
-# against @nest-mcp/server. Every entry is a real, understood gap — never a
-# fixture bug. A scenario that starts passing must be deleted from this list in
-# the same change, or the suite fails on a stale baseline.
+# Baseline for the 2025-era compatibility pass
+# (`conformance server --spec-version 2025-11-25`) against @nest-mcp/server.
+# Every entry is a real, understood gap — never a fixture bug. A scenario that
+# starts passing must be deleted from this list in the same change, or the
+# suite fails on a stale baseline.
 #
-# Recorded against @modelcontextprotocol/conformance 0.1.16, suite "active"
-# (30 scenarios): 23 pass cleanly, 6 fail, 1 emits only warnings. The CLI's own
-# "Total: 24 passed, 6 failed" line counts checks rather than scenarios —
-# dns-rebinding-protection contributes two passing checks.
+# Recorded against @modelcontextprotocol/conformance 0.2.0-alpha.12, suite
+# "active" (31 scenarios): 24 pass cleanly, 6 fail, 1 emits only warnings.
+# Each entry is a behaviour the 2026-07-28 revision removed or replaced.
 #
 # A scenario counts as failing for this baseline when any of its checks is
 # FAILURE *or* WARNING, so a warning-only scenario belongs in this list even

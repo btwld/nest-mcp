@@ -18,17 +18,17 @@ importers:
         specifier: 3.0.1
         version: 3.0.1
       '@modelcontextprotocol/client':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@modelcontextprotocol/core':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@modelcontextprotocol/node':
-        specifier: 2.0.0
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        specifier: 2.1.2
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@nestjs/common':
         specifier: 12.0.1
         version: 12.0.1(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@11.0.0)
@@ -96,14 +96,14 @@ importers:
         specifier: 10.1.3
         version: 10.1.3
       '@modelcontextprotocol/client':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@modelcontextprotocol/node':
-        specifier: 2.0.0
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        specifier: 2.1.2
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@nest-mcp/auth':
         specifier: workspace:^
         version: link:../../packages/auth
@@ -297,7 +297,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/server':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@nest-mcp/server':
         specifier: workspace:^
         version: link:../server
@@ -306,13 +306,13 @@ importers:
     dependencies:
       '@modelcontextprotocol/client':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@modelcontextprotocol/core':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@modelcontextprotocol/server':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@nest-mcp/core':
         specifier: workspace:^
         version: link:../core
@@ -337,14 +337,14 @@ importers:
         version: 4.4.3
     devDependencies:
       '@modelcontextprotocol/client':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@modelcontextprotocol/node':
-        specifier: 2.0.0
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        specifier: 2.1.2
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       ai:
         specifier: 7.0.83
         version: 7.0.83(zod@4.4.3)
@@ -361,7 +361,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/server':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@nest-mcp/client':
         specifier: workspace:^
         version: link:../client
@@ -382,20 +382,20 @@ importers:
         version: link:../core
     devDependencies:
       '@modelcontextprotocol/client':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
 
   packages/nestjs:
     dependencies:
       '@modelcontextprotocol/client':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@modelcontextprotocol/node':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@nest-mcp/auth':
         specifier: workspace:^
         version: link:../auth
@@ -437,10 +437,10 @@ importers:
     dependencies:
       '@modelcontextprotocol/node':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
         specifier: '>=2.0.0 <3.0.0'
-        version: 2.0.0
+        version: 2.4.0
       '@nest-mcp/core':
         specifier: workspace:^
         version: link:../core
@@ -448,11 +448,11 @@ importers:
   tests/conformance:
     dependencies:
       '@modelcontextprotocol/node':
-        specifier: 2.0.0
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)
+        specifier: 2.1.2
+        version: 2.1.2(@modelcontextprotocol/server@2.4.0)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 2.4.0
+        version: 2.4.0
       '@nest-mcp/server':
         specifier: workspace:^
         version: link:../../packages/server
@@ -461,8 +461,8 @@ importers:
         version: 4.4.3
     devDependencies:
       '@modelcontextprotocol/conformance':
-        specifier: 0.1.16
-        version: 0.1.16(supports-color@11.0.0)
+        specifier: 0.2.0-alpha.12
+        version: 0.2.0-alpha.12(supports-color@11.0.0)
       '@types/node':
         specifier: 26.4.0
         version: 26.4.0
@@ -1112,27 +1112,23 @@ packages:
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
 
-  '@modelcontextprotocol/client@2.0.0':
-    resolution: {integrity: sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==}
+  '@modelcontextprotocol/client@2.4.0':
+    resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/conformance@0.1.16':
-    resolution: {integrity: sha512-GI7qiN0r39/MH2srVUR3AXaEN0YLCro20lIBbnvc1frBhszenxvUifBuTzxeVQVagILfBzCIcnungUOma8OrgA==}
+  '@modelcontextprotocol/conformance@0.2.0-alpha.12':
+    resolution: {integrity: sha512-eXtZFgmtZiU5SsvXty+RGXGnyIqEVm3GLU/HZmg1wMjtKOocPZZgD9HQKd30oJhio5UB0wFJmsc6r8u48Q+EYA==}
     hasBin: true
 
-  '@modelcontextprotocol/core@2.0.0':
-    resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/node@2.0.0':
-    resolution: {integrity: sha512-Y4hAC2XdGDUdDOCbLDOCA4+aL3NUldjsOWlDL/YwpAxrPhRm1xHd7lZ+mLacvZ9t3PaH28wgNoaLQGrIk1P2pg==}
+  '@modelcontextprotocol/node@2.1.2':
+    resolution: {integrity: sha512-IIcIqBpr6NCQQs5DgJTgvbSOAw+3iaR/uquqg+e0nXCdudfjPg/80x0TseUnQx14AUAtE4fsJCEpJKPyb6WPVA==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@modelcontextprotocol/server': ^2.0.0
-      hono: ^4.11.4
-    peerDependenciesMeta:
-      hono:
-        optional: true
+      '@modelcontextprotocol/server': ^2.4.0
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -1144,8 +1140,8 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@modelcontextprotocol/server@2.0.0':
-    resolution: {integrity: sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==}
+  '@modelcontextprotocol/server@2.4.0':
+    resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
     engines: {node: '>=20'}
 
   '@nestjs/common@12.0.1':
@@ -2769,10 +2765,6 @@ packages:
     resolution: {integrity: sha512-aBfBS8eYIeXmpHI9ThIlA7/WLq+SLt18iXUZhb52rW89QLKQFoIpPG1bPeewoPZsTyjSSO3T7234FBVUM1V2rA==}
     engines: {node: '>=12'}
 
-  dotenv@17.4.1:
-    resolution: {integrity: sha512-k8DaKGP6r1G30Lx8V4+pCsLzKr8vLmV2paqEj1Y55GdAgJuIqpRp5FfajGF8KtwMxCz9qJc6wUIJnm053d/WCw==}
-    engines: {node: '>=12'}
-
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
@@ -3106,10 +3098,6 @@ packages:
   finalhandler@2.1.1:
     resolution: {integrity: sha512-S8KoZgRZN+a5rNwqTxlZZePjT/4cnm0ROV70LedRHZ0p8u9fRID0hJUZQpkKLzro8LfmC8sx23bY6tVNxv8pQA==}
     engines: {node: '>= 18.0.0'}
-
-  find-my-way@9.7.0:
-    resolution: {integrity: sha512-f2JHn75x2JlwUwLenZypgczR7YWMb/uO9BvUXtus+JMgkbIkLADd38cI4EiV+OQqrGo1Zlq6V8wnqMJ8e62wUQ==}
-    engines: {node: '>=20'}
 
   find-my-way@9.9.0:
     resolution: {integrity: sha512-sJsgZ1sQH2UDuowPuMKg8az7Qc8F0jnj+SKkFWU/+T0xcFlgV5skgXOGUqmQzOdmW6ALA7AhJINWx3qFBkbLHA==}
@@ -3574,9 +3562,6 @@ packages:
 
   jose@6.2.10:
     resolution: {integrity: sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g==}
-
-  jose@6.2.8:
-    resolution: {integrity: sha512-Bsdjwm3Qsd/P0jR+BHDe3LytDfY7WBq2HmCCLIwuVRHMuEC9ae7/R474GIUdF1NgCyZjzVo/A9DOiOBtXq8ZoQ==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -5723,7 +5708,7 @@ snapshots:
       '@dotenvx/primitives': 0.8.0
       commander: 11.1.0
       conf: 10.2.0
-      dotenv: 17.4.1
+      dotenv: 17.4.2
       enquirer: 2.4.1
       env-paths: 2.2.1
       execa: 5.1.1
@@ -6025,24 +6010,26 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@modelcontextprotocol/client@2.0.0':
+  '@modelcontextprotocol/client@2.4.0':
     dependencies:
-      '@modelcontextprotocol/core': 2.0.0
+      '@modelcontextprotocol/core': 2.4.0
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      jose: 6.2.8
+      jose: 6.2.10
       pkce-challenge: 5.0.1
       zod: 4.4.3
 
-  '@modelcontextprotocol/conformance@0.1.16(supports-color@11.0.0)':
+  '@modelcontextprotocol/conformance@0.2.0-alpha.12(supports-color@11.0.0)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.30.0(supports-color@11.0.0)(zod@4.4.3)
       '@octokit/rest': 22.0.1
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
       commander: 14.0.3
       eventsource-parser: 3.1.1
       express: 5.2.1(supports-color@11.0.0)
-      jose: 6.2.8
+      jose: 6.2.10
       undici: 7.29.0
       yaml: 2.9.0
       zod: 4.4.3
@@ -6050,15 +6037,14 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  '@modelcontextprotocol/core@2.0.0':
+  '@modelcontextprotocol/core@2.4.0':
     dependencies:
       zod: 4.4.3
 
-  '@modelcontextprotocol/node@2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.1)':
+  '@modelcontextprotocol/node@2.1.2(@modelcontextprotocol/server@2.4.0)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.13.1)
-      '@modelcontextprotocol/server': 2.0.0
-    optionalDependencies:
+      '@modelcontextprotocol/server': 2.4.0
       hono: 4.13.1
 
   '@modelcontextprotocol/sdk@1.30.0(supports-color@11.0.0)(zod@3.25.76)':
@@ -6074,7 +6060,7 @@ snapshots:
       express: 5.2.1(supports-color@11.0.0)
       express-rate-limit: 8.6.2(express@5.2.1(supports-color@11.0.0))(supports-color@11.0.0)
       hono: 4.13.1
-      jose: 6.2.8
+      jose: 6.2.10
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
@@ -6096,7 +6082,7 @@ snapshots:
       express: 5.2.1(supports-color@11.0.0)
       express-rate-limit: 8.6.2(express@5.2.1(supports-color@11.0.0))(supports-color@11.0.0)
       hono: 4.13.1
-      jose: 6.2.8
+      jose: 6.2.10
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
@@ -6105,9 +6091,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/server@2.0.0':
+  '@modelcontextprotocol/server@2.4.0':
     dependencies:
-      '@modelcontextprotocol/core': 2.0.0
+      '@modelcontextprotocol/core': 2.4.0
       zod: 4.4.3
 
   '@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@11.0.0)':
@@ -7500,8 +7486,6 @@ snapshots:
     dependencies:
       dotenv: 17.4.2
 
-  dotenv@17.4.1: {}
-
   dotenv@17.4.2: {}
 
   dts-resolver@3.0.0: {}
@@ -7980,7 +7964,7 @@ snapshots:
       abstract-logging: 2.0.1
       avvio: 9.3.0
       fast-json-stringify: 7.0.1
-      find-my-way: 9.7.0
+      find-my-way: 9.9.0
       light-my-request: 6.6.0
       pino: 10.3.1
       process-warning: 5.1.0
@@ -8032,12 +8016,6 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
-
-  find-my-way@9.7.0:
-    dependencies:
-      fast-deep-equal: 3.1.3
-      fast-querystring: 1.1.2
-      safe-regex2: 5.1.1
 
   find-my-way@9.9.0:
     dependencies:
@@ -8450,8 +8428,6 @@ snapshots:
   jju@1.4.0: {}
 
   jose@6.2.10: {}
-
-  jose@6.2.8: {}
 
   js-tokens@10.0.0: {}
 

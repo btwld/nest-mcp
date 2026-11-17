@@ -5,7 +5,7 @@ Nest MCP is an alpha-stage Model Context Protocol runtime for NestJS application
 The primary use case is an artifact or agent runtime that needs to expose trusted application capabilities and consume many MCP servers through one controlled NestJS layer. The runtime is intended to make authentication, authorization, routing, lifecycle ownership, and telemetry explicit rather than hiding them behind a global SDK singleton.
 
 > [!WARNING]
-> This repository currently targets stable NestJS `12.0.1`, TypeScript `7.0.2`, MCP SDK `2.0.0`, and Node.js `>=22.13.0`. Every 2.x package is still an alpha prerelease, so expect breaking changes while these packages evolve.
+> This repository currently targets stable NestJS `12.0.1`, TypeScript `7.0.2`, MCP SDK `2.4.0`, and Node.js `>=22.13.0`. Every 2.x package is still an alpha prerelease, so expect breaking changes while these packages evolve.
 
 ## Packages
 

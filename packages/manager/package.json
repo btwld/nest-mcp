@@ -49,7 +49,7 @@
 		"@modelcontextprotocol/client": ">=2.0.0 <3.0.0"
 	},
 	"devDependencies": {
-		"@modelcontextprotocol/client": "2.0.0"
+		"@modelcontextprotocol/client": "2.4.0"
 	},
 	"scripts": {
 		"build": "tsdown",

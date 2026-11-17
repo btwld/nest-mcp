@@ -1,0 +1,6 @@
+# Baseline for the scenarios the 2026-07-28 revision requires
+# (`conformance server --requirements 2026-07-28`). Every entry must be a real,
+# understood gap with a comment naming its cause — never a fixture bug. A
+# scenario that starts passing must be deleted from this list in the same
+# change, or the suite fails on a stale baseline.
+server: []

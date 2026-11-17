@@ -21,8 +21,13 @@ All notable changes to this project will be documented in this file. The format 
 - Authorization-safe eager, search, and lazy Nest tool catalog exposure over per-request visible
   snapshots, including bounded discovery meta-tools and live-registry compatibility.
 - Method- and operation-specific typed transform helpers for client and gateway middleware.
+- Official conformance coverage for the scenarios the 2026-07-28 revision requires, alongside the
+  2025-era compatibility pass, each with its own baseline.
+- CORS preflight support for tool-defined `Mcp-Param-*` request headers in `@nest-mcp/server`.
 
 ### Changed
+
+- Validated against MCP TypeScript SDK `2.4.0` (`@modelcontextprotocol/node` `2.1.2`).
 
 - Renamed Nest capability decorators to `Tool`, `Prompt`, `Resource`, and `Targets`, with matching unprefixed option and decorator types. Module and runtime names remain MCP-qualified.
 
