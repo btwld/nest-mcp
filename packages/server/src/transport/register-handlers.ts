@@ -140,7 +140,7 @@ export function registerHandlers(
   }
   registerCancellationHandler(server);
   registerListHandlers(server, pipeline, registry, options, ctx);
-  registerCompletionHandler(server, pipeline, registry, options);
+  registerCompletionHandler(server, pipeline, registry, options, ctx);
   if (subscriptionManager) {
     registerSubscriptionHandlers(server, subscriptionManager, ctx);
   }
@@ -467,6 +467,7 @@ function registerCompletionHandler(
   pipeline: ExecutionPipelineService,
   registry: McpRegistryService,
   options: McpModuleOptions,
+  ctx: McpExecutionContext,
 ): void {
   const hasCompletions =
     registry.hasPrompts ||
@@ -476,20 +477,30 @@ function registerCompletionHandler(
 
   if (!hasCompletions) return;
 
-  server.server.setRequestHandler(CompleteRequestSchema, async (request) => {
-    const result = await pipeline.complete({
-      ref: request.params.ref,
-      argument: request.params.argument,
-      context: request.params.context,
-    });
-    return {
-      completion: {
-        values: result.values,
-        ...(result.hasMore != null ? { hasMore: result.hasMore } : {}),
-        ...(result.total != null ? { total: result.total } : {}),
-      },
-    };
-  });
+  server.server.setRequestHandler(
+    CompleteRequestSchema,
+    async (request, extra?: ListHandlerExtra) => {
+      // Per-request context so request-scoped completion providers receive the
+      // caller's request, the same as tools, resources and prompts. `authInfo`
+      // is the `McpAuthInfo` the HTTP edge attached to `req.auth`.
+      const requestCtx = withRequestAuth(ctx, (extra ?? {}) as RequestAuthExtra);
+      const result = await pipeline.complete(
+        {
+          ref: request.params.ref,
+          argument: request.params.argument,
+          context: request.params.context,
+        },
+        requestCtx,
+      );
+      return {
+        completion: {
+          values: result.values,
+          ...(result.hasMore != null ? { hasMore: result.hasMore } : {}),
+          ...(result.total != null ? { total: result.total } : {}),
+        },
+      };
+    },
+  );
 }
 
 /**

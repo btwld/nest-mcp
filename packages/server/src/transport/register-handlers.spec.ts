@@ -612,11 +612,14 @@ describe('registerHandlers', () => {
       },
     });
 
-    expect(mockPipeline.complete).toHaveBeenCalledWith({
-      ref: { type: 'ref/prompt', name: 'greet' },
-      argument: { name: 'language', value: 'en' },
-      context: undefined,
-    });
+    expect(mockPipeline.complete).toHaveBeenCalledWith(
+      {
+        ref: { type: 'ref/prompt', name: 'greet' },
+        argument: { name: 'language', value: 'en' },
+        context: undefined,
+      },
+      ctx,
+    );
     expect(result).toEqual({
       completion: {
         values: ['alpha', 'alpine'],
@@ -624,6 +627,31 @@ describe('registerHandlers', () => {
         total: 10,
       },
     });
+  });
+
+  it('completion handler passes the per-request context to the pipeline', async () => {
+    mockPipeline.complete.mockResolvedValue({ values: [] });
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const completeCall = mockInnerServer.setRequestHandler.mock.calls.find(
+      (call: unknown[]) =>
+        (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value ===
+        'completion/complete',
+    );
+    const requestInfo = { headers: { 'x-tenant': 'acme' } };
+    await completeCall?.[1](
+      {
+        method: 'completion/complete',
+        params: {
+          ref: { type: 'ref/prompt', name: 'greet' },
+          argument: { name: 'language', value: 'en' },
+        },
+      },
+      { requestInfo },
+    );
+
+    expect(mockPipeline.complete.mock.calls[0]?.[1]).toMatchObject({ request: requestInfo });
   });
 
   it('completion handler omits hasMore and total when not provided', async () => {

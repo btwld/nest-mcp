@@ -108,7 +108,9 @@ export class McpExecutorService {
       if (ctx?.request) {
         this.moduleRef.registerRequestByContextId(ctx.request, contextId);
       }
-      return this.moduleRef.resolve(binding.scopedTarget, contextId, { strict: false });
+      return this.moduleRef.resolve(binding.scopedToken ?? binding.scopedTarget, contextId, {
+        strict: false,
+      });
     }
     throw new ToolExecutionError(
       label,
@@ -436,12 +438,12 @@ export class McpExecutorService {
 
   // ---- Completions ----
 
-  async complete(request: CompletionRequest): Promise<CompletionResult> {
+  async complete(request: CompletionRequest, ctx?: McpExecutionContext): Promise<CompletionResult> {
     const refName = request.ref.type === 'ref/prompt' ? request.ref.name : request.ref.uri;
     const handler = this.registry.getCompletionHandler(request.ref.type, refName);
 
     if (handler) {
-      const instance = await this.resolveBinding(handler, `completion ${refName}`);
+      const instance = await this.resolveBinding(handler, `completion ${refName}`, ctx);
       const fn = instance[handler.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;

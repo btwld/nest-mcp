@@ -1062,6 +1062,59 @@ describe('McpExecutorService', () => {
       expect(moduleRef.registerRequestByContextId).not.toHaveBeenCalled();
     });
 
+    it('resolves by the injection token when the provider is registered under one', async () => {
+      const moduleRef = {
+        resolve: vi.fn(async () => new ScopedTool()),
+        registerRequestByContextId: vi.fn(),
+      };
+      const exec = makeScopedExecutor(moduleRef);
+      registry.registerTool({
+        name: 'token-greet',
+        description: 'Scoped tool provided under a custom token',
+        methodName: 'greet',
+        target: ScopedTool,
+        scopedTarget: ScopedTool,
+        scopedToken: 'SCOPED_TOOLS',
+      } as RegisteredTool);
+
+      const result = await exec.callTool('token-greet', { name: 'ada' }, ctx);
+      expect(result.content).toEqual([{ type: 'text', text: 'hello ada' }]);
+      expect(moduleRef.resolve).toHaveBeenCalledWith('SCOPED_TOOLS', expect.anything(), {
+        strict: false,
+      });
+    });
+
+    it('registers the request when resolving a scoped completion provider', async () => {
+      class ScopedCompletions {
+        suggest() {
+          return { values: ['acme'] };
+        }
+      }
+      const moduleRef = {
+        resolve: vi.fn(async () => new ScopedCompletions()),
+        registerRequestByContextId: vi.fn(),
+      };
+      const exec = makeScopedExecutor(moduleRef);
+      registry.registerCompletionHandler({
+        refType: 'ref/prompt',
+        refName: 'tenant-prompt',
+        methodName: 'suggest',
+        scopedTarget: ScopedCompletions,
+      });
+      const request = { headers: { 'x-tenant': 'acme' } };
+
+      const result = await exec.complete(
+        {
+          ref: { type: 'ref/prompt', name: 'tenant-prompt' },
+          argument: { name: 'tenant', value: 'a' },
+        },
+        mockMcpContext({ request }),
+      );
+
+      expect(result.values).toEqual(['acme']);
+      expect(moduleRef.registerRequestByContextId).toHaveBeenCalledWith(request, expect.anything());
+    });
+
     it('throws ToolExecutionError when a scoped tool has no ModuleRef available', async () => {
       const exec = makeScopedExecutor(undefined);
 

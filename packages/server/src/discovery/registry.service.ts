@@ -27,7 +27,7 @@ import {
   MCP_TOOL_METADATA,
 } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
-import type { Type } from '@nestjs/common';
+import type { InjectionToken, Type } from '@nestjs/common';
 import type { CompletionMetadata } from '../decorators/completion.decorator';
 
 /**
@@ -47,10 +47,14 @@ export interface TaskHandlerConfig {
  * captured as a live `instance` at scan time; request/transient-scoped
  * providers have no boot-time instance, so the provider class is kept as
  * `scopedTarget` and resolved per call by the executor (`ModuleRef.resolve`).
+ * `scopedToken` is the injection token the provider is registered under when
+ * it differs from the class (`{ provide: 'TOKEN', useClass }`) — Nest resolves
+ * by token, so the class alone would not be found.
  */
 export interface ProviderBinding {
   instance?: Record<string, unknown>;
   scopedTarget?: Type<unknown>;
+  scopedToken?: InjectionToken;
 }
 
 export interface RegisteredTool extends ToolMetadata, ProviderBinding {}
@@ -133,9 +137,12 @@ export class McpRegistryService {
    * boot, so capabilities are bound to the class and resolved per call by the
    * executor via `ModuleRef.resolve`.
    */
-  registerProviderClass(target: Type<unknown>): void {
+  registerProviderClass(target: Type<unknown>, token?: InjectionToken): void {
     if (typeof target !== 'function' || !target.prototype) return;
-    this.scanPrototype(target.prototype, { scopedTarget: target });
+    this.scanPrototype(target.prototype, {
+      scopedTarget: target,
+      ...(token !== undefined && token !== target ? { scopedToken: token } : {}),
+    });
   }
 
   private scanPrototype(prototype: Record<string, unknown>, binding: ProviderBinding): void {

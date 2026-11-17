@@ -307,6 +307,19 @@ describe('McpScannerService', () => {
       expect(tool?.scopedTarget).toBe(WeatherTool);
     });
 
+    it('keeps the injection token of a provider registered under a custom token', () => {
+      const container = makeModulesContainer([
+        { providers: [{ key: 'WEATHER_TOOLS', instance: undefined, metatype: WeatherTool }] },
+      ]);
+      const registry = new McpRegistryService();
+      const scanner = makeScanner(container, 'any-server', registry);
+      scanner.onModuleInit();
+
+      const tool = registry.getTool('getWeather');
+      expect(tool?.scopedTarget).toBe(WeatherTool);
+      expect(tool?.scopedToken).toBe('WEATHER_TOOLS');
+    });
+
     it('ignores instance-less wrappers whose metatype has no MCP decorators', () => {
       const container = makeModulesContainer([
         { providers: [{ key: PlainClass, instance: undefined, metatype: PlainClass }] },

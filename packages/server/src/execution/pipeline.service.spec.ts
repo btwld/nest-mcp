@@ -899,6 +899,25 @@ describe('ExecutionPipelineService', () => {
       expect(result).toBe(expected);
       expect(executor.complete).toHaveBeenCalledWith(request);
     });
+
+    it('passes the execution context through and exposes it as the request context', async () => {
+      let capturedContext: unknown;
+      executor.complete = vi.fn().mockImplementation(async () => {
+        capturedContext = requestContext.getContext();
+        return { values: [] };
+      });
+
+      const request = {
+        ref: { type: 'ref/prompt' as const, name: 'test' },
+        argument: { name: 'arg', value: 'a' },
+      };
+      const completionCtx = mockMcpContext();
+
+      await pipeline.complete(request, completionCtx);
+
+      expect(executor.complete).toHaveBeenCalledWith(request, completionCtx);
+      expect(capturedContext).toBe(completionCtx);
+    });
   });
 
   // --- AsyncLocalStorage context propagation ---

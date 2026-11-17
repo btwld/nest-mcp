@@ -915,6 +915,22 @@ describe('McpRegistryService', () => {
       expect(tool?.scopedTarget).toBe(TestTools);
     });
 
+    it('keeps the injection token when the provider is registered under one', () => {
+      const reg = new McpRegistryService();
+      reg.registerProviderClass(TestTools, 'CUSTOM_TOOLS');
+
+      const tool = reg.getTool('myTool');
+      expect(tool?.scopedTarget).toBe(TestTools);
+      expect(tool?.scopedToken).toBe('CUSTOM_TOOLS');
+    });
+
+    it('omits the token when it is the class itself', () => {
+      const reg = new McpRegistryService();
+      reg.registerProviderClass(TestTools, TestTools);
+
+      expect(reg.getTool('myTool')?.scopedToken).toBeUndefined();
+    });
+
     it('ignores values that are not classes', () => {
       const reg = new McpRegistryService();
       reg.registerProviderClass(undefined as unknown as new () => unknown);

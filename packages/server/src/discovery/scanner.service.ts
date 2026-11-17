@@ -33,7 +33,7 @@ export class McpScannerService implements OnModuleInit {
     const serverTargetedTokens = this.collectServerTargetedTokens();
 
     for (const [, moduleRef] of this.modulesContainer) {
-      for (const [, wrapper] of moduleRef.providers) {
+      for (const [token, wrapper] of moduleRef.providers) {
         const instance = wrapper?.instance;
         const metatype = wrapper?.metatype as (new (...args: unknown[]) => unknown) | undefined;
         const providerClass = instance?.constructor ?? metatype;
@@ -57,9 +57,10 @@ export class McpScannerService implements OnModuleInit {
           }
         } else if (typeof metatype === 'function' && metatype.prototype) {
           // Scoped providers have no usable boot-time instance — register the
-          // class so the executor resolves a fresh one per call.
+          // class (and the token it is provided under) so the executor
+          // resolves a fresh one per call.
           if (this.hasAnyMcpDecorator(metatype.prototype)) {
-            this.registry.registerProviderClass(metatype);
+            this.registry.registerProviderClass(metatype, token);
           }
         }
       }
