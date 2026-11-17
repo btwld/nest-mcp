@@ -37,6 +37,13 @@ export const MCP_CORS_EXPOSED_HEADERS: readonly string[] = Object.freeze([
 	"www-authenticate",
 ]);
 
+/**
+ * Tool parameters annotated with `x-mcp-header` are mirrored by clients into
+ * `Mcp-Param-{name}` request headers. The names are tool-defined, so the
+ * preflight admits the prefix rather than requiring hosts to list each one.
+ */
+const MCP_PARAMETER_HEADER_PATTERN = /^mcp-param-[a-z0-9!#$%&'*+.^_`|~-]{1,128}$/u;
+
 const DEFAULT_CORS_MAX_AGE_SECONDS = 600;
 const PREFLIGHT_VARY = "Origin, Access-Control-Request-Method, Access-Control-Request-Headers";
 
@@ -488,7 +495,11 @@ function allowedRequestHeaders(request: Request, cors: ResolvedCorsPolicy): stri
 	const permitted = requested
 		.split(",")
 		.map((header) => header.trim().toLowerCase())
-		.filter((header) => header.length > 0 && cors.allowedHeaderSet.has(header));
+		.filter(
+			(header) =>
+				header.length > 0 &&
+				(cors.allowedHeaderSet.has(header) || MCP_PARAMETER_HEADER_PATTERN.test(header)),
+		);
 	return permitted.length === 0 ? cors.allowedHeaders : permitted.join(", ");
 }
 

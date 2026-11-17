@@ -318,6 +318,28 @@ describe("MCP HTTP security posture", () => {
 		}
 	});
 
+	it("admits tool-parameter headers in the preflight without listing each one", async () => {
+		const runtime = createRuntime({});
+		try {
+			const response = await runtime.fetch(
+				new Request(ROUTE, {
+					method: "OPTIONS",
+					headers: {
+						origin: "http://localhost:5173",
+						"access-control-request-method": "POST",
+						"access-control-request-headers":
+							"mcp-method, Mcp-Param-Region, mcp-param-, mcp-parameter, x-not-allowed",
+					},
+				}),
+			);
+			expect(response.headers.get("access-control-allow-headers")).toBe(
+				"mcp-method, mcp-param-region",
+			);
+		} finally {
+			await runtime.close();
+		}
+	});
+
 	it("requires an exact-origin allowlist for credentialed CORS", () => {
 		expect(() => resolveMcpHttpSecurity({ cors: { credentials: true } })).toThrowError(
 			/allowedOrigins/,

@@ -61,7 +61,7 @@ identity provider to issue tokens.
 Every runtime gates HTTP dispatch through `definition.httpSecurity` before middleware and the SDK
 handler run. The defaults are safe without configuration: browser requests from routable origins
 are rejected (requests without an `Origin` header always pass), CORS answers the preflights the
-2026-07-28 revision requires for `Mcp-Method`/`Mcp-Name`, and request bodies are capped at 1 MiB on
+2026-07-28 revision requires for `Mcp-Method`/`Mcp-Name` and tool-defined `Mcp-Param-*` headers, and request bodies are capped at 1 MiB on
 both the Node stream and the fetch layer.
 
 ```ts
