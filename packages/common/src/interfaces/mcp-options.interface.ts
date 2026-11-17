@@ -67,6 +67,22 @@ export interface McpModuleOptions {
    */
   filterListsByScopes?: boolean;
 
+  /**
+   * Run tool, resource, resource-template and prompt handlers through the
+   * NestJS enhancer pipeline, so `@UseGuards`, `@UseInterceptors`, `@UsePipes`
+   * and `@UseFilters` — at method, class and application level — apply to MCP
+   * calls. Enhancers receive an execution context whose `getType()` is
+   * `'mcp'`. They run after the module guards, auth decorators, middleware
+   * and resilience wrappers, which keep working unchanged.
+   *
+   * Opt-in, default `false`: once enabled, application-level enhancers
+   * (`APP_GUARD`, `APP_INTERCEPTOR`, `APP_PIPE`, `APP_FILTER` and
+   * `app.useGlobal*()`) run for every MCP call as well. Enhancers that assume
+   * an HTTP request — `context.switchToHttp().getRequest()` — would fail
+   * there, so make them return early for other context types first.
+   */
+  nestEnhancers?: boolean;
+
   // Resilience (global defaults)
   resilience?: {
     timeout?: number;
