@@ -204,4 +204,70 @@ describe('PromptAggregatorService', () => {
       expect(service.getCachedPrompts()).toEqual([]);
     });
   });
+
+  describe('metadata passthrough', () => {
+    it('keeps title, icons, _meta and argument titles', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['ai']);
+      upstreamManager.getClient.mockReturnValue({
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [
+            {
+              name: 'p',
+              title: 'P',
+              icons: [{ src: 'https://example.com/p.png' }],
+              _meta: { k: 'v' },
+              arguments: [{ name: 'text', title: 'Text', required: true }],
+            },
+          ],
+        }),
+      });
+      router.getPrefixForUpstream.mockReturnValue('ai');
+
+      const [prompt] = await service.aggregateAll();
+
+      expect(prompt).toMatchObject({
+        name: 'ai_p',
+        title: 'P',
+        icons: [{ src: 'https://example.com/p.png' }],
+        _meta: { k: 'v' },
+        arguments: [{ name: 'text', title: 'Text', required: true }],
+      });
+    });
+  });
+
+  describe('refreshUpstream', () => {
+    it("replaces only that upstream's cached prompts", async () => {
+      const listA = vi.fn().mockResolvedValue({ prompts: [{ name: 'a1' }] });
+      const listB = vi.fn().mockResolvedValue({ prompts: [{ name: 'b1' }] });
+      upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
+      upstreamManager.getClient.mockImplementation((name: string) => ({
+        listPrompts: name === 'a' ? listA : listB,
+      }));
+      router.getPrefixForUpstream.mockImplementation((name: string) => name);
+      await service.aggregateAll();
+
+      listA.mockResolvedValue({ prompts: [{ name: 'a2' }] });
+      await service.refreshUpstream('a');
+
+      expect(
+        service
+          .getCachedPrompts()
+          .map((p) => p.name)
+          .sort(),
+      ).toEqual(['a_a2', 'b_b1']);
+    });
+
+    it('returns undefined and keeps the cache when the listing fails', async () => {
+      const listPrompts = vi
+        .fn()
+        .mockResolvedValueOnce({ prompts: [{ name: 'a1' }] })
+        .mockRejectedValueOnce(new Error('boom'));
+      upstreamManager.getAllNames.mockReturnValue(['a']);
+      upstreamManager.getClient.mockReturnValue({ listPrompts });
+      await service.aggregateAll();
+
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+      expect(service.getCachedPrompts()).toHaveLength(1);
+    });
+  });
 });

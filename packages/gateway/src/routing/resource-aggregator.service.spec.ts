@@ -226,4 +226,73 @@ describe('ResourceAggregatorService', () => {
       expect(resources[0].name).toBe('file:///nameless.txt');
     });
   });
+
+  describe('metadata passthrough', () => {
+    it('keeps title, icons, size, annotations and _meta', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['files']);
+      upstreamManager.getClient.mockReturnValue({
+        listResources: vi.fn().mockResolvedValue({
+          resources: [
+            {
+              uri: 'file:///a',
+              name: 'a',
+              title: 'A',
+              icons: [{ src: 'https://example.com/a.png' }],
+              size: 42,
+              annotations: { audience: ['user'], priority: 0.5 },
+              _meta: { k: 'v' },
+            },
+          ],
+        }),
+      });
+      router.getPrefixForUpstream.mockReturnValue('fs');
+
+      const [resource] = await service.aggregateAll();
+
+      expect(resource).toMatchObject({
+        uri: 'fs://file:///a',
+        title: 'A',
+        icons: [{ src: 'https://example.com/a.png' }],
+        size: 42,
+        annotations: { audience: ['user'], priority: 0.5 },
+        _meta: { k: 'v' },
+      });
+    });
+  });
+
+  describe('refreshUpstream', () => {
+    it("replaces only that upstream's cached resources", async () => {
+      const listA = vi.fn().mockResolvedValue({ resources: [{ uri: 'a://1', name: '1' }] });
+      const listB = vi.fn().mockResolvedValue({ resources: [{ uri: 'b://1', name: '1' }] });
+      upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
+      upstreamManager.getClient.mockImplementation((name: string) => ({
+        listResources: name === 'a' ? listA : listB,
+      }));
+      await service.aggregateAll();
+
+      listA.mockResolvedValue({ resources: [] });
+      const fresh = await service.refreshUpstream('a');
+
+      expect(fresh).toEqual([]);
+      expect(service.getCachedResources().map((r) => r.uri)).toEqual(['b://1']);
+    });
+
+    it('returns undefined and keeps the cache when the listing fails', async () => {
+      const listResources = vi
+        .fn()
+        .mockResolvedValueOnce({ resources: [{ uri: 'a://1', name: '1' }] })
+        .mockRejectedValueOnce(new Error('boom'));
+      upstreamManager.getAllNames.mockReturnValue(['a']);
+      upstreamManager.getClient.mockReturnValue({ listResources });
+      await service.aggregateAll();
+
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+      expect(service.getCachedResources()).toHaveLength(1);
+    });
+
+    it('returns undefined when the upstream has no client', async () => {
+      upstreamManager.getClient.mockReturnValue(undefined);
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+    });
+  });
 });

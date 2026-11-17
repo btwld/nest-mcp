@@ -227,4 +227,74 @@ describe('ResourceTemplateAggregatorService', () => {
       expect(templates[0].name).toBe('db:///{table}');
     });
   });
+
+  describe('metadata passthrough', () => {
+    it('keeps title, icons, annotations and _meta', async () => {
+      upstreamManager.getAllNames.mockReturnValue(['files']);
+      upstreamManager.getClient.mockReturnValue({
+        listResourceTemplates: vi.fn().mockResolvedValue({
+          resourceTemplates: [
+            {
+              uriTemplate: 'file:///{p}',
+              name: 'file',
+              title: 'File',
+              icons: [{ src: 'https://example.com/f.png' }],
+              annotations: { priority: 1 },
+              _meta: { k: 'v' },
+            },
+          ],
+        }),
+      });
+      router.getPrefixForUpstream.mockReturnValue('fs');
+
+      const [template] = await service.aggregateAll();
+
+      expect(template).toMatchObject({
+        uriTemplate: 'fs://file:///{p}',
+        title: 'File',
+        icons: [{ src: 'https://example.com/f.png' }],
+        annotations: { priority: 1 },
+        _meta: { k: 'v' },
+      });
+    });
+  });
+
+  describe('refreshUpstream', () => {
+    it("replaces only that upstream's cached templates", async () => {
+      const listA = vi
+        .fn()
+        .mockResolvedValue({ resourceTemplates: [{ uriTemplate: 'a://{x}', name: 'x' }] });
+      const listB = vi
+        .fn()
+        .mockResolvedValue({ resourceTemplates: [{ uriTemplate: 'b://{x}', name: 'x' }] });
+      upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
+      upstreamManager.getClient.mockImplementation((name: string) => ({
+        listResourceTemplates: name === 'a' ? listA : listB,
+      }));
+      await service.aggregateAll();
+
+      listA.mockResolvedValue({ resourceTemplates: [{ uriTemplate: 'a://{y}', name: 'y' }] });
+      await service.refreshUpstream('a');
+
+      expect(
+        service
+          .getCachedTemplates()
+          .map((t) => t.uriTemplate)
+          .sort(),
+      ).toEqual(['a://{y}', 'b://{x}']);
+    });
+
+    it('returns undefined and keeps the cache when the listing fails', async () => {
+      const listResourceTemplates = vi
+        .fn()
+        .mockResolvedValueOnce({ resourceTemplates: [{ uriTemplate: 'a://{x}', name: 'x' }] })
+        .mockRejectedValueOnce(new Error('boom'));
+      upstreamManager.getAllNames.mockReturnValue(['a']);
+      upstreamManager.getClient.mockReturnValue({ listResourceTemplates });
+      await service.aggregateAll();
+
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+      expect(service.getCachedTemplates()).toHaveLength(1);
+    });
+  });
 });
