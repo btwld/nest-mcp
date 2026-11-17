@@ -7,12 +7,18 @@ describe('HealthCheckerService', () => {
   let upstreamManager: {
     getClient: ReturnType<typeof vi.fn>;
     setHealthy: ReturnType<typeof vi.fn>;
+    getConfig: ReturnType<typeof vi.fn>;
+    isReconnecting: ReturnType<typeof vi.fn>;
+    reconnect: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
     upstreamManager = {
       getClient: vi.fn(),
       setHealthy: vi.fn(),
+      getConfig: vi.fn().mockReturnValue(undefined),
+      isReconnecting: vi.fn().mockReturnValue(false),
+      reconnect: vi.fn().mockResolvedValue(true),
     };
 
     service = new HealthCheckerService(upstreamManager as unknown as UpstreamManagerService);
@@ -52,6 +58,53 @@ describe('HealthCheckerService', () => {
 
       expect(result).toBe(false);
       expect(upstreamManager.setHealthy).toHaveBeenCalledWith('test', false, 'timeout');
+    });
+
+    it('triggers a reconnect on ping failure when reconnect is enabled', async () => {
+      upstreamManager.getClient.mockReturnValue({
+        ping: vi.fn().mockRejectedValue(new Error('gone')),
+      });
+      upstreamManager.getConfig.mockReturnValue({ reconnect: { enabled: true } });
+
+      await service.check('test');
+
+      expect(upstreamManager.reconnect).toHaveBeenCalledWith('test');
+    });
+
+    it('does not reconnect when reconnect is not enabled', async () => {
+      upstreamManager.getClient.mockReturnValue({
+        ping: vi.fn().mockRejectedValue(new Error('gone')),
+      });
+      upstreamManager.getConfig.mockReturnValue({ reconnect: { maxRetries: 3 } });
+
+      await service.check('test');
+
+      expect(upstreamManager.reconnect).not.toHaveBeenCalled();
+    });
+
+    it('does not start a second reconnect while one is running', async () => {
+      upstreamManager.getClient.mockReturnValue({
+        ping: vi.fn().mockRejectedValue(new Error('gone')),
+      });
+      upstreamManager.getConfig.mockReturnValue({ reconnect: { enabled: true } });
+      upstreamManager.isReconnecting.mockReturnValue(true);
+
+      await service.check('test');
+
+      expect(upstreamManager.reconnect).not.toHaveBeenCalled();
+    });
+
+    it('ignores a ping failure from a client that was replaced meanwhile', async () => {
+      const oldClient = { ping: vi.fn().mockRejectedValue(new Error('closed')) };
+      const newClient = { ping: vi.fn() };
+      upstreamManager.getClient.mockReturnValueOnce(oldClient).mockReturnValue(newClient);
+      upstreamManager.getConfig.mockReturnValue({ reconnect: { enabled: true } });
+
+      const result = await service.check('test');
+
+      expect(result).toBe(false);
+      expect(upstreamManager.setHealthy).not.toHaveBeenCalled();
+      expect(upstreamManager.reconnect).not.toHaveBeenCalled();
     });
 
     it('should handle non-Error throw values', async () => {

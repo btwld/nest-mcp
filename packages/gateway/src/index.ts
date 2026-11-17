@@ -5,9 +5,10 @@ export { McpGatewayModule } from './mcp-gateway.module';
 export type { McpGatewayOptions, McpGatewayAsyncOptions } from './mcp-gateway.module';
 
 // Gateway service
-export { GatewayService } from './gateway.service';
-export type { GatewayCallToolResult } from './gateway.service';
+export { GatewayService, MCP_RESOURCE_NOT_FOUND_CODE } from './gateway.service';
+export type { GatewayCallToolResult, GatewayCallToolOptions } from './gateway.service';
 export type {
+  GatewayCompleteContext,
   GatewayReadResourceResult,
   GatewayGetPromptResult,
   GatewayCompleteResult,
@@ -18,11 +19,17 @@ export { RouterService } from './routing/router.service';
 export { ToolAggregatorService } from './routing/tool-aggregator.service';
 export type { AggregatedTool, ToolInputSchema } from './routing/tool-aggregator.service';
 export { ResourceAggregatorService } from './routing/resource-aggregator.service';
-export type { AggregatedResource } from './routing/resource-aggregator.service';
+export type {
+  AggregatedResource,
+  AggregatedResourceAnnotations,
+} from './routing/resource-aggregator.service';
 export { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
 export type { AggregatedResourceTemplate } from './routing/resource-template-aggregator.service';
 export { PromptAggregatorService } from './routing/prompt-aggregator.service';
-export type { AggregatedPrompt } from './routing/prompt-aggregator.service';
+export type {
+  AggregatedPrompt,
+  AggregatedPromptArgument,
+} from './routing/prompt-aggregator.service';
 export type {
   RoutingConfig,
   ToolRoutingStrategy,
@@ -33,7 +40,10 @@ export type {
 export { UpstreamManagerService } from './upstream/upstream-manager.service';
 export { HealthCheckerService } from './upstream/health-checker.service';
 export type {
+  UpstreamChangeEvent,
+  UpstreamChangeListener,
   UpstreamConfig,
+  UpstreamListKind,
   UpstreamTransportType,
   UpstreamStatus,
 } from './upstream/upstream.interface';

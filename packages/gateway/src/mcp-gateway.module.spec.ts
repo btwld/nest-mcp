@@ -2,6 +2,8 @@ import 'reflect-metadata';
 import { MCP_GATEWAY_OPTIONS, McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpRegistryService } from '../../server/src/discovery/registry.service';
+import { McpPromptBuilder } from '../../server/src/dynamic/prompt-builder.service';
+import { McpResourceBuilder } from '../../server/src/dynamic/resource-builder.service';
 import { McpToolBuilder } from '../../server/src/dynamic/tool-builder.service';
 import { ResponseCacheService } from './cache/response-cache.service';
 import { GatewayService } from './gateway.service';
@@ -359,5 +361,411 @@ describe('Gateway tool registration with inputSchema', () => {
     const result = await tool.instance[tool.methodName]({ key: 'val' });
     expect(handler).toHaveBeenCalledWith({ key: 'val' });
     expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+  });
+});
+
+// ─── Bootstrap registration and upstream sync ───────────────────────────────
+
+describe('McpGatewayModule bootstrap and upstream sync', () => {
+  type Fn = ReturnType<typeof vi.fn>;
+  let registry: McpRegistryService;
+  let gatewayService: Record<string, Fn>;
+  let upstreamManager: Record<string, Fn>;
+  let toolAggregator: Record<string, Fn>;
+  let resourceAggregator: Record<string, Fn>;
+  let promptAggregator: Record<string, Fn>;
+  let templateAggregator: Record<string, Fn>;
+  let changeListener: ((event: unknown) => void) | undefined;
+  let unsubscribe: Fn;
+  let mod: McpGatewayModule;
+
+  const ctx = (overrides: Record<string, unknown> = {}) =>
+    ({
+      sessionId: 's',
+      reportProgress: vi.fn(),
+      signal: new AbortController().signal,
+      ...overrides,
+    }) as never;
+
+  const tool = (name: string, extra: Record<string, unknown> = {}) => ({
+    name,
+    description: `${name} tool`,
+    inputSchema: { type: 'object' },
+    upstreamName: 'up',
+    originalName: name.replace(/^up_/, ''),
+    ...extra,
+  });
+
+  beforeEach(() => {
+    registry = new McpRegistryService();
+    unsubscribe = vi.fn();
+    changeListener = undefined;
+    gatewayService = {
+      listTools: vi.fn().mockResolvedValue([]),
+      listResources: vi.fn().mockResolvedValue([]),
+      listPrompts: vi.fn().mockResolvedValue([]),
+      listResourceTemplates: vi.fn().mockResolvedValue([]),
+      getCachedPrompts: vi.fn().mockReturnValue([]),
+      getCachedResourceTemplates: vi.fn().mockReturnValue([]),
+      callTool: vi.fn(),
+      getPrompt: vi.fn(),
+      readResource: vi.fn(),
+      readResourceTemplate: vi.fn(),
+      complete: vi.fn().mockResolvedValue({ values: [] }),
+    };
+    upstreamManager = {
+      connectAll: vi.fn().mockResolvedValue(undefined),
+      onUpstreamChange: vi.fn((listener: (event: unknown) => void) => {
+        changeListener = listener;
+        return unsubscribe;
+      }),
+    };
+    toolAggregator = { getCachedTools: vi.fn().mockReturnValue([]), refreshUpstream: vi.fn() };
+    resourceAggregator = {
+      getCachedResources: vi.fn().mockReturnValue([]),
+      refreshUpstream: vi.fn(),
+    };
+    promptAggregator = { getCachedPrompts: vi.fn().mockReturnValue([]), refreshUpstream: vi.fn() };
+    templateAggregator = {
+      getCachedTemplates: vi.fn().mockReturnValue([]),
+      refreshUpstream: vi.fn(),
+    };
+
+    mod = new McpGatewayModule(
+      { server: { name: 'gw', version: '1' }, upstreams: [] } as never,
+      gatewayService as never,
+      upstreamManager as never,
+      { startAll: vi.fn() } as never,
+      { configure: vi.fn() } as never,
+      { configure: vi.fn() } as never,
+      { configure: vi.fn() } as never,
+      new McpToolBuilder(registry),
+      new McpResourceBuilder(registry),
+      new McpPromptBuilder(registry),
+      resourceAggregator as never,
+      promptAggregator as never,
+      templateAggregator as never,
+      registry,
+      {} as never,
+      toolAggregator as never,
+    );
+  });
+
+  describe('tools', () => {
+    it('registers display metadata and the output schema', async () => {
+      gatewayService.listTools.mockResolvedValue([
+        tool('up_a', {
+          title: 'A',
+          outputSchema: { type: 'object' },
+          icons: [{ src: 'https://example.com/a.png' }],
+          execution: { taskSupport: 'forbidden' },
+          _meta: { k: 1 },
+        }),
+      ]);
+
+      await mod.onApplicationBootstrap();
+
+      expect(registry.getTool('up_a')).toMatchObject({
+        title: 'A',
+        rawOutputSchema: { type: 'object' },
+        icons: [{ src: 'https://example.com/a.png' }],
+        execution: { taskSupport: 'forbidden' },
+        _meta: { k: 1 },
+      });
+    });
+
+    it('returns structuredContent and _meta from the proxied call and forwards progress', async () => {
+      gatewayService.listTools.mockResolvedValue([tool('up_a')]);
+      gatewayService.callTool.mockResolvedValue({
+        content: [{ type: 'text', text: '{}' }],
+        structuredContent: { ok: true },
+        _meta: { m: 1 },
+      });
+      await mod.onApplicationBootstrap();
+
+      const registered = registry.getTool('up_a');
+      const context = ctx();
+      const result = await registered?.instance?.[registered.methodName]({ x: 1 }, context);
+
+      expect(result).toEqual({
+        content: [{ type: 'text', text: '{}' }],
+        isError: undefined,
+        structuredContent: { ok: true },
+        _meta: { m: 1 },
+      });
+      expect(gatewayService.callTool).toHaveBeenCalledWith(
+        'up_a',
+        { x: 1 },
+        undefined,
+        (context as { signal: AbortSignal }).signal,
+        undefined,
+        undefined,
+        { onProgress: (context as { reportProgress: unknown }).reportProgress },
+      );
+    });
+  });
+
+  describe('prompts', () => {
+    it('registers upstream arguments and forwards the caller arguments unchanged', async () => {
+      const prompt = {
+        name: 'up_p',
+        title: 'P',
+        description: 'Prompt',
+        upstreamName: 'up',
+        originalName: 'p',
+        arguments: [
+          { name: 'text', description: 'Text', required: true },
+          { name: 'lang', required: false },
+        ],
+      };
+      gatewayService.listPrompts.mockResolvedValue([prompt]);
+      gatewayService.getPrompt.mockResolvedValue({ messages: [] });
+      await mod.onApplicationBootstrap();
+
+      const registered = registry.getPrompt('up_p');
+      expect(registered?.title).toBe('P');
+      expect(Object.keys(registered?.parameters?.shape ?? {})).toEqual(['text', 'lang']);
+      expect(registered?.parameters?.safeParse({}).success).toBe(false);
+
+      const context = ctx();
+      await registered?.instance?.[registered.methodName]({ text: 'hi', lang: undefined }, context);
+      expect(gatewayService.getPrompt).toHaveBeenCalledWith(
+        'up_p',
+        { text: 'hi' },
+        (context as { signal: AbortSignal }).signal,
+      );
+    });
+
+    it('gives argument-less prompts an empty argument schema', async () => {
+      gatewayService.listPrompts.mockResolvedValue([
+        { name: 'up_p', upstreamName: 'up', originalName: 'p' },
+      ]);
+
+      await mod.onApplicationBootstrap();
+
+      expect(registry.getPrompt('up_p')?.parameters).toBeDefined();
+    });
+  });
+
+  describe('resources and templates', () => {
+    it('registers resource and template display metadata', async () => {
+      gatewayService.listResources.mockResolvedValue([
+        {
+          uri: 'up://file:///a',
+          name: 'a',
+          title: 'A',
+          icons: [{ src: 'https://example.com/a.png' }],
+          _meta: { k: 1 },
+          upstreamName: 'up',
+          originalUri: 'file:///a',
+        },
+      ]);
+      gatewayService.listResourceTemplates.mockResolvedValue([
+        {
+          uriTemplate: 'up://file:///{p}',
+          name: 'file',
+          title: 'File',
+          _meta: { t: 1 },
+          upstreamName: 'up',
+          originalUriTemplate: 'file:///{p}',
+        },
+      ]);
+
+      await mod.onApplicationBootstrap();
+
+      expect(registry.getResource('up://file:///a')).toMatchObject({
+        title: 'A',
+        icons: [{ src: 'https://example.com/a.png' }],
+        _meta: { k: 1 },
+      });
+      expect(registry.getResourceTemplate('up://file:///{p}')).toMatchObject({
+        title: 'File',
+        _meta: { t: 1 },
+      });
+    });
+  });
+
+  describe('completions', () => {
+    it('forwards the completion context to the gateway service', async () => {
+      const prompt = { name: 'up_p', upstreamName: 'up', originalName: 'p' };
+      gatewayService.getCachedPrompts.mockReturnValue([prompt]);
+      await mod.onApplicationBootstrap();
+
+      const handler = registry.getCompletionHandler('ref/prompt', 'up_p');
+      await handler?.instance?.complete('lang', 'e', { arguments: { text: 'hi' } });
+
+      expect(gatewayService.complete).toHaveBeenCalledWith(
+        { type: 'ref/prompt', name: 'up_p' },
+        { name: 'lang', value: 'e' },
+        { arguments: { text: 'hi' } },
+      );
+    });
+  });
+
+  describe('upstream sync', () => {
+    beforeEach(async () => {
+      await mod.onApplicationBootstrap();
+    });
+
+    it('subscribes to upstream changes and unsubscribes on destroy', () => {
+      expect(upstreamManager.onUpstreamChange).toHaveBeenCalled();
+      mod.onModuleDestroy();
+      expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    it('unregisters removed tools, registers new and changed ones, and broadcasts list_changed', async () => {
+      const keep = tool('up_keep');
+      const gone = tool('up_gone');
+      const changedBefore = tool('up_changed', { description: 'old' });
+      const changedAfter = tool('up_changed', { description: 'new' });
+      const added = tool('up_added');
+      for (const t of [keep, gone, changedBefore]) {
+        new McpToolBuilder(registry).register({ ...t, handler: async () => 'x' });
+      }
+      toolAggregator.getCachedTools.mockReturnValue([keep, gone, changedBefore]);
+      toolAggregator.refreshUpstream.mockResolvedValue([keep, changedAfter, added]);
+      const broadcast = vi.spyOn(registry, 'broadcastNotification');
+      const registered = vi.fn();
+      registry.events.on('tool.registered', registered);
+
+      await mod.syncUpstream('up', ['tools']);
+
+      expect(registry.getTool('up_gone')).toBeUndefined();
+      expect(registry.getTool('up_added')).toBeDefined();
+      expect(registry.getTool('up_changed')?.description).toBe('new');
+      expect(registered.mock.calls.map(([t]) => (t as { name: string }).name).sort()).toEqual([
+        'up_added',
+        'up_changed',
+      ]);
+      expect(broadcast).toHaveBeenCalledWith('notifications/tools/list_changed', {});
+    });
+
+    it('does nothing when the refreshed list is unchanged', async () => {
+      const same = tool('up_same');
+      toolAggregator.getCachedTools.mockReturnValue([same]);
+      toolAggregator.refreshUpstream.mockResolvedValue([{ ...same }]);
+      const broadcast = vi.spyOn(registry, 'broadcastNotification');
+
+      await mod.syncUpstream('up', ['tools']);
+
+      expect(broadcast).not.toHaveBeenCalled();
+    });
+
+    it('leaves the registry alone when the refresh fails', async () => {
+      new McpToolBuilder(registry).register({ ...tool('up_a'), handler: async () => 'x' });
+      toolAggregator.getCachedTools.mockReturnValue([tool('up_a')]);
+      toolAggregator.refreshUpstream.mockResolvedValue(undefined);
+
+      await mod.syncUpstream('up', ['tools']);
+
+      expect(registry.getTool('up_a')).toBeDefined();
+    });
+
+    it('keeps going when a transport refuses to re-add a name', async () => {
+      toolAggregator.getCachedTools.mockReturnValue([tool('up_a', { description: 'old' })]);
+      toolAggregator.refreshUpstream.mockResolvedValue([
+        tool('up_a', { description: 'new' }),
+        tool('up_b'),
+      ]);
+      registry.events.on('tool.registered', (t: { name: string }) => {
+        if (t.name === 'up_a') throw new Error('Tool up_a is already registered');
+      });
+      const broadcast = vi.spyOn(registry, 'broadcastNotification');
+
+      await mod.syncUpstream('up', ['tools']);
+
+      expect(registry.getTool('up_a')?.description).toBe('new');
+      expect(registry.getTool('up_b')).toBeDefined();
+      expect(broadcast).toHaveBeenCalledWith('notifications/tools/list_changed', {});
+    });
+
+    it('syncs resources and templates under the resources list', async () => {
+      resourceAggregator.refreshUpstream.mockResolvedValue([
+        { uri: 'up://r', name: 'r', upstreamName: 'up', originalUri: 'r' },
+      ]);
+      templateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'up://{old}',
+          name: 'old',
+          upstreamName: 'up',
+          originalUriTemplate: '{old}',
+        },
+      ]);
+      templateAggregator.refreshUpstream.mockResolvedValue([
+        {
+          uriTemplate: 'up://{new}',
+          name: 'new',
+          upstreamName: 'up',
+          originalUriTemplate: '{new}',
+        },
+      ]);
+      const broadcast = vi.spyOn(registry, 'broadcastNotification');
+
+      await mod.syncUpstream('up', ['resources']);
+
+      expect(registry.getResource('up://r')).toBeDefined();
+      expect(registry.getResourceTemplate('up://{new}')).toBeDefined();
+      expect(registry.getCompletionHandler('ref/resource', 'up://{new}')).toBeDefined();
+      expect(broadcast).toHaveBeenCalledTimes(1);
+      expect(broadcast).toHaveBeenCalledWith('notifications/resources/list_changed', {});
+    });
+
+    it('syncs prompts and their completion handlers', async () => {
+      promptAggregator.refreshUpstream.mockResolvedValue([
+        { name: 'up_p', upstreamName: 'up', originalName: 'p', arguments: [{ name: 'a' }] },
+      ]);
+      const broadcast = vi.spyOn(registry, 'broadcastNotification');
+
+      await mod.syncUpstream('up', ['prompts']);
+
+      expect(registry.getPrompt('up_p')).toBeDefined();
+      expect(registry.getCompletionHandler('ref/prompt', 'up_p')).toBeDefined();
+      expect(broadcast).toHaveBeenCalledWith('notifications/prompts/list_changed', {});
+    });
+
+    it('re-syncs every list after a reconnect event', async () => {
+      toolAggregator.refreshUpstream.mockResolvedValue([tool('up_new')]);
+      resourceAggregator.refreshUpstream.mockResolvedValue([]);
+      templateAggregator.refreshUpstream.mockResolvedValue([]);
+      promptAggregator.refreshUpstream.mockResolvedValue([]);
+
+      changeListener?.({
+        upstreamName: 'up',
+        kinds: ['tools', 'resources', 'prompts'],
+        reason: 'reconnected',
+      });
+      await vi.waitFor(() => expect(registry.getTool('up_new')).toBeDefined());
+
+      expect(resourceAggregator.refreshUpstream).toHaveBeenCalledWith('up');
+      expect(templateAggregator.refreshUpstream).toHaveBeenCalledWith('up');
+      expect(promptAggregator.refreshUpstream).toHaveBeenCalledWith('up');
+    });
+
+    it('runs syncs for the same upstream one after another', async () => {
+      const order: string[] = [];
+      let release: () => void = () => {};
+      toolAggregator.refreshUpstream
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              release = () => {
+                order.push('first');
+                resolve([]);
+              };
+            }),
+        )
+        .mockImplementationOnce(async () => {
+          order.push('second');
+          return [];
+        });
+
+      changeListener?.({ upstreamName: 'up', kinds: ['tools'], reason: 'list_changed' });
+      changeListener?.({ upstreamName: 'up', kinds: ['tools'], reason: 'list_changed' });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(order).toEqual([]);
+
+      release();
+      await vi.waitFor(() => expect(order).toEqual(['first', 'second']));
+    });
   });
 });

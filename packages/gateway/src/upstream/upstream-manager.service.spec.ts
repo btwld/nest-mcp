@@ -29,6 +29,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  PromptListChangedNotificationSchema,
+  ResourceListChangedNotificationSchema,
+  TaskStatusNotificationSchema,
+  ToolListChangedNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { UpstreamManagerService } from './upstream-manager.service';
 import type { UpstreamConfig } from './upstream.interface';
 
@@ -503,7 +509,10 @@ describe('UpstreamManagerService', () => {
       await serviceWithRegistry.connect(config);
 
       const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
-      expect(instance.setNotificationHandler).toHaveBeenCalledOnce();
+      expect(instance.setNotificationHandler).toHaveBeenCalledWith(
+        TaskStatusNotificationSchema,
+        expect.any(Function),
+      );
     });
 
     it('does not register setNotificationHandler when no registry is provided', async () => {
@@ -517,7 +526,10 @@ describe('UpstreamManagerService', () => {
       await service.connect(config);
 
       const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
-      expect(instance.setNotificationHandler).not.toHaveBeenCalled();
+      expect(instance.setNotificationHandler).not.toHaveBeenCalledWith(
+        TaskStatusNotificationSchema,
+        expect.any(Function),
+      );
     });
 
     it('prefixes taskId with upstream name and calls broadcastNotification', async () => {
@@ -534,10 +546,9 @@ describe('UpstreamManagerService', () => {
 
       const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
       // Extract the registered notification handler
-      const [, handler] = instance.setNotificationHandler.mock.calls[0] as [
-        unknown,
-        (n: unknown) => void,
-      ];
+      const [, handler] = instance.setNotificationHandler.mock.calls.find(
+        ([schema]: [unknown]) => schema === TaskStatusNotificationSchema,
+      ) as [unknown, (n: unknown) => void];
 
       // Simulate the upstream emitting a task status notification
       handler({ params: { taskId: 't1', status: 'completed', progress: 1 } });
@@ -547,6 +558,215 @@ describe('UpstreamManagerService', () => {
         status: 'completed',
         progress: 1,
       });
+    });
+  });
+
+  describe('upstream list changes', () => {
+    const config: UpstreamConfig = {
+      name: 'lists',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+    };
+
+    const handlerFor = (
+      instance: { setNotificationHandler: ReturnType<typeof vi.fn> },
+      schema: unknown,
+    ) =>
+      (
+        instance.setNotificationHandler.mock.calls.find(([s]: [unknown]) => s === schema) as [
+          unknown,
+          () => void,
+        ]
+      )[1];
+
+    it.each([
+      [ToolListChangedNotificationSchema, 'tools'],
+      [ResourceListChangedNotificationSchema, 'resources'],
+      [PromptListChangedNotificationSchema, 'prompts'],
+    ])('emits a list_changed event for %#', async (schema, kind) => {
+      const listener = vi.fn();
+      service.onUpstreamChange(listener);
+      await service.connect(config);
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+
+      handlerFor(instance, schema)();
+
+      expect(listener).toHaveBeenCalledWith({
+        upstreamName: 'lists',
+        kinds: [kind],
+        reason: 'list_changed',
+      });
+    });
+
+    it('stops delivering events after unsubscribe', async () => {
+      const listener = vi.fn();
+      const unsubscribe = service.onUpstreamChange(listener);
+      await service.connect(config);
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+
+      unsubscribe();
+      handlerFor(instance, ToolListChangedNotificationSchema)();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('keeps notifying other listeners when one throws', async () => {
+      const failing = vi.fn(() => {
+        throw new Error('boom');
+      });
+      const ok = vi.fn();
+      service.onUpstreamChange(failing);
+      service.onUpstreamChange(ok);
+      await service.connect(config);
+      const instance = MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+
+      handlerFor(instance, PromptListChangedNotificationSchema)();
+
+      expect(ok).toHaveBeenCalled();
+    });
+  });
+
+  describe('reconnect', () => {
+    const base: UpstreamConfig = {
+      name: 'flaky',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+    };
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const latestClient = () =>
+      MockedClient.mock.results[MockedClient.mock.results.length - 1].value;
+
+    it('reconnects with a fresh client after the connection closes', async () => {
+      const listener = vi.fn();
+      service.onUpstreamChange(listener);
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 100 } });
+      const first = latestClient();
+
+      first.onclose();
+      expect(service.isHealthy('flaky')).toBe(false);
+      expect(service.isConnected('flaky')).toBe(false);
+      expect(service.isReconnecting('flaky')).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(MockedClient).toHaveBeenCalledTimes(2);
+      expect(service.getClient('flaky')).toBe(latestClient());
+      expect(service.getClient('flaky')).not.toBe(first);
+      expect(service.isHealthy('flaky')).toBe(true);
+      expect(service.isConnected('flaky')).toBe(true);
+      expect(service.isReconnecting('flaky')).toBe(false);
+      expect(listener).toHaveBeenCalledWith({
+        upstreamName: 'flaky',
+        kinds: ['tools', 'resources', 'prompts'],
+        reason: 'reconnected',
+      });
+    });
+
+    it('does not reconnect when reconnect is not enabled', async () => {
+      await service.connect(base);
+      latestClient().onclose();
+
+      await vi.advanceTimersByTimeAsync(60000);
+
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+      expect(service.isHealthy('flaky')).toBe(false);
+      expect(service.getStatus('flaky')?.error).toBe('Connection closed');
+    });
+
+    it('backs off exponentially and gives up after maxRetries', async () => {
+      await service.connect({ ...base, reconnect: { enabled: true, maxRetries: 3, delayMs: 100 } });
+      const refusing = () =>
+        ({
+          connect: vi.fn().mockRejectedValue(new Error('refused')),
+          close: vi.fn().mockResolvedValue(undefined),
+          setRequestHandler: vi.fn(),
+          setNotificationHandler: vi.fn(),
+        }) as never;
+      MockedClient.mockImplementationOnce(refusing)
+        .mockImplementationOnce(refusing)
+        .mockImplementationOnce(refusing);
+
+      const result = service.reconnect('flaky');
+      await vi.advanceTimersByTimeAsync(99);
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(MockedClient).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(MockedClient).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(MockedClient).toHaveBeenCalledTimes(4);
+
+      await expect(result).resolves.toBe(false);
+      expect(service.isHealthy('flaky')).toBe(false);
+      expect(service.getStatus('flaky')?.error).toBe('refused');
+    });
+
+    it('shares one in-flight cycle between concurrent callers', async () => {
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 10 } });
+
+      const a = service.reconnect('flaky');
+      const b = service.reconnect('flaky');
+      expect(b).toBe(a);
+      await vi.advanceTimersByTimeAsync(10);
+
+      await expect(a).resolves.toBe(true);
+      expect(MockedClient).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries the initial connection when it fails and reconnect is enabled', async () => {
+      MockedClient.mockImplementationOnce(
+        () =>
+          ({
+            connect: vi.fn().mockRejectedValue(new Error('not up yet')),
+            close: vi.fn().mockResolvedValue(undefined),
+            setRequestHandler: vi.fn(),
+            setNotificationHandler: vi.fn(),
+          }) as never,
+      );
+
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 50 } });
+      expect(service.isConnected('flaky')).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(service.isConnected('flaky')).toBe(true);
+    });
+
+    it('ignores onclose of a client closed by disconnect', async () => {
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 10 } });
+      const client = latestClient();
+      client.close.mockImplementation(async () => client.onclose?.());
+
+      await service.disconnect('flaky');
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+      expect(service.getClient('flaky')).toBeUndefined();
+    });
+
+    it('stops a pending reconnect when the upstream is disconnected', async () => {
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 1000 } });
+
+      const result = service.reconnect('flaky');
+      await service.disconnect('flaky');
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await expect(result).resolves.toBe(false);
+      expect(MockedClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns false for an unknown upstream', async () => {
+      await expect(service.reconnect('nope')).resolves.toBe(false);
+    });
+
+    it('does not reconnect after module destroy', async () => {
+      await service.connect({ ...base, reconnect: { enabled: true, delayMs: 10 } });
+      await service.onModuleDestroy();
+
+      await expect(service.reconnect('flaky')).resolves.toBe(false);
     });
   });
 });
