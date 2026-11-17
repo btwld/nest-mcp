@@ -58,6 +58,25 @@ breaking changes to the public API within 1.x.
 - Request-scoped providers registered under a custom injection token resolve correctly, and
   completion handlers on request-scoped providers receive the caller's request.
 
+### Client
+
+- An expired Streamable HTTP session (`404`) now starts a new session through the reconnect path;
+  without `reconnect` the client is marked disconnected. `disconnect()` ends the session with an
+  HTTP `DELETE` first, stops a reconnection in progress, and a connection closed by the caller is
+  never reopened automatically.
+- Resource subscriptions are replayed after a reconnect.
+- `onNotification` supports several handlers per method and no longer replaces the SDK's own
+  progress and cancellation handling.
+- Capabilities declared by handlers are merged per key with the `capabilities` option, so nested
+  flags survive handler registration and reconnects.
+- `connectTimeout` now takes effect (it was accepted but ignored).
+- New options: `clientInfo`, `elicitationModes` and `setElicitationHandler(handler, { modes })`
+  for URL-mode elicitation, `fetch`, `reconnectionOptions`, `sessionId`, and `stderr` for stdio.
+  Sampling, elicitation and roots handlers receive the SDK request `extra` as an optional last
+  argument.
+- `drainAllPages` accepts `{ maxPages, onTruncated }`, and the `listAll*` methods log a warning
+  when the page cap cuts a listing short.
+
 ### Server features
 
 - **Request-scoped providers**: tools, resources and prompts declared on request- or

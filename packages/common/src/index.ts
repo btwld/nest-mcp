@@ -46,6 +46,7 @@ export * from './utils/capabilities-builder';
 export * from './utils/duration';
 export { paginate, type PaginatedResult } from './utils/paginator';
 export { drainAllPages } from './utils/drain-pages';
+export type { DrainAllPagesOptions, DrainAllPagesTruncation } from './utils/drain-pages';
 export * from './utils/exposure-capabilities';
 export * from './utils/exposure-presets';
 export * from './utils/build-client-context';
