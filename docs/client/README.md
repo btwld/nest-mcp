@@ -8,7 +8,7 @@ NestJS module for connecting to and consuming [Model Context Protocol (MCP)](htt
 - **Declarative module registration** -- `forRoot` and `forRootAsync` with NestJS DI
 - **Named client injection** -- `@InjectMcpClient('name')` decorator
 - **Notification handling** -- `@OnMcpNotification` decorator for server-sent notifications
-- **Auto-reconnect** -- configurable exponential backoff on connection loss
+- **Auto-reconnect** -- configurable linear backoff on connection loss or session expiry, with resource subscriptions replayed
 - **Health checks** -- `McpClientHealthIndicator` for readiness probes
 - **OAuth support** -- re-exported OAuth utilities from the MCP SDK
 - **Testing utilities** -- `MockMcpClient` for unit tests

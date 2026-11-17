@@ -6,11 +6,13 @@
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `connect()` | `Promise<void>` | Establishes the transport connection and performs the MCP handshake |
-| `disconnect()` | `Promise<void>` | Closes the transport connection |
+| `connect()` | `Promise<void>` | Establishes the transport connection and performs the MCP handshake (bounded by `connectTimeout` when set) |
+| `disconnect()` | `Promise<void>` | Ends the session (HTTP `DELETE` for Streamable HTTP, errors ignored), closes the transport, stops any reconnection in progress and forgets tracked resource subscriptions |
 | `isConnected()` | `boolean` | Returns `true` if the client is currently connected |
 
 Connection is managed automatically by `McpClientBootstrap` during the NestJS application lifecycle. You typically do not need to call `connect()` or `disconnect()` manually.
+
+A client closed with `disconnect()` is never reconnected automatically, even if a reconnection attempt was already under way; call `connect()` to open it again.
 
 ## Tools
 
@@ -50,6 +52,8 @@ for (const tool of tools) {
 | `listAllResourceTemplates(options?)` | `RequestOptions` | `Promise<ResourceTemplate[]>` | Lists all resource templates across all pages |
 | `subscribeResource(params, options?)` | `SubscribeRequest['params']` | `Promise<...>` | Subscribes to resource change notifications |
 | `unsubscribeResource(params, options?)` | `UnsubscribeRequest['params']` | `Promise<...>` | Unsubscribes from resource change notifications |
+
+Successful `subscribeResource` calls are remembered and sent again after the client reconnects, so subscriptions survive a lost connection or an expired session. `unsubscribeResource` removes the URI from that list (even if the request itself fails). A re-subscription that fails after a reconnect is logged as a warning and does not fail the reconnect.
 
 ### Example: reading a resource
 
@@ -111,9 +115,11 @@ These methods register handlers for requests initiated by the server. Each autom
 | Method | Parameters | Description |
 |--------|-----------|-------------|
 | `setSamplingHandler(handler)` | `McpSamplingHandler` | Handles `sampling/createMessage` requests |
-| `setElicitationHandler(handler)` | `McpElicitationHandler` | Handles `elicitation/create` requests |
+| `setElicitationHandler(handler, options?)` | `McpElicitationHandler`, `{ modes?: Array<'form' \| 'url'> }` | Handles `elicitation/create` requests; form mode only unless `modes` lists `'url'` |
 | `setRootsHandler(handler)` | `McpRootsHandler` | Handles `roots/list` requests |
 | `sendRootsListChanged()` | -- | Notifies the server that the roots list has changed |
+
+Handlers receive the SDK's per-request context (`extra`: abort `signal`, `requestId`, `_meta`, `sendNotification`, `sendRequest`) as an optional extra argument. Declared capabilities are merged per key with the connection's `capabilities`, so explicit nested flags are kept. Register handlers before `connect()` so their capabilities are part of the handshake.
 
 These can also be set via the connection config (see [Connections](./connections.md)).
 
@@ -121,9 +127,9 @@ These can also be set via the connection config (see [Connections](./connections
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `onNotification(method, handler)` | method string, handler function | Registers a handler for a specific notification method |
+| `onNotification(method, handler)` | method string, handler function | Adds a handler for a specific notification method |
 
-Notification handlers persist across reconnects. See [Notifications](./notifications.md) for the decorator-based approach.
+Several handlers can be registered for the same method, and they persist across reconnects. See [Notifications](./notifications.md) for details and the decorator-based approach.
 
 ## Server info
 
@@ -136,7 +142,9 @@ Notification handlers persist across reconnects. See [Notifications](./notificat
 
 ## Pagination
 
-The `listAll*` methods (`listAllTools`, `listAllResources`, `listAllResourceTemplates`, `listAllPrompts`) handle pagination automatically using `drainAllPages` from `@nest-mcp/common`. They follow `nextCursor` tokens until all pages are fetched and return the complete array.
+The `listAll*` methods (`listAllTools`, `listAllResources`, `listAllResourceTemplates`, `listAllPrompts`) handle pagination automatically using `drainAllPages` from `@nest-mcp/common`. They follow `nextCursor` tokens until all pages are fetched and return the complete array. As a safety limit they stop after 100 pages; when that happens while the server still reports more pages, a warning is logged and the partial list is returned.
+
+`drainAllPages(fetchPage, maxPagesOrOptions?)` accepts either the page cap or `{ maxPages?, onTruncated? }`, where `onTruncated({ maxPages, itemCount, nextCursor })` is called when the cap cuts the listing short.
 
 The single-page `list*` methods return the raw paginated result including the `nextCursor` field if you need manual pagination control.
 

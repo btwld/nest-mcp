@@ -55,9 +55,17 @@ The decorated method receives a notification object:
 3. The handler is bound to the provider instance, so `this` references work correctly.
 4. If no client matches the `connectionName`, a warning is logged and the handler is skipped.
 
+## Multiple handlers and SDK handlers
+
+- Several handlers can be registered for the same method (from different providers, or by calling `onNotification()` more than once). Each registration adds a handler; none replaces another. They run in registration order.
+- Handlers are isolated from each other: an error thrown by one handler is logged and the remaining handlers still run.
+- Handlers the MCP SDK installs itself keep working. For example, registering a handler for `notifications/progress` or `notifications/cancelled` does not break `onprogress` callbacks, `resetTimeoutOnProgress`, or incoming request cancellation: the SDK's own handler runs first, then yours.
+
 ## Persistence across reconnects
 
 Notification handlers registered via `@OnMcpNotification` (or the programmatic `client.onNotification()` method) are stored internally and automatically re-applied after a reconnection. You do not need to re-register handlers when a client reconnects.
+
+Resource subscriptions made with `client.subscribeResource()` are also replayed after a reconnection, so `notifications/resources/updated` keeps arriving (see [Reconnection](./reconnection.md)).
 
 ## Programmatic alternative
 
