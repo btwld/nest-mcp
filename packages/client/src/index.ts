@@ -29,7 +29,11 @@ export type {
   McpClientTransportType,
   McpSamplingHandler,
   McpElicitationHandler,
+  McpElicitationHandlerOptions,
+  McpElicitationMode,
   McpRootsHandler,
+  McpClientRequestHandlerExtra,
+  McpClientInfo,
 } from './interfaces/client-options.interface';
 
 // Transport

@@ -87,6 +87,19 @@ describe('createSseTransport', () => {
     expect(options?.authProvider).toBe(mockAuthProvider);
   });
 
+  it('should pass a custom fetch through to the SDK transport', () => {
+    const fetchImpl = vi.fn();
+    createSseTransport({
+      name: 'test',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+      fetch: fetchImpl,
+    });
+
+    const [, options] = vi.mocked(SSEClientTransport).mock.calls[0];
+    expect(options?.fetch).toBe(fetchImpl);
+  });
+
   it('should return the created transport', () => {
     const transport = createSseTransport({
       name: 'test',

@@ -11,5 +11,8 @@ export function createStreamableHttpTransport(
   return new StreamableHTTPClientTransport(url, {
     requestInit,
     authProvider: connection.authProvider,
+    ...(connection.fetch && { fetch: connection.fetch }),
+    ...(connection.reconnectionOptions && { reconnectionOptions: connection.reconnectionOptions }),
+    ...(connection.sessionId && { sessionId: connection.sessionId }),
   });
 }

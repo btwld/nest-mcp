@@ -110,4 +110,40 @@ describe('createStreamableHttpTransport', () => {
     });
     expect(StreamableHTTPClientTransport).toHaveBeenCalledTimes(2);
   });
+
+  it('should pass fetch, reconnectionOptions and sessionId through to the SDK transport', () => {
+    const fetchImpl = vi.fn();
+    const reconnectionOptions = {
+      initialReconnectionDelay: 10,
+      maxReconnectionDelay: 100,
+      reconnectionDelayGrowFactor: 2,
+      maxRetries: 3,
+    };
+    createStreamableHttpTransport({
+      name: 'test',
+      transport: 'streamable-http',
+      url: 'http://localhost:3000/mcp',
+      fetch: fetchImpl,
+      reconnectionOptions,
+      sessionId: 'abc',
+    });
+
+    const [, options] = vi.mocked(StreamableHTTPClientTransport).mock.calls[0];
+    expect(options?.fetch).toBe(fetchImpl);
+    expect(options?.reconnectionOptions).toBe(reconnectionOptions);
+    expect(options?.sessionId).toBe('abc');
+  });
+
+  it('should not set fetch, reconnectionOptions or sessionId keys when omitted', () => {
+    createStreamableHttpTransport({
+      name: 'test',
+      transport: 'streamable-http',
+      url: 'http://localhost:3000/mcp',
+    });
+
+    const [, options] = vi.mocked(StreamableHTTPClientTransport).mock.calls[0];
+    expect(options).not.toHaveProperty('fetch');
+    expect(options).not.toHaveProperty('reconnectionOptions');
+    expect(options).not.toHaveProperty('sessionId');
+  });
 });

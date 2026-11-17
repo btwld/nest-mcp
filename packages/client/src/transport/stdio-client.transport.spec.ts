@@ -43,6 +43,23 @@ describe('createStdioTransport', () => {
     });
   });
 
+  it('should pass stderr through to StdioClientTransport', () => {
+    createStdioTransport({
+      name: 'test',
+      transport: 'stdio',
+      command: 'node',
+      stderr: 'pipe',
+    });
+
+    expect(vi.mocked(StdioClientTransport).mock.calls[0][0]).toMatchObject({ stderr: 'pipe' });
+  });
+
+  it('should not set the stderr key when omitted', () => {
+    createStdioTransport({ name: 'test', transport: 'stdio', command: 'node' });
+
+    expect(vi.mocked(StdioClientTransport).mock.calls[0][0]).not.toHaveProperty('stderr');
+  });
+
   it('should return the created transport', () => {
     const transport = createStdioTransport({
       name: 'test',
