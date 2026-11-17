@@ -267,9 +267,7 @@ describe('McpBearerGuard', () => {
     const { guard } = makeGuard(makeOptions(), verifier);
     const req = { headers: { authorization: 'Bearer tok' } };
 
-    const error = await expectHttpException(
-      guard.canActivate(makeContext(req, makeExpressRes())),
-    );
+    const error = await expectHttpException(guard.canActivate(makeContext(req, makeExpressRes())));
 
     expect(error.getStatus()).toBe(401);
     expect(error.getResponse()).toMatchObject({
