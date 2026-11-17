@@ -64,6 +64,11 @@ interface HttpResponse {
   header?: (name: string, value: string) => unknown;
 }
 
+/** JSON-RPC server-error codes the SDK transport uses for its own HTTP-level errors. */
+const RPC_BAD_REQUEST = -32000;
+const RPC_SESSION_NOT_FOUND = -32001;
+const RPC_INTERNAL_ERROR = -32603;
+
 @Injectable()
 export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StreamableHttpService.name);
@@ -76,6 +81,9 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   private readonly sessionAuth = new Map<string, { sub?: string; clientId: string }>();
   /** Lazily resolved bearer-token verifier (cached on first successful resolution). */
   private bearerVerifier?: BearerTokenVerifier;
+  /** Time of the last client request per stateful session (`session.timeout`). */
+  private readonly lastActivity = new Map<string, number>();
+  private idleSweep?: NodeJS.Timeout;
 
   private readonly registryListeners: Array<{
     event: string;
@@ -103,6 +111,37 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
           'requests will fail until then.',
       );
     }
+
+    const timeout = this.options.session?.timeout;
+    if (!this.isStateless && timeout && timeout > 0) {
+      const interval = this.options.session?.cleanupInterval ?? Math.min(timeout, 60_000);
+      this.idleSweep = setInterval(() => {
+        this.expireIdleSessions().catch((error) =>
+          this.logger.warn(`Idle session sweep failed: ${String(error)}`),
+        );
+      }, interval);
+      // Housekeeping only — never the reason a process stays alive.
+      this.idleSweep.unref?.();
+    }
+  }
+
+  /**
+   * Close stateful sessions that have had no client request for longer than
+   * `session.timeout`. A later request for such a session gets 404, which
+   * tells the client to start a new one. Returns the number of sessions closed.
+   */
+  async expireIdleSessions(now = Date.now()): Promise<number> {
+    const timeout = this.options.session?.timeout;
+    if (!timeout || timeout <= 0) return 0;
+
+    const idle = [...this.lastActivity]
+      .filter(([, last]) => now - last > timeout)
+      .map(([sessionId]) => sessionId);
+    for (const sessionId of idle) {
+      this.logger.log(`Session idle for more than ${timeout}ms, closing: ${sessionId}`);
+      await this.cleanupSession(sessionId);
+    }
+    return idle.length;
   }
 
   get isStateless(): boolean {
@@ -138,50 +177,92 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (error) {
       this.logger.error('Error handling POST request', error);
-      const resObj = res as HttpResponse;
-      if (!resObj.headersSent) {
-        resObj.status?.(500).json?.({ error: 'Internal server error' }) ??
-          resObj.code?.(500).send?.({ error: 'Internal server error' });
-      }
+      this.sendError(res, 500, RPC_INTERNAL_ERROR, 'Internal server error');
     }
   }
 
   async handleGetRequest(req: unknown, res: unknown): Promise<void> {
-    const resObj = res as HttpResponse;
     if (this.isStateless) {
-      resObj.status?.(405).json?.({ error: 'SSE not supported in stateless mode' }) ??
-        resObj.code?.(405).send?.({ error: 'SSE not supported in stateless mode' });
+      this.sendError(
+        res,
+        405,
+        RPC_BAD_REQUEST,
+        'Method not allowed: stateless mode has no stream',
+        {
+          Allow: 'POST',
+        },
+      );
       return;
     }
 
-    const reqObj = req as HttpRequest;
-    const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
-    if (!sessionId || !this.transports.has(sessionId)) {
-      resObj.status?.(404).json?.({ error: 'Session not found' }) ??
-        resObj.code?.(404).send?.({ error: 'Session not found' });
-      return;
-    }
-
-    if (!this.enforceSessionBinding(sessionId, req, res)) return;
-
-    const transport = this.transports.get(sessionId);
-    if (transport) {
-      await transport.handleRequest(rawRequestOf(req), rawResponseOf(res));
-    }
+    const transport = this.resolveSessionTransport(req, res);
+    if (!transport) return;
+    await transport.handleRequest(rawRequestOf(req), rawResponseOf(res));
   }
 
   async handleDeleteRequest(req: unknown, res: unknown): Promise<void> {
-    const reqObj = req as HttpRequest;
-    const resObj = res as HttpResponse;
-    const sessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
-    if (sessionId && this.transports.has(sessionId)) {
-      if (!this.enforceSessionBinding(sessionId, req, res)) return;
-      await this.cleanupSession(sessionId);
-      resObj.status?.(204).end?.() ?? resObj.code?.(204).send?.();
-    } else {
-      resObj.status?.(404).json?.({ error: 'Session not found' }) ??
-        resObj.code?.(404).send?.({ error: 'Session not found' });
+    if (this.isStateless) {
+      this.sendError(
+        res,
+        405,
+        RPC_BAD_REQUEST,
+        'Method not allowed: stateless mode has no session',
+        {
+          Allow: 'POST',
+        },
+      );
+      return;
     }
+
+    const transport = this.resolveSessionTransport(req, res);
+    if (!transport) return;
+    // Let the SDK transport terminate the session: it validates the protocol
+    // version, invokes `onsessionclosed`, and closes — which fires `onclose`
+    // and runs our session cleanup.
+    await transport.handleRequest(rawRequestOf(req), rawResponseOf(res));
+  }
+
+  /**
+   * Look up the transport for the request's `Mcp-Session-Id`, answering the
+   * request itself when there is none: 400 for a missing header, 404 for an
+   * unknown or terminated session (the status that tells clients to start a
+   * new session), 403 when the session belongs to another principal.
+   */
+  private resolveSessionTransport(
+    req: unknown,
+    res: unknown,
+  ): StreamableHTTPServerTransport | undefined {
+    const sessionId = (req as HttpRequest).headers?.['mcp-session-id'] as string | undefined;
+    if (!sessionId) {
+      this.sendError(res, 400, RPC_BAD_REQUEST, 'Bad Request: Mcp-Session-Id header is required');
+      return undefined;
+    }
+    const transport = this.transports.get(sessionId);
+    if (!transport) {
+      this.sendError(res, 404, RPC_SESSION_NOT_FOUND, 'Session not found');
+      return undefined;
+    }
+    if (!this.enforceSessionBinding(sessionId, req, res)) return undefined;
+    this.lastActivity.set(sessionId, Date.now());
+    return transport;
+  }
+
+  /** Answer with a JSON-RPC error body, the shape the SDK transport itself uses. */
+  private sendError(
+    res: unknown,
+    status: number,
+    code: number,
+    message: string,
+    headers?: Record<string, string>,
+  ): void {
+    const resObj = res as HttpResponse;
+    if (resObj.headersSent) return;
+    for (const [name, value] of Object.entries(headers ?? {})) {
+      if (resObj.setHeader) resObj.setHeader(name, value);
+      else resObj.header?.(name, value);
+    }
+    const body = { jsonrpc: '2.0', error: { code, message }, id: null };
+    resObj.status?.(status).json?.(body) ?? resObj.code?.(status).send?.(body);
   }
 
   private buildTransportOptions(stateless: boolean): StreamableHTTPServerTransportOptions {
@@ -217,11 +298,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
     const sub = auth?.extra?.sub as string | undefined;
     if (auth && auth.clientId === bound.clientId && sub === bound.sub) return true;
 
-    const resObj = res as HttpResponse;
-    if (!resObj.headersSent) {
-      const body = { error: 'Session does not belong to this principal' };
-      resObj.status?.(403).json?.(body) ?? resObj.code?.(403).send?.(body);
-    }
+    this.sendError(res, 403, RPC_BAD_REQUEST, 'Session does not belong to this principal');
     return false;
   }
 
@@ -247,16 +324,29 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
     const reqObj = req as HttpRequest;
     const existingSessionId = reqObj.headers?.['mcp-session-id'] as string | undefined;
 
-    if (existingSessionId && this.transports.has(existingSessionId)) {
-      if (!this.enforceSessionBinding(existingSessionId, req, res)) return;
-      const transport = this.transports.get(existingSessionId);
+    if (existingSessionId) {
+      // A request for a terminated or unknown session gets 404 — the status
+      // that tells clients to re-initialize — without building a server for it.
+      const transport = this.resolveSessionTransport(req, res);
       if (transport) {
         await transport.handleRequest(rawRequestOf(req), rawResponseOf(res), body);
       }
       return;
     }
 
-    // New session
+    // New session — refuse it when the configured session limit is reached.
+    const maxConcurrent = this.options.session?.maxConcurrent;
+    if (maxConcurrent && this.transports.size >= maxConcurrent) {
+      await this.expireIdleSessions();
+      if (this.transports.size >= maxConcurrent) {
+        this.logger.warn(`Session limit reached (${maxConcurrent}); refusing a new session`);
+        this.sendError(res, 503, RPC_BAD_REQUEST, 'Maximum concurrent sessions reached', {
+          'Retry-After': '30',
+        });
+        return;
+      }
+    }
+
     const transport = new StreamableHTTPServerTransport(this.buildTransportOptions(false));
 
     transport.onclose = () => {
@@ -275,6 +365,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
       this.servers.set(sessionId, server);
       this.contexts.set(sessionId, ctx);
       this.sdkHandles.set(sessionId, new Map());
+      this.lastActivity.set(sessionId, Date.now());
 
       const oauth = this.oauthOptions;
       const auth = reqObj.auth;
@@ -470,6 +561,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
     this.contexts.delete(sessionId);
     this.sdkHandles.delete(sessionId);
     this.sessionAuth.delete(sessionId);
+    this.lastActivity.delete(sessionId);
 
     if (transport) {
       await transport.close();
@@ -482,6 +574,7 @@ export class StreamableHttpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    if (this.idleSweep) clearInterval(this.idleSweep);
     for (const { event, listener } of this.registryListeners) {
       this.registry.events.removeListener(event, listener);
     }
