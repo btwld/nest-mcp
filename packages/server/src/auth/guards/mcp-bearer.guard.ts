@@ -15,7 +15,8 @@ import {
 import { ModuleRef } from '@nestjs/core';
 import { MCP_BEARER_TOKEN_VERIFIER, MCP_RESOURCE_SERVER_OPTIONS } from '../auth.constants';
 import type { McpResourceServerOptions } from '../interfaces/resource-server-options.interface';
-import { buildResourceMetadataUrl } from '../utils/resource-url.util';
+import { buildResourceMetadataUrl, canonicalizeResourceUri } from '../utils/resource-url.util';
+import { audienceMatches } from '../verifiers/audience.util';
 import type { BearerTokenVerifier } from '../verifiers/bearer-verifier.interface';
 
 interface HttpRequest {
@@ -76,6 +77,17 @@ export class McpBearerGuard implements CanActivate {
       const authInfo = await this.resolveVerifier().verify(token);
       if (!authInfo) {
         throw new InvalidTokenError('Invalid or expired token');
+      }
+
+      // A verifier may report the RFC 8707 resource the token is bound to.
+      // The built-in verifiers validate `aud` themselves; this covers custom
+      // ones — a token bound to another resource must not be accepted here.
+      if (
+        authInfo.resource &&
+        options.validateAudience !== false &&
+        !audienceMatches(authInfo.resource, canonicalizeResourceUri(options.resource))
+      ) {
+        throw new InvalidTokenError('Token was not issued for this resource');
       }
 
       const requiredScopes = options.requiredScopes ?? [];
