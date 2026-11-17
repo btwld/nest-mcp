@@ -28,6 +28,36 @@ breaking changes to the public API within 1.x.
   registration now reaches live sessions with `listChanged`, and sessions no longer leak a
   placeholder entry.
 
+### Protocol conformance (MCP 2025-11-25)
+
+- A server with no tools (prompts or resources only) no longer fails every connection, and a
+  prompt declared without `parameters` no longer fails `prompts/get`.
+- Cancellation relies on the SDK's per-request signal. The previous handler was shared across
+  sessions, so a cancellation could reach a request with the same id in another session, and the
+  response to a cancelled request was still sent.
+- Elicitation and sampling requests made from a tool call are tied to that call, so Streamable
+  HTTP delivers them on the call's response stream instead of dropping them when the client has
+  no standalone stream open.
+- Streamable HTTP answers an unknown or terminated `Mcp-Session-Id` with `404` (was `400` plus a
+  discarded server instance), a missing session id on `GET`/`DELETE` with `400`, and `GET`/`DELETE`
+  in stateless mode with `405`; error bodies are JSON-RPC errors. `DELETE` now goes through the
+  SDK transport, so `onsessionclosed` fires.
+- `session.timeout`, `session.maxConcurrent` and `session.cleanupInterval` now take effect for
+  stateful Streamable HTTP sessions (they were accepted but ignored). Both limits stay off unless
+  configured.
+- Tool input schemas describe what the caller sends: parameters with a default are no longer
+  listed as `required`.
+- An invalid pagination cursor, completion for an unknown prompt or resource template, and a
+  missing task in the task proxy answer with `-32602` (Invalid params). An error with code
+  `-32042` (URL elicitation required) thrown by a tool reaches the client as that protocol error.
+- Progress notifications stop once the request has completed and non-increasing values are
+  dropped.
+- A custom token verifier that reports the resource a token is bound to is now checked against
+  the configured resource. The `.well-known` discovery routes are version-neutral.
+- STDIO servers started with `bootstrapStdioApp` shut down when the client closes stdin.
+- Request-scoped providers registered under a custom injection token resolve correctly, and
+  completion handlers on request-scoped providers receive the caller's request.
+
 ### Server features
 
 - **Request-scoped providers**: tools, resources and prompts declared on request- or

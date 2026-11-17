@@ -36,8 +36,10 @@ async deleteRepo({ name }: { name: string }, ctx: McpExecutionContext) {
 }
 ```
 
-`ctx.elicit` is `undefined` when the transport/client cannot deliver
-elicitation requests — always guard.
+`ctx.elicit` is available inside tool calls. The request is tied to the tool
+call that makes it, so on Streamable HTTP it travels on that call's response
+stream. If the connected client has not declared the `elicitation` capability
+the call rejects — catch the error, or fall back to HTTP elicitation below.
 
 ## HTTP elicitation (`McpElicitationModule`)
 

@@ -42,10 +42,10 @@ export class AppModule {}
 | `resilience.retry` | `RetryConfig` | No | Global retry config |
 | `resilience.circuitBreaker` | `CircuitBreakerConfig` | No | Global circuit breaker config |
 | `middleware` | `McpMiddleware[]` | No | Global middleware functions |
-| `session` | `object` | No | Session manager settings |
-| `session.timeout` | `number` | No | Session timeout in ms (default: 30 min) |
-| `session.maxConcurrent` | `number` | No | Max concurrent sessions (default: 1000) |
-| `session.cleanupInterval` | `number` | No | Cleanup interval in ms (default: 5 min) |
+| `session` | `object` | No | Limits for stateful Streamable HTTP sessions (see [Transports](./transports.md#session-limits)) |
+| `session.timeout` | `number` | No | Close sessions with no client request for this many ms (default: no expiry) |
+| `session.maxConcurrent` | `number` | No | Refuse new sessions beyond this many (default: unlimited) |
+| `session.cleanupInterval` | `number` | No | How often idle sessions are swept, in ms (default: `min(timeout, 60000)`) |
 | `pagination` | `object` | No | Pagination settings |
 | `pagination.defaultPageSize` | `number` | No | Default page size for list operations |
 | `capabilities` | `object` | No | MCP capability flags |
