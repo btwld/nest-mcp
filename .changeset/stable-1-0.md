@@ -77,6 +77,26 @@ breaking changes to the public API within 1.x.
 - `drainAllPages` accepts `{ maxPages, onTruncated }`, and the `listAll*` methods log a warning
   when the page cap cuts a listing short.
 
+### Gateway
+
+- Tool results keep `structuredContent` and `_meta` from the upstream (also when served from the
+  cache). They were dropped while the tool's output schema was still advertised, so clients
+  rejected every structured tool.
+- Proxied prompts keep their `arguments` in `prompts/list`, and `prompts/get` forwards the
+  caller's arguments.
+- `readResource`, `readResourceTemplate` and `getPrompt` answer upstream failures with JSON-RPC
+  errors instead of returning the error as content, and read results carry gateway URIs.
+- `UpstreamConfig.timeout` cancels the upstream request when it expires and is honored above
+  60 seconds. Progress and completion context are forwarded to the upstream.
+- Tools are routed by the longest matching prefix, so prefixes may contain `_`. Duplicate
+  prefixes now fail at startup instead of overwriting each other.
+- Upstream `title`, `icons`, `_meta` and tool `execution` reach the gateway's lists.
+- `UpstreamConfig.reconnect` now takes effect (it was documented but never read; off unless
+  `enabled: true`), and an upstream's lists are re-synced after a reconnect or when the upstream
+  sends `list_changed`.
+- Dynamic builders accept `title`, `icons` and `_meta` (plus `execution` for tools and raw
+  `arguments` for prompts).
+
 ### Server features
 
 - **Request-scoped providers**: tools, resources and prompts declared on request- or
