@@ -171,6 +171,23 @@ NestJS peer dependencies (if not already installed):
 npm install @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
+## Compatibility
+
+The 1.x line is stable and follows [semantic versioning](https://semver.org/): no breaking changes to the public API within 1.x.
+
+| Requirement | Supported range |
+|-------------|-----------------|
+| NestJS | `^10.0.0`, `^11.0.0`, `^12.0.0` |
+| Node.js | `>=20` (`>=20.19` with NestJS 12, which ships as ESM) |
+| MCP TypeScript SDK | `@modelcontextprotocol/sdk` `^1.32.0` (the v1 line) |
+| Zod | `^4.0.0` |
+| HTTP platforms | Express and Fastify |
+| Module format | CommonJS, consumable from native ESM projects |
+
+**MCP protocol revisions.** The 1.x line speaks every revision supported by the v1 SDK: `2025-11-25` (default), `2025-06-18`, `2025-03-26`, and `2024-11-05`. Clients that also support those revisions — including v2 SDK clients in their default mode — connect through the regular `initialize` handshake. Native support for the `2026-07-28` revision (stateless core) requires the v2 SDK and is planned for the 2.x line; clients pinned to `2026-07-28` only cannot connect to a 1.x server.
+
+The SDK floor is `1.32.0` because earlier v1 releases are affected by published security advisories — keep `@modelcontextprotocol/sdk` up to date.
+
 ## Quick start
 
 ### Server
@@ -188,7 +205,7 @@ export class ToolsService {
   @Tool({
     name: 'greet',
     description: 'Greet a user by name',
-    schema: z.object({ name: z.string() }),
+    parameters: z.object({ name: z.string() }),
   })
   async greet({ name }: { name: string }) {
     return `Hello, ${name}!`;

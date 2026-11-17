@@ -158,6 +158,8 @@ In **stateless** mode, each POST request creates a temporary transport that is d
 
 Legacy transport using separate endpoints for the SSE connection and JSON-RPC messages.
 
+> The MCP specification has deprecated the HTTP+SSE transport in favor of Streamable HTTP. Use Streamable HTTP for new servers; SSE remains available throughout 1.x for existing clients.
+
 ```typescript
 McpModule.forRoot({
   name: 'my-server',
@@ -251,6 +253,15 @@ const app = await bootstrapStdioApp(AppModule, {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `logLevels` | `LogLevel[]` | all levels | Which NestJS log levels to emit to stderr |
+
+## HTTP Platforms
+
+The HTTP transports (Streamable HTTP and SSE) work on both `@nestjs/platform-express` and `@nestjs/platform-fastify` without extra configuration — the transport unwraps the platform request/response before handing them to the MCP SDK.
+
+Body parsing is handled either way:
+
+- When the platform already parsed the body (a global `express.json()`, Fastify's built-in JSON parser), the parsed value is passed through to the SDK.
+- When no parser ran (for example `NestFactory.create(AppModule, { bodyParser: false })`), the transport reads the raw request stream itself.
 
 ## Multiple Transports
 

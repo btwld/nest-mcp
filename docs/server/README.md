@@ -69,7 +69,7 @@ export class ToolsService {
 
 - **Decorator-driven** -- `@Tool`, `@Resource`, `@ResourceTemplate`, `@Prompt`, `@Completion`
 - **Multiple transports** -- Streamable HTTP, SSE, and STDIO
-- **OAuth 2.1 auth** -- Built-in JWT, PKCE, dynamic client registration
+- **OAuth 2.1 resource server** -- Bearer-token verification (JWKS or introspection), audience validation, RFC 9728 protected-resource metadata, per-tool scopes and roles
 - **Resilience** -- Rate limiting, circuit breaker, retry, timeout
 - **Middleware** -- Global and per-tool request pipeline
 - **Dynamic registration** -- Add/remove tools, resources, prompts at runtime
