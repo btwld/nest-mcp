@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ValidationError } from '../errors/validation.error';
 import { paginate } from './paginator';
 
 describe('paginate', () => {
@@ -46,15 +47,25 @@ describe('paginate', () => {
     expect(result.nextCursor).toBeUndefined();
   });
 
-  it('treats invalid cursor as start', () => {
-    const result = paginate(items, 'not-valid-base64url-number', 3);
-    expect(result.items).toEqual(items.slice(0, 3));
+  it('rejects a cursor that does not decode to an index', () => {
+    expect(() => paginate(items, 'not-valid-base64url-number', 3)).toThrow(ValidationError);
   });
 
-  it('treats negative decoded cursor as start', () => {
+  it('rejects a negative or fractional cursor', () => {
     const negCursor = Buffer.from('-5').toString('base64url');
-    const result = paginate(items, negCursor, 3);
-    expect(result.items).toEqual(items.slice(0, 3));
+    const fractional = Buffer.from('1.5').toString('base64url');
+    expect(() => paginate(items, negCursor, 3)).toThrow('Invalid cursor');
+    expect(() => paginate(items, fractional, 3)).toThrow('Invalid cursor');
+  });
+
+  it('reports an invalid cursor as Invalid params', () => {
+    try {
+      paginate(items, '!!!', 3);
+      throw new Error('expected paginate to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).code).toBe(-32602);
+    }
   });
 
   it('returns empty result for empty input array', () => {

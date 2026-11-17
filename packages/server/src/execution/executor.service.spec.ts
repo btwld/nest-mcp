@@ -604,13 +604,12 @@ describe('McpExecutorService', () => {
       expect(result).toEqual({ contents: [{ uri: 'file:///users/42', text: 'user data' }] });
     });
 
-    it('throws on resource not found', async () => {
-      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow(
-        ToolExecutionError,
-      );
-      await expect(executor.readResource('file:///missing', ctx)).rejects.toThrow(
-        'Resource not found',
-      );
+    it('reports a missing resource as Invalid params with the uri', async () => {
+      await expect(executor.readResource('file:///missing', ctx)).rejects.toMatchObject({
+        message: 'Resource not found: file:///missing',
+        code: -32602,
+        data: { uri: 'file:///missing' },
+      });
     });
 
     it('passes through result with contents property', async () => {
@@ -842,22 +841,40 @@ describe('McpExecutorService', () => {
       expect(result.values).toEqual([]);
     });
 
-    it('returns empty for unknown prompt', async () => {
-      const result = await executor.complete({
-        ref: { type: 'ref/prompt', name: 'nonexistent' },
-        argument: { name: 'arg', value: 'val' },
-      });
-
-      expect(result.values).toEqual([]);
+    it('rejects completion for an unknown prompt with Invalid params', async () => {
+      await expect(
+        executor.complete({
+          ref: { type: 'ref/prompt', name: 'nonexistent' },
+          argument: { name: 'arg', value: 'val' },
+        }),
+      ).rejects.toMatchObject({ code: -32602 });
     });
 
     it('returns empty for resource completion without custom handler', async () => {
+      registry.registerResourceTemplate({
+        uriTemplate: 'file:///{path}',
+        name: 'files',
+        description: 'Files',
+        methodName: 'read',
+        target: Object,
+        instance: {},
+      } as RegisteredResourceTemplate);
+
       const result = await executor.complete({
         ref: { type: 'ref/resource', uri: 'file:///{path}' },
         argument: { name: 'path', value: '/sr' },
       });
 
       expect(result.values).toEqual([]);
+    });
+
+    it('rejects completion for an unknown resource template with Invalid params', async () => {
+      await expect(
+        executor.complete({
+          ref: { type: 'ref/resource', uri: 'missing:///{id}' },
+          argument: { name: 'id', value: '' },
+        }),
+      ).rejects.toMatchObject({ code: -32602 });
     });
 
     it('caps values at 100 and sets hasMore', async () => {

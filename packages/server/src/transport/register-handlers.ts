@@ -2,8 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   CancelTaskRequestSchema,
-  CancelledNotificationSchema,
   CompleteRequestSchema,
+  ErrorCode,
   GetTaskPayloadRequestSchema,
   GetTaskRequestSchema,
   ListPromptsRequestSchema,
@@ -11,6 +11,7 @@ import {
   ListResourcesRequestSchema,
   ListTasksRequestSchema,
   ListToolsRequestSchema,
+  McpError as SdkMcpError,
   SubscribeRequestSchema,
   UnsubscribeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -23,7 +24,7 @@ import type {
   McpProgress,
   ToolContent,
 } from '@nest-mcp/common';
-import { buildClientContext } from '@nest-mcp/common';
+import { ValidationError, buildClientContext } from '@nest-mcp/common';
 import { z } from 'zod';
 import type {
   McpRegistryService,
@@ -33,6 +34,7 @@ import type {
   RegisteredTool,
   TaskHandlerConfig,
 } from '../discovery/registry.service';
+import { buildCreateMessage } from '../execution/context.factory';
 import type { ExecutionPipelineService } from '../execution/pipeline.service';
 import type { ResourceSubscriptionManager } from '../subscription/resource-subscription.manager';
 
@@ -42,13 +44,6 @@ import type { ResourceSubscriptionManager } from '../subscription/resource-subsc
  * The MCP SDK requires a Zod schema to pass arguments to the handler callback.
  */
 const PASSTHROUGH_SCHEMA = z.looseObject({});
-
-/**
- * Map of active request IDs to their AbortControllers.
- * Used to cancel in-flight tool executions when a `notifications/cancelled`
- * notification is received from the client.
- */
-const activeRequests = new Map<string | number, AbortController>();
 
 /** Headers of the originating HTTP request, as surfaced by the SDK transport. */
 interface RequestInfoLike {
@@ -85,20 +80,62 @@ function withRequestAuth(ctx: McpExecutionContext, extra: RequestAuthExtra): Mcp
   return { ...ctx, request: extra.requestInfo ?? ctx.request, authInfo: extra.authInfo, user };
 }
 
-function createSignalContext(
-  ctx: McpExecutionContext,
-  extra: { signal: AbortSignal; requestId: string | number },
-): { ctxWithSignal: McpExecutionContext; cleanup: () => void } {
-  const controller = new AbortController();
-  if (extra.signal.aborted) {
-    controller.abort();
-  } else {
-    extra.signal.addEventListener('abort', () => controller.abort(), { once: true });
-  }
-  activeRequests.set(extra.requestId, controller);
+/**
+ * Per-request context carrying the SDK's abort signal. The SDK aborts it when
+ * the client sends `notifications/cancelled` for this request (scoped to the
+ * session that owns the request) and then suppresses the response, so no
+ * cancellation bookkeeping is needed here.
+ */
+function withSignal(ctx: McpExecutionContext, extra: { signal: AbortSignal }): McpExecutionContext {
+  return { ...ctx, signal: extra.signal };
+}
+
+/**
+ * The SDK surfaces a "URL elicitation required" failure as a JSON-RPC error
+ * (code -32042) only for its own error class; anything else thrown from a tool
+ * becomes an `isError` result. Convert errors carrying that code so handlers
+ * can raise it with any error type.
+ */
+function asUrlElicitationRequired(error: unknown): unknown {
+  if (error instanceof SdkMcpError) return error;
+  const candidate = error as { code?: unknown; message?: unknown; data?: unknown } | null;
+  if (candidate?.code !== ErrorCode.UrlElicitationRequired) return error;
+  return new SdkMcpError(
+    ErrorCode.UrlElicitationRequired,
+    typeof candidate.message === 'string' ? candidate.message : 'URL elicitation required',
+    candidate.data,
+  );
+}
+
+/**
+ * The SDK installs its `tools/call`, `resources/read` and `prompts/get`
+ * handlers lazily, on the first registration of each kind. Install them up
+ * front for every declared capability: a capability that starts empty then
+ * still answers calls once items are registered dynamically, and that first
+ * dynamic registration no longer collides with the list handlers installed by
+ * {@link registerListHandlers}.
+ */
+function initializeSdkHandlers(
+  server: McpServer,
+  declared: { tools: boolean; resources: boolean; prompts: boolean },
+): void {
+  const sdk = server as unknown as {
+    setToolRequestHandlers?: () => void;
+    setResourceRequestHandlers?: () => void;
+    setPromptRequestHandlers?: () => void;
+  };
+  if (declared.tools) sdk.setToolRequestHandlers?.();
+  if (declared.resources) sdk.setResourceRequestHandlers?.();
+  if (declared.prompts) sdk.setPromptRequestHandlers?.();
+}
+
+/** Capabilities the server declares, from registered items or explicit options. */
+function declaredCapabilities(registry: McpRegistryService, options: McpModuleOptions) {
   return {
-    ctxWithSignal: { ...ctx, signal: controller.signal },
-    cleanup: () => activeRequests.delete(extra.requestId),
+    tools: registry.hasTools || !!options.capabilities?.tools,
+    resources:
+      registry.hasResources || registry.hasResourceTemplates || !!options.capabilities?.resources,
+    prompts: registry.hasPrompts || !!options.capabilities?.prompts,
   };
 }
 
@@ -112,9 +149,8 @@ export interface SdkHandle {
  * registry onto an McpServer instance, including parameter schemas, prompt
  * argument metadata, and resource mimeType information.
  *
- * Also registers:
- * - A `notifications/cancelled` handler for server-side request cancellation
- * - Custom list request handlers for cursor-based pagination
+ * Also registers custom list request handlers for cursor-based pagination.
+ * Cancellation is left to the SDK, which aborts the per-request signal.
  *
  * Shared across all transport implementations (streamable HTTP, SSE, stdio).
  */
@@ -126,6 +162,7 @@ export function registerHandlers(
   options: McpModuleOptions,
   subscriptionManager?: ResourceSubscriptionManager,
 ): void {
+  initializeSdkHandlers(server, declaredCapabilities(registry, options));
   for (const tool of registry.getAllTools()) {
     registerToolOnServer(server, tool, pipeline, ctx);
   }
@@ -138,7 +175,6 @@ export function registerHandlers(
   for (const prompt of registry.getAllPrompts()) {
     registerPromptOnServer(server, prompt, pipeline, ctx);
   }
-  registerCancellationHandler(server);
   registerListHandlers(server, pipeline, registry, options, ctx);
   registerCompletionHandler(server, pipeline, registry, options, ctx);
   if (subscriptionManager) {
@@ -192,15 +228,19 @@ export function registerToolOnServer(
     ) => {
       // Fresh spread per call: the pipeline's user write-back stays
       // request-isolated instead of mutating the shared session context.
-      const requestCtx = withRequestAuth(ctx, extra);
-      const { ctxWithSignal: baseCtxWithSignal, cleanup } = createSignalContext(requestCtx, extra);
+      const requestCtx = withSignal(withRequestAuth(ctx, extra), extra);
 
       // Build per-request reportProgress that sends notifications/progress
-      // when the client provided a progressToken in _meta
+      // when the client provided a progressToken in _meta. Progress must
+      // increase and must stop once the request has completed.
       const progressToken = extra._meta?.progressToken;
+      let finished = false;
+      let lastProgress = Number.NEGATIVE_INFINITY;
       const reportProgress =
         progressToken != null && extra.sendNotification
           ? async (progress: McpProgress) => {
+              if (finished || !(progress.progress > lastProgress)) return;
+              lastProgress = progress.progress;
               await extra.sendNotification?.({
                 method: 'notifications/progress' as const,
                 params: {
@@ -226,24 +266,33 @@ export function registerToolOnServer(
           }
         : undefined;
 
+      // Server-to-client requests made while handling this call are tied to
+      // it (`relatedRequestId`): Streamable HTTP then delivers them on this
+      // call's response stream instead of the optional standalone GET stream,
+      // where they would be dropped when the client has not opened one.
+      const related = { relatedRequestId: extra.requestId, signal: extra.signal };
+
       // Build per-request elicit that delegates to the SDK's elicitInput method
       const elicit = (params: ElicitRequest, options?: { signal?: AbortSignal }) =>
-        server.server.elicitInput(
-          params as Parameters<typeof server.server.elicitInput>[0],
-          options,
-        ) as Promise<ElicitResult>;
+        server.server.elicitInput(params as Parameters<typeof server.server.elicitInput>[0], {
+          ...related,
+          ...(options?.signal ? { signal: options.signal } : {}),
+        }) as Promise<ElicitResult>;
 
       const ctxWithSignal: McpExecutionContext = {
-        ...baseCtxWithSignal,
+        ...requestCtx,
         reportProgress,
         ...(streamContent ? { streamContent } : {}),
         elicit,
+        ...(requestCtx.createMessage ? { createMessage: buildCreateMessage(server, related) } : {}),
       };
 
       try {
         return await pipeline.callTool(tool.name, args, ctxWithSignal);
+      } catch (error) {
+        throw asUrlElicitationRequired(error);
       } finally {
-        cleanup();
+        finished = true;
       }
     },
   );
@@ -271,12 +320,7 @@ export function registerResourceOnServer(
       uri: URL,
       extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
     ) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
-      try {
-        return await pipeline.readResource(uri.href, ctxWithSignal);
-      } finally {
-        cleanup();
-      }
+      return pipeline.readResource(uri.href, withSignal(withRequestAuth(ctx, extra), extra));
     },
   );
 }
@@ -305,12 +349,7 @@ export function registerResourceTemplateOnServer(
       _variables: Record<string, string>,
       extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
     ) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
-      try {
-        return await pipeline.readResource(uri.href, ctxWithSignal);
-      } finally {
-        cleanup();
-      }
+      return pipeline.readResource(uri.href, withSignal(withRequestAuth(ctx, extra), extra));
     },
   );
 }
@@ -325,9 +364,10 @@ export function registerPromptOnServer(
   pipeline: ExecutionPipelineService,
   ctx: McpExecutionContext,
 ): SdkHandle {
-  return (
+  type PromptExtra = RequestAuthExtra & { signal: AbortSignal; requestId: string | number };
+  const handle = (
     server as unknown as {
-      registerPrompt: (...args: unknown[]) => SdkHandle;
+      registerPrompt: (...args: unknown[]) => SdkHandle & { argsSchema?: unknown };
     }
   ).registerPrompt(
     prompt.name,
@@ -335,35 +375,23 @@ export function registerPromptOnServer(
       description: prompt.description,
       argsSchema: prompt.parameters?.shape,
     },
-    async (
-      args: Record<string, unknown>,
-      extra: RequestAuthExtra & { signal: AbortSignal; requestId: string | number },
-    ) => {
-      const { ctxWithSignal, cleanup } = createSignalContext(withRequestAuth(ctx, extra), extra);
-      try {
-        return await pipeline.getPrompt(prompt.name, args, ctxWithSignal);
-      } finally {
-        cleanup();
-      }
+    // The SDK invokes `cb(args, extra)` for prompts that have an args schema
+    // and `cb(extra)` for prompts that do not.
+    async (...callbackArgs: [Record<string, unknown>, PromptExtra] | [PromptExtra]) => {
+      const [args, extra] =
+        callbackArgs.length > 1
+          ? (callbackArgs as [Record<string, unknown>, PromptExtra])
+          : [{}, callbackArgs[0] as PromptExtra];
+      return pipeline.getPrompt(prompt.name, args, withSignal(withRequestAuth(ctx, extra), extra));
     },
   );
-}
-
-/**
- * Registers a `notifications/cancelled` handler on the low-level SDK Server
- * to abort in-flight tool executions when the client sends a cancellation.
- */
-function registerCancellationHandler(server: McpServer): void {
-  server.server.setNotificationHandler(CancelledNotificationSchema, async (notification) => {
-    const requestId = notification.params?.requestId;
-    if (requestId != null) {
-      const controller = activeRequests.get(requestId);
-      if (controller) {
-        controller.abort();
-        activeRequests.delete(requestId);
-      }
-    }
-  });
+  // Prompts without a Zod schema (no parameters, or dynamically registered
+  // with raw argument metadata) still receive the caller's arguments: give
+  // the SDK a permissive schema so it forwards them instead of dropping them.
+  if (!prompt.parameters && handle) {
+    handle.argsSchema = PASSTHROUGH_SCHEMA;
+  }
+  return handle;
 }
 
 /**
@@ -391,28 +419,29 @@ function registerListHandlers(
   options: McpModuleOptions,
   ctx: McpExecutionContext,
 ): void {
-  server.server.setRequestHandler(
-    ListToolsRequestSchema,
-    async (request, extra?: ListHandlerExtra) => {
-      const cursor = request.params?.cursor;
-      const clientContext = buildClientContext({
-        transport: ctx.transport,
-        request: extra?.requestInfo ?? ctx.request,
-      });
-      const result = await pipeline.listTools(cursor, clientContext, {
-        scopes: extra?.authInfo?.scopes,
-      });
-      return {
-        tools: result.items,
-        ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
-      };
-    },
-  );
+  const declared = declaredCapabilities(registry, options);
 
-  const hasResources =
-    registry.hasResources || registry.hasResourceTemplates || !!options.capabilities?.resources;
+  if (declared.tools) {
+    server.server.setRequestHandler(
+      ListToolsRequestSchema,
+      async (request, extra?: ListHandlerExtra) => {
+        const cursor = request.params?.cursor;
+        const clientContext = buildClientContext({
+          transport: ctx.transport,
+          request: extra?.requestInfo ?? ctx.request,
+        });
+        const result = await pipeline.listTools(cursor, clientContext, {
+          scopes: extra?.authInfo?.scopes,
+        });
+        return {
+          tools: result.items,
+          ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+        };
+      },
+    );
+  }
 
-  if (hasResources) {
+  if (declared.resources) {
     server.server.setRequestHandler(
       ListResourcesRequestSchema,
       async (request, extra?: ListHandlerExtra) => {
@@ -440,9 +469,7 @@ function registerListHandlers(
     );
   }
 
-  const hasPrompts = registry.hasPrompts || !!options.capabilities?.prompts;
-
-  if (hasPrompts) {
+  if (declared.prompts) {
     server.server.setRequestHandler(
       ListPromptsRequestSchema,
       async (request, extra?: ListHandlerExtra) => {
@@ -520,13 +547,13 @@ function registerTaskProxyHandlers(server: McpServer, config: TaskHandlerConfig)
 
   server.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
     const task = await config.getTask(request.params.taskId);
-    if (!task) throw new Error(`Task "${request.params.taskId}" not found`);
+    if (!task) throw new ValidationError(`Task "${request.params.taskId}" not found`);
     return task;
   });
 
   server.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
     const task = await config.cancelTask(request.params.taskId);
-    if (!task) throw new Error(`Task "${request.params.taskId}" not found`);
+    if (!task) throw new ValidationError(`Task "${request.params.taskId}" not found`);
     return task;
   });
 

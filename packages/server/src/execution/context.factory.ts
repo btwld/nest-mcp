@@ -10,6 +10,30 @@ import type {
 import type { McpSamplingContent } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
+/**
+ * Build the `createMessage` (sampling) function exposed on the execution
+ * context. `requestOptions` ties the server-to-client request to the client
+ * request being handled, so Streamable HTTP delivers it on that request's
+ * response stream and cancelling the request cancels the sampling call.
+ */
+export function buildCreateMessage(
+  server: McpServer,
+  requestOptions?: { relatedRequestId?: string | number; signal?: AbortSignal },
+): (params: McpSamplingParams) => Promise<McpSamplingResult> {
+  return async (params) => {
+    if (!server.server.getClientCapabilities()?.sampling) {
+      throw new Error('Connected client does not support sampling');
+    }
+    const result = await server.server.createMessage(params, requestOptions);
+    return {
+      role: result.role,
+      content: result.content as McpSamplingContent,
+      model: result.model,
+      stopReason: result.stopReason,
+    };
+  };
+}
+
 @Injectable()
 export class McpContextFactory {
   createContext(options: {
@@ -41,22 +65,7 @@ export class McpContextFactory {
       ...(options.notifyResourceUpdated
         ? { notifyResourceUpdated: options.notifyResourceUpdated }
         : {}),
-      ...(server
-        ? {
-            createMessage: async (params: McpSamplingParams): Promise<McpSamplingResult> => {
-              if (!server.server.getClientCapabilities()?.sampling) {
-                throw new Error('Connected client does not support sampling');
-              }
-              const result = await server.server.createMessage(params);
-              return {
-                role: result.role,
-                content: result.content as McpSamplingContent,
-                model: result.model,
-                stopReason: result.stopReason,
-              };
-            },
-          }
-        : {}),
+      ...(server ? { createMessage: buildCreateMessage(server) } : {}),
       log: {
         debug: (message, data) => {
           logger.debug(message, data);

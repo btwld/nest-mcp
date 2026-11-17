@@ -2,7 +2,9 @@ import {
   type CompletionRequest,
   type CompletionResult,
   JSON_RPC_INTERNAL_ERROR,
+  JSON_RPC_INVALID_PARAMS,
   MCP_OPTIONS,
+  MCP_URL_ELICITATION_REQUIRED,
   McpError,
   type McpExecutionContext,
   type McpModuleOptions,
@@ -132,7 +134,7 @@ export class McpExecutorService {
   buildToolEntries(): ToolListEntry[] {
     return this.registry.getAllTools().map((tool): ToolListEntry => {
       const inputSchema = tool.parameters
-        ? (zodToJsonSchema(tool.parameters) as Record<string, unknown>)
+        ? (zodToJsonSchema(tool.parameters, 'input') as Record<string, unknown>)
         : (tool.inputSchema ?? { type: 'object' });
       const outputSchema = tool.outputSchema
         ? (zodToJsonSchema(tool.outputSchema) as Record<string, unknown>)
@@ -212,6 +214,11 @@ export class McpExecutorService {
       return this.normalizeToolResult(result, tool);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
+        throw error;
+      }
+      // "URL elicitation required" is a protocol-level signal for the client,
+      // not a tool failure — let it through untouched.
+      if ((error as { code?: unknown } | null)?.code === MCP_URL_ELICITATION_REQUIRED) {
         throw error;
       }
       const err = error instanceof Error ? error : new Error(String(error));
@@ -349,7 +356,7 @@ export class McpExecutorService {
       }
     }
 
-    throw new ToolExecutionError('resources/read', `Resource not found: ${uri}`);
+    throw new McpError(`Resource not found: ${uri}`, JSON_RPC_INVALID_PARAMS, { uri });
   }
 
   /**
@@ -478,7 +485,8 @@ export class McpExecutorService {
     argument: { name: string; value: string },
   ): CompletionResult {
     const prompt = this.registry.getPrompt(promptName);
-    if (!prompt?.parameters) return { values: [] };
+    if (!prompt) throw new ValidationError(`Prompt '${promptName}' not found`);
+    if (!prompt.parameters) return { values: [] };
 
     if (!(prompt.parameters instanceof ZodObject)) return { values: [] };
     const shape = prompt.parameters.shape;
@@ -499,9 +507,13 @@ export class McpExecutorService {
   }
 
   private defaultResourceComplete(
-    _uri: string,
+    uri: string,
     _argument: { name: string; value: string },
   ): CompletionResult {
+    const known =
+      this.registry.getAllResourceTemplates().some((t) => t.uriTemplate === uri) ||
+      this.registry.getResource(uri) !== undefined;
+    if (!known) throw new ValidationError(`Resource template '${uri}' not found`);
     // Resource template completion requires domain-specific knowledge.
     // Without a custom handler, return empty results.
     return { values: [] };

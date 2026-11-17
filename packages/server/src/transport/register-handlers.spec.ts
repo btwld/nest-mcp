@@ -1,3 +1,4 @@
+import { McpError as SdkMcpError } from '@modelcontextprotocol/sdk/types.js';
 import type { McpExecutionContext, McpModuleOptions } from '@nest-mcp/common';
 import { McpTransportType } from '@nest-mcp/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -284,16 +285,13 @@ describe('registerHandlers', () => {
 
   // --- Cancellation ---
 
-  it('registers notifications/cancelled handler on inner server', () => {
+  it('leaves cancellation to the SDK instead of replacing its handler', () => {
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
-    expect(mockInnerServer.setNotificationHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ shape: expect.any(Object) }),
-      expect.any(Function),
-    );
+    expect(mockInnerServer.setNotificationHandler).not.toHaveBeenCalled();
   });
 
-  it('cancellation handler aborts in-flight request', async () => {
+  it('tool context carries the SDK request signal, which aborts on cancellation', async () => {
     mockRegistry.getAllTools.mockReturnValue([
       { name: 'slow', description: 'Slow', parameters: null },
     ]);
@@ -311,26 +309,53 @@ describe('registerHandlers', () => {
 
     const registerTool = mockServer.registerTool as ReturnType<typeof vi.fn>;
     const callback = registerTool.mock.calls[0][2];
-    const mockExtra = { signal: new AbortController().signal, requestId: 'req-42' };
+    const controller = new AbortController();
+    const mockExtra = { signal: controller.signal, requestId: 'req-42' };
 
     // Start the tool call (don't await)
     const callPromise = callback({}, mockExtra);
 
-    // Get the signal passed to the pipeline
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
-    expect(passedCtx.signal).toBeDefined();
+    expect(passedCtx.signal).toBe(controller.signal);
     expect(passedCtx.signal?.aborted).toBe(false);
 
-    // Invoke the cancellation handler
-    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
-    await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-42' } });
-
-    // Signal should now be aborted
+    // The SDK aborts the request signal when the client cancels the request
+    controller.abort();
     expect(passedCtx.signal?.aborted).toBe(true);
 
     // Resolve the blocked call to clean up
     resolveCall({ content: [] });
     await callPromise;
+  });
+
+  it('requests with the same id in different sessions keep separate signals', async () => {
+    const tool = { name: 'slow', description: 'Slow', parameters: null };
+    mockRegistry.getAllTools.mockReturnValue([tool]);
+    const pending: Array<(value: unknown) => void> = [];
+    mockPipeline.callTool.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+
+    const first = new AbortController();
+    const second = new AbortController();
+    const firstCall = callback({}, { signal: first.signal, requestId: 1 });
+    const secondCall = callback({}, { signal: second.signal, requestId: 1 });
+
+    first.abort();
+
+    const firstCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
+    const secondCtx = mockPipeline.callTool.mock.calls[1][2] as McpExecutionContext;
+    expect(firstCtx.signal?.aborted).toBe(true);
+    expect(secondCtx.signal?.aborted).toBe(false);
+
+    for (const resolve of pending) resolve({ content: [] });
+    await Promise.all([firstCall, secondCall]);
   });
 
   it('resource callback passes signal through context', async () => {
@@ -350,7 +375,7 @@ describe('registerHandlers', () => {
     expect(passedCtx.signal?.aborted).toBe(false);
   });
 
-  it('resource cancellation aborts in-flight call', async () => {
+  it('resource context signal aborts with the SDK request signal', async () => {
     mockRegistry.getAllResources.mockReturnValue([
       { name: 'slow', uri: 'data://slow', mimeType: undefined },
     ]);
@@ -367,16 +392,17 @@ describe('registerHandlers', () => {
 
     const resource = mockServer.resource as ReturnType<typeof vi.fn>;
     const callback = resource.mock.calls[0][3];
-    const mockExtra = { signal: new AbortController().signal, requestId: 'req-r3' };
+    const controller = new AbortController();
 
-    const callPromise = callback(new URL('data://slow'), mockExtra);
+    const callPromise = callback(new URL('data://slow'), {
+      signal: controller.signal,
+      requestId: 'req-r3',
+    });
 
     const passedCtx = mockPipeline.readResource.mock.calls[0][1] as McpExecutionContext;
     expect(passedCtx.signal?.aborted).toBe(false);
 
-    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
-    await cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'req-r3' } });
-
+    controller.abort();
     expect(passedCtx.signal?.aborted).toBe(true);
 
     resolveCall({ contents: [] });
@@ -400,22 +426,76 @@ describe('registerHandlers', () => {
     expect(passedCtx.signal?.aborted).toBe(false);
   });
 
-  it('cancellation handler is a no-op when notification has no requestId', async () => {
+  it('prompt callback accepts the single-argument form used without an args schema', async () => {
+    mockRegistry.getAllPrompts.mockReturnValue([{ name: 'hello', description: 'Hello' }]);
+
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
-    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
-    await expect(
-      cancelHandler({ method: 'notifications/cancelled', params: {} }),
-    ).resolves.toBeUndefined();
+    const registerPrompt = mockServer.registerPrompt as ReturnType<typeof vi.fn>;
+    const callback = registerPrompt.mock.calls[0][2];
+    const controller = new AbortController();
+    // The SDK calls `cb(extra)` when the prompt has no args schema.
+    await callback({ signal: controller.signal, requestId: 'req-q2' });
+
+    expect(mockPipeline.getPrompt).toHaveBeenCalledWith(
+      'hello',
+      {},
+      expect.objectContaining({ signal: controller.signal }),
+    );
   });
 
-  it('cancellation handler is a no-op when requestId is not tracked', async () => {
+  it('gives prompts without a Zod schema a permissive args schema', () => {
+    const handle: { remove: () => void; argsSchema?: unknown } = { remove: vi.fn() };
+    (mockServer.registerPrompt as ReturnType<typeof vi.fn>).mockReturnValue(handle);
+    mockRegistry.getAllPrompts.mockReturnValue([{ name: 'hello', description: 'Hello' }]);
+
     registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
 
-    const cancelHandler = mockInnerServer.setNotificationHandler.mock.calls[0][1];
-    await expect(
-      cancelHandler({ method: 'notifications/cancelled', params: { requestId: 'unknown-req' } }),
-    ).resolves.toBeUndefined();
+    const schema = handle.argsSchema as { parse: (value: unknown) => unknown };
+    expect(schema).toBeDefined();
+    expect(schema.parse({ anything: 'goes' })).toEqual({ anything: 'goes' });
+  });
+
+  it('keeps the Zod args schema for prompts that declare parameters', () => {
+    const handle: { remove: () => void; argsSchema?: unknown } = { remove: vi.fn() };
+    (mockServer.registerPrompt as ReturnType<typeof vi.fn>).mockReturnValue(handle);
+    mockRegistry.getAllPrompts.mockReturnValue([
+      { name: 'greet', description: 'Greet', parameters: z.object({ name: z.string() }) },
+    ]);
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    expect(handle.argsSchema).toBeUndefined();
+  });
+
+  it('does not register tools/list when the tools capability is not declared', () => {
+    mockRegistry.hasTools = false;
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    const methods = mockInnerServer.setRequestHandler.mock.calls.map(
+      (call: unknown[]) =>
+        (call[0] as { shape?: { method?: { value?: string } } })?.shape?.method?.value,
+    );
+    expect(methods).not.toContain('tools/list');
+    expect(methods).toContain('prompts/list');
+  });
+
+  it('initializes the SDK handlers of every declared capability up front', () => {
+    const sdkInit = {
+      setToolRequestHandlers: vi.fn(),
+      setResourceRequestHandlers: vi.fn(),
+      setPromptRequestHandlers: vi.fn(),
+    };
+    Object.assign(mockServer, sdkInit);
+    mockRegistry.hasPrompts = false;
+    mockOptions = { ...mockOptions, capabilities: { resources: { subscribe: true } } };
+
+    registerHandlers(mockServer, mockRegistry, mockPipeline, ctx, mockOptions);
+
+    expect(sdkInit.setToolRequestHandlers).toHaveBeenCalledTimes(1);
+    expect(sdkInit.setResourceRequestHandlers).toHaveBeenCalledTimes(1);
+    expect(sdkInit.setPromptRequestHandlers).not.toHaveBeenCalled();
   });
 
   // --- Pagination ---
@@ -1067,16 +1147,29 @@ describe('registerToolOnServer', () => {
       sendNotification,
     };
 
+    mockPipeline.callTool.mockImplementation(
+      async (_name: string, _args: unknown, callCtx: McpExecutionContext) => {
+        await callCtx.reportProgress({ progress: 50, total: 100, message: 'halfway' });
+        // Progress must increase: a repeated or lower value is dropped.
+        await callCtx.reportProgress({ progress: 50 });
+        await callCtx.reportProgress({ progress: 20 });
+        return { content: [] };
+      },
+    );
+
     await callback({}, mockExtra);
 
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
     expect(passedCtx.reportProgress).not.toBe(ctx.reportProgress);
-
-    await passedCtx.reportProgress({ progress: 50, total: 100, message: 'halfway' });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledWith({
       method: 'notifications/progress',
       params: { progressToken: 'tok-1', progress: 50, total: 100, message: 'halfway' },
     });
+
+    // Progress must stop once the request has completed.
+    await passedCtx.reportProgress({ progress: 99 });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
   });
 
   it('tool callback uses session reportProgress when no progressToken', async () => {
@@ -1107,10 +1200,14 @@ describe('registerToolOnServer', () => {
       sendNotification,
     };
 
-    await callback({}, mockExtra);
+    mockPipeline.callTool.mockImplementation(
+      async (_name: string, _args: unknown, callCtx: McpExecutionContext) => {
+        await callCtx.reportProgress({ progress: 10 });
+        return { content: [] };
+      },
+    );
 
-    const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
-    await passedCtx.reportProgress({ progress: 10 });
+    await callback({}, mockExtra);
 
     expect(sendNotification).toHaveBeenCalledWith({
       method: 'notifications/progress',
@@ -1204,14 +1301,57 @@ describe('registerToolOnServer', () => {
     registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
 
     const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
-    await callback({}, { signal: new AbortController().signal, requestId: 'req-e1' });
+    const requestSignal = new AbortController().signal;
+    await callback({}, { signal: requestSignal, requestId: 'req-e1' });
 
     const passedCtx = mockPipeline.callTool.mock.calls[0][2] as McpExecutionContext;
     expect(passedCtx.elicit).toBeDefined();
 
+    // Tied to the originating request, so it travels on that request's stream.
     const elicitParams = { method: 'elicitation/create', params: {} };
     await passedCtx.elicit(elicitParams as never, { signal: undefined });
-    expect(elicitInput).toHaveBeenCalledWith(elicitParams, { signal: undefined });
+    expect(elicitInput).toHaveBeenCalledWith(elicitParams, {
+      relatedRequestId: 'req-e1',
+      signal: requestSignal,
+    });
+
+    const override = new AbortController().signal;
+    await passedCtx.elicit(elicitParams as never, { signal: override });
+    expect(elicitInput).toHaveBeenLastCalledWith(elicitParams, {
+      relatedRequestId: 'req-e1',
+      signal: override,
+    });
+  });
+
+  it('tool callback surfaces a URL-elicitation-required error as the SDK protocol error', async () => {
+    const tool = { name: 'needs-auth', description: 'Needs auth', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+    const failure = Object.assign(new Error('Authorize first'), {
+      code: -32042,
+      data: { elicitations: [] },
+    });
+    mockPipeline.callTool.mockRejectedValue(failure);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    const thrown = await callback(
+      {},
+      { signal: new AbortController().signal, requestId: 'req-u1' },
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(SdkMcpError);
+    expect(thrown).toMatchObject({ code: -32042, data: { elicitations: [] } });
+  });
+
+  it('tool callback rethrows other errors unchanged', async () => {
+    const tool = { name: 'boom', description: 'Boom', parameters: null };
+    registerToolOnServer(mockServer as never, tool as never, mockPipeline as never, ctx);
+    const failure = new Error('boom');
+    mockPipeline.callTool.mockRejectedValue(failure);
+
+    const callback = (mockServer.registerTool as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    await expect(
+      callback({}, { signal: new AbortController().signal, requestId: 'req-u2' }),
+    ).rejects.toBe(failure);
   });
 
   // --- Per-request auth context (stale-ctx fix) ---

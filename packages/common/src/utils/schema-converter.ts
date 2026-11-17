@@ -3,10 +3,21 @@ import { ZodObject, type ZodType, z } from 'zod';
 /**
  * Converts a Zod schema to JSON Schema compatible with MCP specification.
  * Uses Zod v4's native z.toJSONSchema() for accurate conversion.
+ *
+ * `io` selects which side of the schema is described. Use `'input'` for what
+ * a caller sends (tool parameters): fields with a default are then optional
+ * and transforms are described by their input type. `'output'` (the default)
+ * describes the parsed value, which is right for output schemas.
  */
-export function zodToJsonSchema(schema: ZodType): Record<string, unknown> {
+export function zodToJsonSchema(
+  schema: ZodType,
+  io: 'input' | 'output' = 'output',
+): Record<string, unknown> {
   // Strip $schema metadata — not needed for MCP tool/resource schemas
-  const { $schema: _$schema, ...result } = z.toJSONSchema(schema) as Record<string, unknown>;
+  const { $schema: _$schema, ...result } = z.toJSONSchema(schema, { io }) as Record<
+    string,
+    unknown
+  >;
   return result;
 }
 
