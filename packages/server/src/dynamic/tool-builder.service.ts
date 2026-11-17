@@ -1,4 +1,10 @@
-import type { McpExecutionContext, ToolAnnotations, ToolCallResult } from '@nest-mcp/common';
+import type {
+  Icon,
+  McpExecutionContext,
+  ToolAnnotations,
+  ToolCallResult,
+  ToolExecution,
+} from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
@@ -6,6 +12,8 @@ import type { RegisteredTool } from '../discovery/registry.service';
 
 export interface DynamicToolConfig {
   name: string;
+  /** Human-readable display title (surfaced in `tools/list`). */
+  title?: string;
   description: string;
   parameters?: ZodType;
   inputSchema?: Record<string, unknown>;
@@ -13,6 +21,11 @@ export interface DynamicToolConfig {
   /** Raw JSON schema for output — used when no Zod outputSchema is available (e.g. gateway-proxied tools). */
   rawOutputSchema?: Record<string, unknown>;
   annotations?: ToolAnnotations;
+  icons?: Icon[];
+  /** Execution hints surfaced in `tools/list` (e.g. `{ taskSupport: 'forbidden' }`). */
+  execution?: ToolExecution;
+  /** Free-form metadata surfaced as the tool's `_meta` in `tools/list`. */
+  _meta?: Record<string, unknown>;
   handler: (
     args: Record<string, unknown>,
     ctx: McpExecutionContext,
@@ -41,6 +54,10 @@ export class McpToolBuilder {
       outputSchema: config.outputSchema,
       rawOutputSchema: config.rawOutputSchema,
       annotations: config.annotations,
+      ...(config.title !== undefined ? { title: config.title } : {}),
+      ...(config.icons ? { icons: config.icons } : {}),
+      ...(config.execution ? { execution: config.execution } : {}),
+      ...(config._meta ? { _meta: config._meta } : {}),
       methodName: config.name,
       target: handlerWrapper.constructor as abstract new (...args: unknown[]) => unknown,
       instance: handlerWrapper,

@@ -98,7 +98,10 @@ export type { DynamicToolConfig } from './dynamic/tool-builder.service';
 export { McpResourceBuilder } from './dynamic/resource-builder.service';
 export type { DynamicResourceConfig } from './dynamic/resource-builder.service';
 export { McpPromptBuilder } from './dynamic/prompt-builder.service';
-export type { DynamicPromptConfig } from './dynamic/prompt-builder.service';
+export type {
+  DynamicPromptArgument,
+  DynamicPromptConfig,
+} from './dynamic/prompt-builder.service';
 
 // Observability
 export { MetricsService } from './observability/metrics.service';
