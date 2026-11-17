@@ -33,6 +33,16 @@ import {
 import type { SdkHandle } from '../register-handlers';
 
 /**
+ * Strip trailing slashes with a linear scan — the URL is client-controlled, so
+ * a backtracking pattern such as `/\/+$/` must not run over it.
+ */
+function stripTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === '/') end--;
+  return path.slice(0, end);
+}
+
+/**
  * Derive the messages-endpoint path advertised to the client in the SSE
  * `endpoint` event. When the app mounts controllers behind a path prefix
  * (`app.setGlobalPrefix`, `RouterModule`), the incoming SSE request path
@@ -53,7 +63,7 @@ export function resolveMessagesPath(
   const rawUrl = r?.originalUrl ?? r?.raw?.originalUrl ?? r?.url ?? r?.raw?.url;
   if (typeof rawUrl !== 'string' || rawUrl.length === 0) return messagesPath;
 
-  const path = rawUrl.split('?')[0].replace(/\/+$/, '');
+  const path = stripTrailingSlashes(rawUrl.split('?')[0]);
   const ssePath = sseEndpoint.startsWith('/') ? sseEndpoint : `/${sseEndpoint}`;
   if (path === ssePath || !path.endsWith(ssePath)) return messagesPath;
 
