@@ -10,6 +10,30 @@ import type {
 import type { McpSamplingContent } from '@nest-mcp/common';
 import { Injectable, Logger } from '@nestjs/common';
 
+/**
+ * Build the `createMessage` (sampling) function exposed on the execution
+ * context. `requestOptions` ties the server-to-client request to the client
+ * request being handled, so Streamable HTTP delivers it on that request's
+ * response stream and cancelling the request cancels the sampling call.
+ */
+export function buildCreateMessage(
+  server: McpServer,
+  requestOptions?: { relatedRequestId?: string | number; signal?: AbortSignal },
+): (params: McpSamplingParams) => Promise<McpSamplingResult> {
+  return async (params) => {
+    if (!server.server.getClientCapabilities()?.sampling) {
+      throw new Error('Connected client does not support sampling');
+    }
+    const result = await server.server.createMessage(params, requestOptions);
+    return {
+      role: result.role,
+      content: result.content as McpSamplingContent,
+      model: result.model,
+      stopReason: result.stopReason,
+    };
+  };
+}
+
 @Injectable()
 export class McpContextFactory {
   createContext(options: {
@@ -25,6 +49,10 @@ export class McpContextFactory {
     const logger = new Logger(`MCP:${options.sessionId.slice(0, 8)}`);
     const loggerName = `MCP:${options.sessionId.slice(0, 8)}`;
     const server = options.mcpServer;
+    // `logging/setLevel` stores the client's level keyed by the TRANSPORT
+    // session id (SDK `Server`). Pass the same key on every message or the
+    // SDK's per-session level filtering never applies.
+    const transportSessionId = () => server?.server?.transport?.sessionId;
 
     return {
       sessionId: options.sessionId,
@@ -37,61 +65,58 @@ export class McpContextFactory {
       ...(options.notifyResourceUpdated
         ? { notifyResourceUpdated: options.notifyResourceUpdated }
         : {}),
-      ...(server
-        ? {
-            createMessage: async (params: McpSamplingParams): Promise<McpSamplingResult> => {
-              if (!server.server.getClientCapabilities()?.sampling) {
-                throw new Error('Connected client does not support sampling');
-              }
-              const result = await server.server.createMessage(params);
-              return {
-                role: result.role,
-                content: result.content as McpSamplingContent,
-                model: result.model,
-                stopReason: result.stopReason,
-              };
-            },
-          }
-        : {}),
+      ...(server ? { createMessage: buildCreateMessage(server) } : {}),
       log: {
         debug: (message, data) => {
           logger.debug(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'debug',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'debug',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         info: (message, data) => {
           logger.log(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'info',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'info',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         warn: (message, data) => {
           logger.warn(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'warning',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'warning',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
         error: (message, data) => {
           logger.error(message, data);
           server
-            ?.sendLoggingMessage({
-              level: 'error',
-              logger: loggerName,
-              data: data ? { message, ...data } : message,
-            })
+            ?.sendLoggingMessage(
+              {
+                level: 'error',
+                logger: loggerName,
+                data: data ? { message, ...data } : message,
+              },
+              transportSessionId(),
+            )
             .catch(() => {});
         },
       },

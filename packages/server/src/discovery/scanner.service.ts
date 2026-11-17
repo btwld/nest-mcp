@@ -33,18 +33,35 @@ export class McpScannerService implements OnModuleInit {
     const serverTargetedTokens = this.collectServerTargetedTokens();
 
     for (const [, moduleRef] of this.modulesContainer) {
-      for (const [, wrapper] of moduleRef.providers) {
+      for (const [token, wrapper] of moduleRef.providers) {
         const instance = wrapper?.instance;
-        if (!instance || !instance.constructor) continue;
+        const metatype = wrapper?.metatype as (new (...args: unknown[]) => unknown) | undefined;
+        const providerClass = instance?.constructor ?? metatype;
+        if (!providerClass) continue;
 
         // If this provider is explicitly targeted at a server, filter by current server
-        const targetedServers = serverTargetedTokens.get(instance.constructor as InjectionToken);
+        const targetedServers = serverTargetedTokens.get(providerClass as InjectionToken);
         if (targetedServers && !targetedServers.includes(this.options.name)) {
           continue;
         }
 
-        if (this.hasAnyMcpDecorator(instance)) {
-          this.registry.registerProvider(instance);
+        // Request/transient-scoped wrappers expose a never-constructed shell
+        // object as `instance` (Nest creates it via Object.create for lazy
+        // instantiation), so instance truthiness alone cannot distinguish
+        // scoped providers from singletons.
+        const isStatic = this.isDependencyTreeStatic(wrapper) && Boolean(instance?.constructor);
+
+        if (isStatic && instance?.constructor) {
+          if (this.hasAnyMcpDecorator(Object.getPrototypeOf(instance))) {
+            this.registry.registerProvider(instance);
+          }
+        } else if (typeof metatype === 'function' && metatype.prototype) {
+          // Scoped providers have no usable boot-time instance — register the
+          // class (and the token it is provided under) so the executor
+          // resolves a fresh one per call.
+          if (this.hasAnyMcpDecorator(metatype.prototype)) {
+            this.registry.registerProviderClass(metatype, token);
+          }
         }
       }
     }
@@ -81,8 +98,19 @@ export class McpScannerService implements OnModuleInit {
     return map;
   }
 
-  private hasAnyMcpDecorator(instance: unknown): boolean {
-    const prototype = Object.getPrototypeOf(instance);
+  /**
+   * True when the wrapper's whole dependency tree is singleton-scoped (a
+   * request/transient provider anywhere in the tree makes it per-request).
+   * Falls back to `true` for wrapper mocks that lack the Nest API.
+   */
+  private isDependencyTreeStatic(wrapper: unknown): boolean {
+    const candidate = wrapper as { isDependencyTreeStatic?: () => boolean };
+    return typeof candidate.isDependencyTreeStatic === 'function'
+      ? candidate.isDependencyTreeStatic()
+      : true;
+  }
+
+  private hasAnyMcpDecorator(prototype: object): boolean {
     const methodNames = Object.getOwnPropertyNames(prototype).filter(
       (name) => name !== 'constructor',
     );

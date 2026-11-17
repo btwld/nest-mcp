@@ -101,6 +101,97 @@ describe('RouterService', () => {
     });
   });
 
+  describe('prefixes containing underscores', () => {
+    beforeEach(() => {
+      service.configure(
+        [
+          { name: 'my-api', url: 'http://localhost', transport: 'sse', toolPrefix: 'my_api' },
+          { name: 'my', url: 'http://localhost', transport: 'sse' },
+        ],
+        routing,
+      );
+    });
+
+    it('routes to the longest matching prefix', () => {
+      expect(service.resolve('my_api_tool')).toEqual({
+        upstreamName: 'my-api',
+        originalToolName: 'tool',
+      });
+    });
+
+    it('falls back to a shorter prefix when the longer one does not match', () => {
+      expect(service.resolve('my_tool')).toEqual({ upstreamName: 'my', originalToolName: 'tool' });
+    });
+
+    it('matches only the full prefix followed by an underscore', () => {
+      service.configure(
+        [{ name: 'a', url: 'http://localhost', transport: 'sse', toolPrefix: 'a_b_c' }],
+        routing,
+      );
+      expect(service.resolve('a_b_c_d')).toEqual({ upstreamName: 'a', originalToolName: 'd' });
+      expect(service.resolve('a_b_d')).toBeUndefined();
+    });
+
+    it('warns when one prefix overlaps another', () => {
+      const warn = vi.spyOn(
+        (service as unknown as { logger: { warn: (m: string) => void } }).logger,
+        'warn',
+      );
+      service.configure(
+        [
+          { name: 'api', url: 'http://localhost', transport: 'sse' },
+          { name: 'v2', url: 'http://localhost', transport: 'sse', toolPrefix: 'api_v2' },
+        ],
+        routing,
+      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('"api_v2"'));
+    });
+  });
+
+  describe('duplicate prefixes', () => {
+    it('throws when two upstreams share a toolPrefix', () => {
+      expect(() =>
+        service.configure(
+          [
+            { name: 'a', url: 'http://localhost', transport: 'sse', toolPrefix: 'x' },
+            { name: 'b', url: 'http://localhost', transport: 'sse', toolPrefix: 'x' },
+          ],
+          routing,
+        ),
+      ).toThrow(/Duplicate tool prefix "x" for upstreams "a" and "b"/);
+    });
+
+    it('throws when a toolPrefix collides with another upstream name', () => {
+      expect(() =>
+        service.configure(
+          [
+            { name: 'github', url: 'http://localhost', transport: 'sse' },
+            { name: 'gh2', url: 'http://localhost', transport: 'sse', toolPrefix: 'github' },
+          ],
+          routing,
+        ),
+      ).toThrow(/Duplicate tool prefix "github"/);
+    });
+
+    it('ignores disabled upstreams when checking for duplicates', () => {
+      expect(() =>
+        service.configure(
+          [
+            { name: 'a', url: 'http://localhost', transport: 'sse', toolPrefix: 'x' },
+            {
+              name: 'b',
+              url: 'http://localhost',
+              transport: 'sse',
+              toolPrefix: 'x',
+              enabled: false,
+            },
+          ],
+          routing,
+        ),
+      ).not.toThrow();
+    });
+  });
+
   describe('buildPrefixedName', () => {
     it('should join prefix and tool name with underscore', () => {
       expect(service.buildPrefixedName('gh', 'listRepos')).toBe('gh_listRepos');

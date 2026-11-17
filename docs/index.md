@@ -73,7 +73,7 @@ import { ToolsService } from './tools.service';
     McpModule.forRoot({
       name: 'my-server',
       version: '1.0.0',
-      transports: [{ type: McpTransportType.STREAMABLE_HTTP }],
+      transport: McpTransportType.STREAMABLE_HTTP,
     }),
   ],
   providers: [ToolsService],
@@ -88,7 +88,7 @@ import { z } from 'zod';
 
 @Injectable()
 export class ToolsService {
-  @Tool({ name: 'greet', description: 'Greet a user', schema: z.object({ name: z.string() }) })
+  @Tool({ name: 'greet', description: 'Greet a user', parameters: z.object({ name: z.string() }) })
   async greet({ name }: { name: string }) {
     return `Hello, ${name}!`;
   }

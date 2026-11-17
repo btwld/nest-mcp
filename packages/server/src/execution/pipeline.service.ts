@@ -302,8 +302,9 @@ export class ExecutionPipelineService {
 
   // ---- Completions ----
 
-  async complete(request: CompletionRequest): Promise<CompletionResult> {
-    return this.executor.complete(request);
+  async complete(request: CompletionRequest, ctx?: McpExecutionContext): Promise<CompletionResult> {
+    if (!ctx) return this.executor.complete(request);
+    return this.requestContext.run(ctx, () => this.executor.complete(request, ctx));
   }
 
   // ---- Helpers ----

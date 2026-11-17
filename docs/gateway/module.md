@@ -113,7 +113,8 @@ On application bootstrap (`onApplicationBootstrap`), the module runs the followi
 8. **Register resources** -- aggregates resources from all upstreams
 9. **Register prompts** -- aggregates prompts from all upstreams
 10. **Register resource templates** -- aggregates resource templates from all upstreams
-11. **Register completion handlers** -- sets up autocompletion for prompts and resource templates
+11. **Register completion handlers** -- sets up autocompletion for prompts and resource templates (the completion `context.arguments` sent by the client is forwarded to the upstream)
+12. **Watch upstream changes** -- subscribes to upstream list-changed notifications and reconnects, and keeps the registered tools, resources, resource templates and prompts in sync (see [Upstreams](./upstreams.md#runtime-list-changes))
 
 ## Exported providers
 

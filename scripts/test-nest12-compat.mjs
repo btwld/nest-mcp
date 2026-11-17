@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureSource = join(repositoryRoot, 'test', 'compat', 'nest12-esm');
-const exactNestVersion = '12.0.0-alpha.5';
-const expectedNestPeerRange = '^10.0.0 || ^11.0.0 || 12.0.0-alpha.5';
+const exactNestVersion = '12.5.1';
+const expectedNestPeerRange = '^10.0.0 || ^11.0.0 || ^12.0.0';
 const nestWorkspaceDependencies = new Set([
   '@nestjs/common',
   '@nestjs/core',
@@ -61,7 +61,7 @@ async function verifyNestPeerRanges() {
       assert.equal(
         manifest.peerDependencies?.[peer],
         expectedNestPeerRange,
-        `${manifest.name} must advertise the exact tested Nest 12 alpha peer`,
+        `${manifest.name} must advertise the supported Nest peer range`,
       );
     }
   }

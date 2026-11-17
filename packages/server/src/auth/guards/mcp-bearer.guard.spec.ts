@@ -258,6 +258,44 @@ describe('McpBearerGuard', () => {
     expect(res.setHeader.mock.calls[0][1]).toContain(', scope="read write", resource_metadata=');
   });
 
+  // --- Resource reported by a custom verifier ---
+
+  it('rejects a token whose verifier-reported resource is a different resource', async () => {
+    const verifier = {
+      verify: vi.fn(async () => makeAuthInfo({ resource: 'https://other.example.com/mcp' })),
+    };
+    const { guard } = makeGuard(makeOptions(), verifier);
+    const req = { headers: { authorization: 'Bearer tok' } };
+
+    const error = await expectHttpException(guard.canActivate(makeContext(req, makeExpressRes())));
+
+    expect(error.getStatus()).toBe(401);
+    expect(error.getResponse()).toMatchObject({
+      error: 'invalid_token',
+      error_description: 'Token was not issued for this resource',
+    });
+  });
+
+  it('accepts a verifier-reported resource that matches after canonicalization', async () => {
+    const verifier = {
+      verify: vi.fn(async () => makeAuthInfo({ resource: 'https://API.example.com/mcp/' })),
+    };
+    const { guard } = makeGuard(makeOptions(), verifier);
+    const req = { headers: { authorization: 'Bearer tok' } };
+
+    await expect(guard.canActivate(makeContext(req, makeExpressRes()))).resolves.toBe(true);
+  });
+
+  it('skips the resource check when audience validation is disabled', async () => {
+    const verifier = {
+      verify: vi.fn(async () => makeAuthInfo({ resource: 'https://other.example.com/mcp' })),
+    };
+    const { guard } = makeGuard(makeOptions({ validateAudience: false }), verifier);
+    const req = { headers: { authorization: 'Bearer tok' } };
+
+    await expect(guard.canActivate(makeContext(req, makeExpressRes()))).resolves.toBe(true);
+  });
+
   it('passes when the token carries all required scopes', async () => {
     const authInfo = makeAuthInfo({ scopes: ['read', 'write', 'admin'] });
     const verifier = { verify: vi.fn().mockResolvedValue(authInfo) };

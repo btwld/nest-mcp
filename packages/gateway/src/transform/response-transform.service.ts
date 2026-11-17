@@ -11,6 +11,14 @@ export interface ToolCallResponse {
   upstreamName: string;
   content: ToolContent[];
   isError?: boolean;
+  /**
+   * Structured result from the upstream. Tools that advertise an
+   * `outputSchema` must return it, so transforms that rewrite `content`
+   * should keep this field consistent.
+   */
+  structuredContent?: Record<string, unknown>;
+  /** Upstream result metadata. */
+  _meta?: Record<string, unknown>;
 }
 
 @Injectable()

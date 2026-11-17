@@ -51,7 +51,7 @@ export function getToolSchema(
       continue;
     }
     const inputSchema = meta.parameters
-      ? (zodToJsonSchema(meta.parameters) as Record<string, unknown>)
+      ? (zodToJsonSchema(meta.parameters, 'input') as Record<string, unknown>)
       : (meta.inputSchema ?? { type: 'object' });
     schemas.push({
       name: meta.name,

@@ -64,7 +64,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bodyParser must be disabled: the MCP transports read the raw
+  // request stream themselves. A pre-consumed body surfaces as
+  // JSON-RPC -32700 "Parse error: Invalid JSON".
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   await app.listen(3000);
 }
 bootstrap();

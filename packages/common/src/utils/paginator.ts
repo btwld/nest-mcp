@@ -1,3 +1,5 @@
+import { ValidationError } from '../errors/validation.error';
+
 export interface PaginatedResult<T> {
   items: T[];
   nextCursor?: string;
@@ -23,7 +25,11 @@ function encodeCursor(index: number): string {
 }
 
 function decodeCursor(cursor: string): number {
-  const decoded = Number(Buffer.from(cursor, 'base64url').toString());
-  if (Number.isNaN(decoded) || decoded < 0) return 0;
+  const text = Buffer.from(cursor, 'base64url').toString();
+  const decoded = Number(text);
+  // Spec: an invalid cursor is an Invalid params error, not "start over".
+  if (text.trim() === '' || !Number.isInteger(decoded) || decoded < 0) {
+    throw new ValidationError('Invalid cursor');
+  }
   return decoded;
 }

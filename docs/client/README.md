@@ -8,7 +8,7 @@ NestJS module for connecting to and consuming [Model Context Protocol (MCP)](htt
 - **Declarative module registration** -- `forRoot` and `forRootAsync` with NestJS DI
 - **Named client injection** -- `@InjectMcpClient('name')` decorator
 - **Notification handling** -- `@OnMcpNotification` decorator for server-sent notifications
-- **Auto-reconnect** -- configurable exponential backoff on connection loss
+- **Auto-reconnect** -- configurable linear backoff on connection loss or session expiry, with resource subscriptions replayed
 - **Health checks** -- `McpClientHealthIndicator` for readiness probes
 - **OAuth support** -- re-exported OAuth utilities from the MCP SDK
 - **Testing utilities** -- `MockMcpClient` for unit tests
@@ -31,9 +31,9 @@ The following packages must be installed in your project:
 
 | Package | Version |
 |---------|---------|
-| `@modelcontextprotocol/sdk` | `^1.10.0` |
-| `@nestjs/common` | `^10.0.0 \|\| ^11.0.0 \|\| 12.0.0-alpha.5` |
-| `@nestjs/core` | `^10.0.0 \|\| ^11.0.0 \|\| 12.0.0-alpha.5` |
+| `@modelcontextprotocol/sdk` | `^1.32.0` |
+| `@nestjs/common` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
+| `@nestjs/core` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
 | `reflect-metadata` | `>=0.1.13` |
 | `rxjs` | `^7.0.0` |
 
@@ -94,4 +94,4 @@ export class MyService {
 
 ## License
 
-MIT
+BSD-3-Clause

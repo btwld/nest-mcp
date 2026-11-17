@@ -8,5 +8,6 @@ export function createStdioTransport(connection: McpClientStdioConnection): Tran
     args: connection.args,
     env: connection.env,
     cwd: connection.cwd,
+    ...(connection.stderr !== undefined && { stderr: connection.stderr }),
   });
 }

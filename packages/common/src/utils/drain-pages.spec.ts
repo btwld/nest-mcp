@@ -66,6 +66,51 @@ describe('drainAllPages', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('accepts an options object with maxPages', async () => {
+    const fetch = vi.fn().mockResolvedValue({ data: [1], nextCursor: 'next' });
+    const result = await drainAllPages(fetch, { maxPages: 2 });
+    expect(result).toEqual([1, 1]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('defaults to 100 pages when the options object omits maxPages', async () => {
+    const fetch = vi.fn().mockResolvedValue({ data: [1], nextCursor: 'next' });
+    const onTruncated = vi.fn();
+    await drainAllPages(fetch, { onTruncated });
+    expect(fetch).toHaveBeenCalledTimes(100);
+    expect(onTruncated).toHaveBeenCalledWith({
+      maxPages: 100,
+      itemCount: 100,
+      nextCursor: 'next',
+    });
+  });
+
+  it('calls onTruncated once when the page cap is reached with a cursor left', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [1, 2], nextCursor: 'p2' })
+      .mockResolvedValueOnce({ data: [3], nextCursor: 'p3' });
+    const onTruncated = vi.fn();
+
+    const result = await drainAllPages(fetch, { maxPages: 2, onTruncated });
+
+    expect(result).toEqual([1, 2, 3]);
+    expect(onTruncated).toHaveBeenCalledTimes(1);
+    expect(onTruncated).toHaveBeenCalledWith({ maxPages: 2, itemCount: 3, nextCursor: 'p3' });
+  });
+
+  it('does not call onTruncated when the last page has no cursor', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [1], nextCursor: 'p2' })
+      .mockResolvedValueOnce({ data: [2], nextCursor: undefined });
+    const onTruncated = vi.fn();
+
+    await drainAllPages(fetch, { maxPages: 2, onTruncated });
+
+    expect(onTruncated).not.toHaveBeenCalled();
+  });
+
   it('accumulates items from exactly two pages', async () => {
     const fetch = vi
       .fn()

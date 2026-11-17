@@ -130,6 +130,35 @@ describe('Dynamic Builders', () => {
       expect(listener).not.toHaveBeenCalled();
     });
 
+    it('propagates display metadata: title, icons, execution, _meta', () => {
+      const icons = [{ src: 'https://example.com/icon.png', mimeType: 'image/png' }];
+      builder.register({
+        name: 'meta-tool',
+        title: 'Meta Tool',
+        description: 'with metadata',
+        icons,
+        execution: { taskSupport: 'forbidden' },
+        _meta: { vendor: 'x' },
+        handler: async () => 'ok',
+      });
+
+      const tool = registry.getTool('meta-tool');
+      expect(tool?.title).toBe('Meta Tool');
+      expect(tool?.icons).toBe(icons);
+      expect(tool?.execution).toEqual({ taskSupport: 'forbidden' });
+      expect(tool?._meta).toEqual({ vendor: 'x' });
+    });
+
+    it('does not set display metadata keys that were not provided', () => {
+      builder.register({ name: 'plain', description: 'plain', handler: async () => 'ok' });
+
+      const tool = registry.getTool('plain');
+      expect(tool).not.toHaveProperty('title');
+      expect(tool).not.toHaveProperty('icons');
+      expect(tool).not.toHaveProperty('execution');
+      expect(tool).not.toHaveProperty('_meta');
+    });
+
     it('propagates Zod parameters and outputSchema', () => {
       const parameters = z.object({ query: z.string() });
       const outputSchema = z.object({ result: z.string() });
@@ -216,6 +245,23 @@ describe('Dynamic Builders', () => {
       const resource = registry.getResource('file:///typed.json');
       expect(resource?.description).toBe('A typed resource');
       expect(resource?.mimeType).toBe('application/json');
+    });
+
+    it('propagates title, icons and _meta', () => {
+      const icons = [{ src: 'https://example.com/r.png' }];
+      builder.register({
+        uri: 'file:///meta.txt',
+        name: 'meta',
+        title: 'Meta resource',
+        icons,
+        _meta: { k: 1 },
+        handler: async () => 'x',
+      });
+
+      const resource = registry.getResource('file:///meta.txt');
+      expect(resource?.title).toBe('Meta resource');
+      expect(resource?.icons).toBe(icons);
+      expect(resource?._meta).toEqual({ k: 1 });
     });
 
     it('emits resource.registered event on register', () => {
@@ -355,6 +401,66 @@ describe('Dynamic Builders', () => {
       const prompt = registry.getPrompt('zod-prompt');
       expect(prompt?.parameters).toBe(parameters);
     });
+
+    it('builds a string argument schema from raw arguments', () => {
+      builder.register({
+        name: 'raw-prompt',
+        description: 'Raw prompt',
+        arguments: [
+          { name: 'topic', description: 'The topic', required: true },
+          { name: 'tone', title: 'Tone' },
+        ],
+        handler: async () => ({ messages: [] }),
+      });
+
+      const parameters = registry.getPrompt('raw-prompt')?.parameters;
+      expect(parameters).toBeDefined();
+      expect(parameters?.safeParse({ topic: 'cats', tone: 'dry' }).success).toBe(true);
+      expect(parameters?.safeParse({ tone: 'dry' }).success).toBe(false);
+      expect(parameters?.safeParse({ topic: 1 }).success).toBe(false);
+    });
+
+    it('builds an empty schema for an empty argument list', () => {
+      builder.register({
+        name: 'no-args',
+        description: 'No args',
+        arguments: [],
+        handler: async () => ({ messages: [] }),
+      });
+
+      const parameters = registry.getPrompt('no-args')?.parameters;
+      expect(parameters).toBeDefined();
+      expect(Object.keys(parameters?.shape ?? {})).toEqual([]);
+    });
+
+    it('prefers Zod parameters over raw arguments', () => {
+      const parameters = z.object({ topic: z.string() });
+      builder.register({
+        name: 'both',
+        description: 'Both',
+        parameters,
+        arguments: [{ name: 'other' }],
+        handler: async () => ({ messages: [] }),
+      });
+
+      expect(registry.getPrompt('both')?.parameters).toBe(parameters);
+    });
+
+    it('propagates title, icons and _meta', () => {
+      builder.register({
+        name: 'meta-prompt',
+        title: 'Meta prompt',
+        description: 'Meta',
+        icons: [{ src: 'https://example.com/p.png' }],
+        _meta: { a: true },
+        handler: async () => ({ messages: [] }),
+      });
+
+      const prompt = registry.getPrompt('meta-prompt');
+      expect(prompt?.title).toBe('Meta prompt');
+      expect(prompt?.icons).toEqual([{ src: 'https://example.com/p.png' }]);
+      expect(prompt?._meta).toEqual({ a: true });
+    });
   });
 
   describe('Integration: builder -> executor', () => {
@@ -423,6 +529,115 @@ describe('Dynamic Builders', () => {
       expect(result.messages[0].content).toEqual({
         type: 'text',
         text: 'Summarize: long text',
+      });
+    });
+
+    it('listPrompts advertises raw prompt arguments', async () => {
+      const promptBuilder = new McpPromptBuilder(registry);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
+
+      promptBuilder.register({
+        name: 'translate',
+        title: 'Translate',
+        description: 'Translate text',
+        arguments: [
+          { name: 'text', description: 'Text to translate', required: true },
+          { name: 'lang' },
+        ],
+        handler: async () => ({ messages: [] }),
+      });
+
+      const { items } = await executor.listPrompts();
+      expect(items).toEqual([
+        {
+          name: 'translate',
+          title: 'Translate',
+          description: 'Translate text',
+          arguments: [
+            { name: 'text', description: 'Text to translate', required: true },
+            { name: 'lang', description: undefined, required: false },
+          ],
+        },
+      ]);
+    });
+
+    it('getPrompt passes declared raw arguments to the handler unchanged', async () => {
+      const promptBuilder = new McpPromptBuilder(registry);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
+      const handler = vi.fn().mockResolvedValue({ messages: [] });
+
+      promptBuilder.register({
+        name: 'translate',
+        description: 'Translate text',
+        arguments: [{ name: 'text', required: true }, { name: 'lang' }],
+        handler,
+      });
+
+      await executor.getPrompt('translate', { text: 'hola', lang: 'en' }, mockMcpContext());
+      expect(handler).toHaveBeenCalledWith({ text: 'hola', lang: 'en' }, expect.anything());
+    });
+
+    it('listTools surfaces dynamic tool display metadata', async () => {
+      const toolBuilder = new McpToolBuilder(registry);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
+
+      toolBuilder.register({
+        name: 'meta-tool',
+        title: 'Meta Tool',
+        description: 'with metadata',
+        inputSchema: { type: 'object' },
+        icons: [{ src: 'https://example.com/i.png' }],
+        execution: { taskSupport: 'forbidden' },
+        _meta: { vendor: 'x' },
+        handler: async () => 'ok',
+      });
+
+      const { items } = await executor.listTools();
+      expect(items[0]).toMatchObject({
+        name: 'meta-tool',
+        title: 'Meta Tool',
+        icons: [{ src: 'https://example.com/i.png' }],
+        execution: { taskSupport: 'forbidden' },
+        _meta: { vendor: 'x' },
+      });
+    });
+
+    it('callTool returns structuredContent and _meta from a handler result unchanged', async () => {
+      const toolBuilder = new McpToolBuilder(registry);
+      const executor = new McpExecutorService(
+        registry,
+        new McpExceptionFilterRunner(new Reflector()),
+        defaultOptions,
+      );
+
+      toolBuilder.register({
+        name: 'structured',
+        description: 'Structured',
+        rawOutputSchema: { type: 'object', properties: { n: { type: 'number' } } },
+        handler: async () => ({
+          content: [{ type: 'text', text: '{"n":1}' }],
+          structuredContent: { n: 1 },
+          _meta: { trace: 'abc' },
+        }),
+      });
+
+      const result = await executor.callTool('structured', {}, mockMcpContext());
+      expect(result).toEqual({
+        content: [{ type: 'text', text: '{"n":1}' }],
+        structuredContent: { n: 1 },
+        _meta: { trace: 'abc' },
       });
     });
   });

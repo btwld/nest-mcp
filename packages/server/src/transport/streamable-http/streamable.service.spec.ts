@@ -735,7 +735,11 @@ describe('StreamableHttpService session-identity binding', () => {
     );
 
     expect(res.statusCode).toBe(403);
-    expect(res.body).toEqual({ error: 'Session does not belong to this principal' });
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Session does not belong to this principal' },
+      id: null,
+    });
     expect(transport.handleRequest).toHaveBeenCalledTimes(1);
   });
 
@@ -748,7 +752,11 @@ describe('StreamableHttpService session-identity binding', () => {
       forbidden,
     );
     expect(forbidden.statusCode).toBe(403);
-    expect(forbidden.body).toEqual({ error: 'Session does not belong to this principal' });
+    expect(forbidden.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Session does not belong to this principal' },
+      id: null,
+    });
 
     const allowed = makeExpressRes();
     await service.handleGetRequest(
@@ -770,13 +778,15 @@ describe('StreamableHttpService session-identity binding', () => {
     expect(forbidden.statusCode).toBe(403);
     expect(transport.close).not.toHaveBeenCalled();
 
+    // The owner's DELETE is handed to the SDK transport, which terminates the
+    // session (and invokes `onsessionclosed`) itself.
     const allowed = makeExpressRes();
     await service.handleDeleteRequest(
       makeReq({ 'mcp-session-id': 'sess-1' }, makeAuthInfo('user-a')),
       allowed,
     );
-    expect(allowed.statusCode).toBe(204);
-    expect(transport.close).toHaveBeenCalledTimes(1);
+    expect(allowed.statusCode).toBeUndefined();
+    expect(transport.handleRequest).toHaveBeenCalledTimes(2);
   });
 
   it('rejects requests from a different client of the same user', async () => {
@@ -808,7 +818,11 @@ describe('StreamableHttpService session-identity binding', () => {
     await service.handleGetRequest(makeReq({ 'mcp-session-id': 'sess-1' }), res);
 
     expect(res.statusCode).toBe(403);
-    expect(res.body).toEqual({ error: 'Session does not belong to this principal' });
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Session does not belong to this principal' },
+      id: null,
+    });
     expect(transport.handleRequest).toHaveBeenCalledTimes(1);
   });
 
@@ -819,7 +833,11 @@ describe('StreamableHttpService session-identity binding', () => {
     await service.handleDeleteRequest(makeReq({ 'mcp-session-id': 'sess-1' }), res);
 
     expect(res.statusCode).toBe(403);
-    expect(res.body).toEqual({ error: 'Session does not belong to this principal' });
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Session does not belong to this principal' },
+      id: null,
+    });
     expect(transport.close).not.toHaveBeenCalled();
   });
 
@@ -980,5 +998,112 @@ describe('StreamableHttpService Fastify raw unwrapping', () => {
     expect(rawReq.auth).toBe(auth);
     // Stateless cleanup listens on the RAW response (Fastify reply has no `on`).
     expect(rawRes.on).toHaveBeenCalledWith('close', expect.any(Function));
+  });
+});
+
+describe('StreamableHttpService session status codes', () => {
+  beforeEach(() => {
+    hoisted.transports.length = 0;
+  });
+
+  it('answers 404 for a POST to an unknown session without creating a transport', async () => {
+    const { service } = makeService(makeServiceOptions());
+
+    const res = makeExpressRes();
+    await service.handlePostRequest(makeReq({ 'mcp-session-id': 'gone' }), res);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Session not found' },
+      id: null,
+    });
+    expect(hoisted.transports).toHaveLength(0);
+  });
+
+  it('answers 400 for GET and DELETE without a session id', async () => {
+    const { service } = makeService(makeServiceOptions());
+
+    const getRes = makeExpressRes();
+    await service.handleGetRequest(makeReq(), getRes);
+    expect(getRes.statusCode).toBe(400);
+
+    const deleteRes = makeExpressRes();
+    await service.handleDeleteRequest(makeReq(), deleteRes);
+    expect(deleteRes.statusCode).toBe(400);
+    expect(deleteRes.body).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
+  });
+
+  it('answers 404 for GET and DELETE on an unknown session', async () => {
+    const { service } = makeService(makeServiceOptions());
+
+    const getRes = makeExpressRes();
+    await service.handleGetRequest(makeReq({ 'mcp-session-id': 'gone' }), getRes);
+    expect(getRes.statusCode).toBe(404);
+
+    const deleteRes = makeExpressRes();
+    await service.handleDeleteRequest(makeReq({ 'mcp-session-id': 'gone' }), deleteRes);
+    expect(deleteRes.statusCode).toBe(404);
+  });
+
+  it('answers 405 with an Allow header for GET and DELETE in stateless mode', async () => {
+    const { service } = makeService(makeServiceOptions({ stateless: true }));
+
+    for (const handle of [service.handleGetRequest, service.handleDeleteRequest]) {
+      const res = makeExpressRes();
+      await handle.call(service, makeReq({ 'mcp-session-id': 'sess-1' }), res);
+      expect(res.statusCode).toBe(405);
+      expect(res.setHeader).toHaveBeenCalledWith('Allow', 'POST');
+    }
+  });
+});
+
+describe('StreamableHttpService session limits', () => {
+  beforeEach(() => {
+    hoisted.transports.length = 0;
+  });
+
+  function withSession(session: McpModuleOptions['session'], ids: string[]) {
+    const queue = [...ids];
+    const options = makeServiceOptions({ sessionIdGenerator: () => queue.shift() ?? 'extra' });
+    return makeService({ ...options, session });
+  }
+
+  it('closes sessions idle for longer than session.timeout and answers 404 afterwards', async () => {
+    const { service } = withSession({ timeout: 1000 }, ['sess-1']);
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+    const transport = lastTransport();
+
+    expect(await service.expireIdleSessions(Date.now() + 500)).toBe(0);
+    expect(await service.expireIdleSessions(Date.now() + 5000)).toBe(1);
+    expect(transport.close).toHaveBeenCalled();
+
+    const res = makeExpressRes();
+    await service.handlePostRequest(makeReq({ 'mcp-session-id': 'sess-1' }), res);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('never expires sessions when no timeout is configured', async () => {
+    const { service } = withSession(undefined, ['sess-1']);
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+
+    expect(await service.expireIdleSessions(Date.now() + 10 * 60 * 60 * 1000)).toBe(0);
+  });
+
+  it('refuses a new session with 503 once session.maxConcurrent is reached', async () => {
+    const { service } = withSession({ maxConcurrent: 1 }, ['sess-1', 'sess-2']);
+    await service.handlePostRequest(makeReq(), makeExpressRes());
+
+    const res = makeExpressRes();
+    await service.handlePostRequest(makeReq(), res);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '30');
+    expect(hoisted.transports).toHaveLength(1);
+
+    // Requests on the existing session are still served.
+    const existing = makeExpressRes();
+    await service.handlePostRequest(makeReq({ 'mcp-session-id': 'sess-1' }), existing);
+    expect(existing.statusCode).toBeUndefined();
   });
 });

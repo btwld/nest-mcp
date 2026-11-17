@@ -55,5 +55,16 @@ export async function bootstrapStdioApp(
     }
   }
 
+  // An MCP client ends a stdio session by closing the server's stdin. Close
+  // the application then, so lifecycle hooks run and the process can exit.
+  let closing = false;
+  const shutdown = () => {
+    if (closing) return;
+    closing = true;
+    app.close().catch(() => {});
+  };
+  process.stdin.once('end', shutdown);
+  process.stdin.once('close', shutdown);
+
   return app;
 }

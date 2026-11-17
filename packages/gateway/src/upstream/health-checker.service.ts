@@ -52,9 +52,21 @@ export class HealthCheckerService implements OnModuleDestroy {
       this.upstreamManager.setHealthy(name, true);
       return true;
     } catch (error) {
+      // A reconnect may have swapped the client while this ping was in
+      // flight; a failure of the replaced client says nothing about the new one.
+      if (this.upstreamManager.getClient(name) !== client) return false;
+
       const message = extractErrorMessage(error);
       this.logger.warn(`Health check failed for "${name}": ${message}`);
       this.upstreamManager.setHealthy(name, false, message);
+
+      if (
+        this.upstreamManager.getConfig(name)?.reconnect?.enabled === true &&
+        !this.upstreamManager.isReconnecting(name)
+      ) {
+        this.logger.log(`Reconnecting to "${name}" after a failed health check`);
+        void this.upstreamManager.reconnect(name);
+      }
       return false;
     }
   }

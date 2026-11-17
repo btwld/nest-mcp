@@ -29,6 +29,7 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import type {
   McpElicitationHandler,
+  McpElicitationHandlerOptions,
   McpRootsHandler,
   McpSamplingHandler,
 } from '../interfaces/client-options.interface';
@@ -177,7 +178,10 @@ export class MockMcpClient {
     // no-op in mock — handler not invoked
   }
 
-  setElicitationHandler(_handler: McpElicitationHandler): void {
+  setElicitationHandler(
+    _handler: McpElicitationHandler,
+    _options?: McpElicitationHandlerOptions,
+  ): void {
     // no-op in mock — handler not invoked
   }
 

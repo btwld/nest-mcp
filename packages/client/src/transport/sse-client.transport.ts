@@ -9,5 +9,6 @@ export function createSseTransport(connection: McpClientSseConnection): Transpor
   return new SSEClientTransport(url, {
     requestInit,
     authProvider: connection.authProvider,
+    ...(connection.fetch && { fetch: connection.fetch }),
   });
 }

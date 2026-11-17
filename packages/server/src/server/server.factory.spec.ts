@@ -53,7 +53,7 @@ describe('createMcpServer', () => {
   });
 
   // Reads the SDK Server's private `_instructions` — the only place the value
-  // lands before an initialize round-trip. Pinned to @modelcontextprotocol/sdk ^1.26.
+  // lands before an initialize round-trip. Pinned to @modelcontextprotocol/sdk 1.x.
   function instructionsOf(server: McpServer): string | undefined {
     return (server.server as unknown as { _instructions?: string })._instructions;
   }

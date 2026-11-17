@@ -254,4 +254,108 @@ describe('ToolAggregatorService', () => {
       expect(service.getCachedTools()).toEqual([]);
     });
   });
+
+  describe('metadata passthrough', () => {
+    const listWith = (tool: Record<string, unknown>) => {
+      upstreamManager.getAllNames.mockReturnValue(['api']);
+      upstreamManager.getClient.mockReturnValue({
+        listTools: vi.fn().mockResolvedValue({
+          tools: [{ name: 't', inputSchema: { type: 'object' }, ...tool }],
+        }),
+      });
+      router.getPrefixForUpstream.mockReturnValue('api');
+    };
+
+    it('keeps title, icons, _meta and a forbidden execution hint', async () => {
+      const icons = [{ src: 'https://example.com/t.png' }];
+      listWith({
+        title: 'T',
+        icons,
+        execution: { taskSupport: 'forbidden' },
+        _meta: { a: 1 },
+      });
+
+      const [tool] = await service.aggregateAll();
+
+      expect(tool).toMatchObject({
+        name: 'api_t',
+        title: 'T',
+        icons,
+        execution: { taskSupport: 'forbidden' },
+        _meta: { a: 1 },
+      });
+    });
+
+    it.each(['optional', 'required'])(
+      'drops execution when the upstream declares taskSupport %s',
+      async (taskSupport) => {
+        listWith({ execution: { taskSupport } });
+
+        const [tool] = await service.aggregateAll();
+
+        expect(tool).not.toHaveProperty('execution');
+      },
+    );
+
+    it('warns when the prefixed name violates the tool-name guidance', async () => {
+      const warn = vi.spyOn(
+        (service as unknown as { logger: { warn: (m: string) => void } }).logger,
+        'warn',
+      );
+      listWith({ name: 'has space' });
+
+      const [tool] = await service.aggregateAll();
+
+      expect(tool.name).toBe('api_has space');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('"api_has space"'));
+    });
+  });
+
+  describe('refreshUpstream', () => {
+    it("replaces only that upstream's cached tools", async () => {
+      const listA = vi
+        .fn()
+        .mockResolvedValue({ tools: [{ name: 'a1', inputSchema: { type: 'object' } }] });
+      const listB = vi
+        .fn()
+        .mockResolvedValue({ tools: [{ name: 'b1', inputSchema: { type: 'object' } }] });
+      upstreamManager.getAllNames.mockReturnValue(['a', 'b']);
+      upstreamManager.getClient.mockImplementation((name: string) => ({
+        listTools: name === 'a' ? listA : listB,
+      }));
+      router.getPrefixForUpstream.mockImplementation((name: string) => name);
+      await service.aggregateAll();
+
+      listA.mockResolvedValue({ tools: [{ name: 'a2', inputSchema: { type: 'object' } }] });
+      const fresh = await service.refreshUpstream('a');
+
+      expect(fresh?.map((t) => t.name)).toEqual(['a_a2']);
+      expect(
+        service
+          .getCachedTools()
+          .map((t) => t.name)
+          .sort(),
+      ).toEqual(['a_a2', 'b_b1']);
+    });
+
+    it('returns undefined and keeps the cache when the listing fails', async () => {
+      const listTools = vi
+        .fn()
+        .mockResolvedValueOnce({ tools: [{ name: 'x', inputSchema: { type: 'object' } }] })
+        .mockRejectedValueOnce(new Error('boom'));
+      upstreamManager.getAllNames.mockReturnValue(['a']);
+      upstreamManager.getClient.mockReturnValue({ listTools });
+      await service.aggregateAll();
+
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+      expect(service.getCachedTools()).toHaveLength(1);
+    });
+
+    it('returns undefined for an unhealthy upstream', async () => {
+      upstreamManager.getClient.mockReturnValue({ listTools: vi.fn() });
+      upstreamManager.isHealthy.mockReturnValue(false);
+
+      await expect(service.refreshUpstream('a')).resolves.toBeUndefined();
+    });
+  });
 });

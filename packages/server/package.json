@@ -44,9 +44,13 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
+    "test:e2e": "vitest run -c vitest.e2e.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
@@ -56,9 +60,9 @@
     "@nest-mcp/common": "workspace:*"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "@nestjs/common": "^10.0.0 || ^11.0.0 || 12.0.0-alpha.5",
-    "@nestjs/core": "^10.0.0 || ^11.0.0 || 12.0.0-alpha.5",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0",
     "jose": "^5.2.0 || ^6.0.0",
     "reflect-metadata": ">=0.1.13",
     "rxjs": "^7.0.0",
@@ -70,7 +74,7 @@
     }
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",

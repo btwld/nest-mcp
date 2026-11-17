@@ -37,6 +37,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
@@ -46,7 +49,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0 || ^11.0.0 || 12.0.0-alpha.5",
+    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
     "reflect-metadata": ">=0.1.13",
     "zod": "^4.0.0"
   },

@@ -1,3 +1,4 @@
+import { McpError } from '@nest-mcp/common';
 import type { ResponseCacheService } from './cache/response-cache.service';
 import { GatewayService } from './gateway.service';
 import type { PolicyEngineService } from './policies/policy-engine.service';
@@ -327,6 +328,130 @@ describe('GatewayService', () => {
         signal: controller.signal,
       });
     });
+
+    it('passes structuredContent and _meta from the upstream through to the result', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: '{"count":2}' }],
+          structuredContent: { count: 2 },
+          _meta: { traceId: 't-1' },
+        }),
+      });
+
+      const result = await service.callTool('gh_listRepos', {});
+
+      expect(result).toEqual({
+        content: [{ type: 'text', text: '{"count":2}' }],
+        isError: undefined,
+        structuredContent: { count: 2 },
+        _meta: { traceId: 't-1' },
+      });
+      expect(responseTransform.apply).toHaveBeenCalledWith(
+        expect.objectContaining({ structuredContent: { count: 2 }, _meta: { traceId: 't-1' } }),
+      );
+    });
+
+    it('lets response transforms rewrite structuredContent', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockResolvedValue({ content: [], structuredContent: { a: 1 } }),
+      });
+      responseTransform.apply.mockImplementation((res) =>
+        Promise.resolve({ ...res, structuredContent: { a: 2 } }),
+      );
+
+      const result = await service.callTool('gh_listRepos', {});
+
+      expect(result.structuredContent).toEqual({ a: 2 });
+    });
+
+    it('omits structuredContent and _meta when the upstream returns none', async () => {
+      setupSuccessfulCall();
+
+      const result = await service.callTool('gh_listRepos', {});
+
+      expect(result).not.toHaveProperty('structuredContent');
+      expect(result).not.toHaveProperty('_meta');
+    });
+
+    it('caches structuredContent and _meta, and returns them on a cache hit', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockResolvedValue({
+          content: [],
+          structuredContent: { n: 1 },
+          _meta: { m: true },
+        }),
+      });
+      const store = new Map<string, unknown>();
+      responseCache.set.mockImplementation((key: string, value: unknown) => store.set(key, value));
+      responseCache.get.mockImplementation((key: string) => store.get(key));
+
+      await service.callTool('gh_listRepos', {});
+      const cached = await service.callTool('gh_listRepos', {});
+
+      expect(upstreamManager.getClient).toHaveBeenCalledTimes(1);
+      expect(cached.structuredContent).toEqual({ n: 1 });
+      expect(cached._meta).toEqual({ m: true });
+    });
+
+    it('forwards upstream progress to onProgress and resets the timeout on progress', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      const mockClient = {
+        callTool: vi.fn().mockImplementation(async (_params, _schema, options) => {
+          options.onprogress({ progress: 1, total: 4, message: 'step 1' });
+          options.onprogress({ progress: 2 });
+          return { content: [] };
+        }),
+      };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 5000 });
+      const onProgress = vi.fn().mockResolvedValue(undefined);
+
+      await service.callTool('gh_listRepos', {}, undefined, undefined, undefined, undefined, {
+        onProgress,
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const options = mockClient.callTool.mock.calls[0][2];
+      expect(options).toMatchObject({ timeout: 5000, resetTimeoutOnProgress: true });
+      expect(onProgress).toHaveBeenNthCalledWith(1, { progress: 1, total: 4, message: 'step 1' });
+      expect(onProgress).toHaveBeenNthCalledWith(2, { progress: 2 });
+    });
+
+    it('does not fail the call when forwarding progress fails', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockImplementation(async (_params, _schema, options) => {
+          options.onprogress({ progress: 1 });
+          return { content: [{ type: 'text', text: 'ok' }] };
+        }),
+      });
+      const onProgress = vi.fn().mockRejectedValue(new Error('session gone'));
+
+      const result = await service.callTool(
+        'gh_listRepos',
+        {},
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { onProgress },
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result.isError).toBeFalsy();
+      expect(onProgress).toHaveBeenCalled();
+    });
+
+    it('does not request progress when no onProgress is given', async () => {
+      const mockClient = setupSuccessfulCall();
+
+      await service.callTool('gh_listRepos', {});
+
+      expect(mockClient.callTool).toHaveBeenCalledWith(expect.any(Object), undefined, undefined);
+    });
   });
 
   describe('listResources', () => {
@@ -361,50 +486,47 @@ describe('GatewayService', () => {
   });
 
   describe('readResource', () => {
-    it('should return not-found when resource is not in cache', async () => {
+    const cachedResource = {
+      uri: 'fs://file:///a',
+      upstreamName: 'files',
+      originalUri: 'file:///a',
+    };
+
+    it('throws -32002 with data.uri when the resource is not in the cache', async () => {
       resourceAggregator.getCachedResources.mockReturnValue([]);
 
-      const result = await service.readResource('missing://uri');
+      const error = await service.readResource('missing://uri').catch((e: unknown) => e);
 
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('not found') }),
-      );
+      expect(error).toBeInstanceOf(McpError);
+      expect(error).toMatchObject({ code: -32002, data: { uri: 'missing://uri' } });
     });
 
-    it('should return error when client is not connected', async () => {
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
+    it('throws -32603 when the client is not connected', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
       upstreamManager.getClient.mockReturnValue(undefined);
 
-      const result = await service.readResource('fs://file:///a');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('not connected') }),
-      );
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('not connected'),
+      });
     });
 
-    it('should return error when upstream is unhealthy', async () => {
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
+    it('throws -32603 when the upstream is unhealthy', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
       upstreamManager.getClient.mockReturnValue({});
       upstreamManager.isHealthy.mockReturnValue(false);
 
-      const result = await service.readResource('fs://file:///a');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
-      );
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('unhealthy'),
+      });
     });
 
-    it('should delegate read to upstream client with originalUri', async () => {
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
+    it('reads the originalUri upstream and returns the gateway URI', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
       const mockClient = {
         readResource: vi.fn().mockResolvedValue({
-          contents: [{ uri: 'file:///a', text: 'hello' }],
+          contents: [{ uri: 'file:///a', text: 'hello', mimeType: 'text/plain' }],
         }),
       };
       upstreamManager.getClient.mockReturnValue(mockClient);
@@ -413,29 +535,73 @@ describe('GatewayService', () => {
       const result = await service.readResource('fs://file:///a');
 
       expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'file:///a' }, undefined);
-      expect(result.contents).toEqual([{ uri: 'file:///a', text: 'hello' }]);
+      expect(result.contents).toEqual([
+        { uri: 'fs://file:///a', text: 'hello', mimeType: 'text/plain' },
+      ]);
     });
 
-    it('should return error when upstream call throws', async () => {
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
+    it('prefixes URIs of additional contents with the same gateway prefix', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi.fn().mockResolvedValue({
+          contents: [
+            { uri: 'file:///a', text: 'a' },
+            { uri: 'file:///a/child', text: 'child' },
+          ],
+        }),
+      });
+
+      const result = await service.readResource('fs://file:///a');
+
+      expect(result.contents.map((c) => c.uri)).toEqual(['fs://file:///a', 'fs://file:///a/child']);
+    });
+
+    it('maps an upstream -32002 to a gateway -32002 carrying the gateway URI', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error('gone'), { code: -32002, data: { uri: 'x' } }),
+          ),
+      });
+
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32002,
+        data: { uri: 'fs://file:///a' },
+      });
+    });
+
+    it('passes an upstream -32602 through as invalid params', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('bad uri'), { code: -32602 })),
+      });
+
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32602,
+        message: expect.stringContaining('bad uri'),
+      });
+    });
+
+    it('throws -32603 with the upstream message when the upstream call throws', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
       upstreamManager.getClient.mockReturnValue({
         readResource: vi.fn().mockRejectedValue(new Error('read failed')),
       });
       upstreamManager.isHealthy.mockReturnValue(true);
 
-      const result = await service.readResource('fs://file:///a');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('read failed') }),
-      );
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('read failed'),
+        data: { uri: 'fs://file:///a', upstream: 'files' },
+      });
     });
 
     it('should pass signal to upstream client.readResource', async () => {
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
+      resourceAggregator.getCachedResources.mockReturnValue([cachedResource]);
       const mockClient = {
         readResource: vi.fn().mockResolvedValue({ contents: [{ uri: 'file:///a', text: 'hi' }] }),
       };
@@ -483,53 +649,44 @@ describe('GatewayService', () => {
   });
 
   describe('getPrompt', () => {
-    it('should return not-found when prompt is not in cache', async () => {
+    const cachedPrompt = {
+      name: 'ai_summarize',
+      upstreamName: 'assistant',
+      originalName: 'summarize',
+    };
+
+    it('throws -32602 when the prompt is not in the cache', async () => {
       promptAggregator.getCachedPrompts.mockReturnValue([]);
 
-      const result = await service.getPrompt('missing', {});
+      const error = await service.getPrompt('missing', {}).catch((e: unknown) => e);
 
-      expect(result.messages[0]).toEqual(
-        expect.objectContaining({
-          content: expect.objectContaining({ text: expect.stringContaining('not found') }),
-        }),
-      );
+      expect(error).toBeInstanceOf(McpError);
+      expect(error).toMatchObject({ code: -32602, message: expect.stringContaining('not found') });
     });
 
-    it('should return error when client is not connected', async () => {
-      promptAggregator.getCachedPrompts.mockReturnValue([
-        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
-      ]);
+    it('throws -32603 when the client is not connected', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
       upstreamManager.getClient.mockReturnValue(undefined);
 
-      const result = await service.getPrompt('ai_summarize', {});
-
-      expect(result.messages[0]).toEqual(
-        expect.objectContaining({
-          content: expect.objectContaining({ text: expect.stringContaining('not connected') }),
-        }),
-      );
+      await expect(service.getPrompt('ai_summarize', {})).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('not connected'),
+      });
     });
 
-    it('should return error when upstream is unhealthy', async () => {
-      promptAggregator.getCachedPrompts.mockReturnValue([
-        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
-      ]);
+    it('throws -32603 when the upstream is unhealthy', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
       upstreamManager.getClient.mockReturnValue({});
       upstreamManager.isHealthy.mockReturnValue(false);
 
-      const result = await service.getPrompt('ai_summarize', {});
-
-      expect(result.messages[0]).toEqual(
-        expect.objectContaining({
-          content: expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
-        }),
-      );
+      await expect(service.getPrompt('ai_summarize', {})).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('unhealthy'),
+      });
     });
 
     it('should delegate getPrompt to upstream with originalName and args', async () => {
-      promptAggregator.getCachedPrompts.mockReturnValue([
-        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
-      ]);
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
       const mockClient = {
         getPrompt: vi.fn().mockResolvedValue({
           description: 'Summarize text',
@@ -539,10 +696,10 @@ describe('GatewayService', () => {
       upstreamManager.getClient.mockReturnValue(mockClient);
       upstreamManager.isHealthy.mockReturnValue(true);
 
-      const result = await service.getPrompt('ai_summarize', { text: 'hello' });
+      const result = await service.getPrompt('ai_summarize', { text: 'hello', style: 'brief' });
 
       expect(mockClient.getPrompt).toHaveBeenCalledWith(
-        { name: 'summarize', arguments: { text: 'hello' } },
+        { name: 'summarize', arguments: { text: 'hello', style: 'brief' } },
         undefined,
       );
       expect(result.description).toBe('Summarize text');
@@ -551,28 +708,46 @@ describe('GatewayService', () => {
       ]);
     });
 
-    it('should return error when upstream call throws', async () => {
-      promptAggregator.getCachedPrompts.mockReturnValue([
-        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
-      ]);
+    it('omits description when the upstream does not return one', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
+      upstreamManager.getClient.mockReturnValue({
+        getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
+      });
+
+      const result = await service.getPrompt('ai_summarize', {});
+
+      expect(result).not.toHaveProperty('description');
+    });
+
+    it('throws -32603 with the upstream message when the upstream call throws', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
       upstreamManager.getClient.mockReturnValue({
         getPrompt: vi.fn().mockRejectedValue(new Error('prompt failed')),
       });
       upstreamManager.isHealthy.mockReturnValue(true);
 
-      const result = await service.getPrompt('ai_summarize', {});
+      await expect(service.getPrompt('ai_summarize', {})).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('prompt failed'),
+      });
+    });
 
-      expect(result.messages[0]).toEqual(
-        expect.objectContaining({
-          content: expect.objectContaining({ text: expect.stringContaining('prompt failed') }),
-        }),
-      );
+    it('passes an upstream -32602 (e.g. missing argument) through as invalid params', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
+      upstreamManager.getClient.mockReturnValue({
+        getPrompt: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('missing text'), { code: -32602 })),
+      });
+
+      await expect(service.getPrompt('ai_summarize', {})).rejects.toMatchObject({
+        code: -32602,
+        message: expect.stringContaining('missing text'),
+      });
     });
 
     it('should pass signal to upstream client.getPrompt', async () => {
-      promptAggregator.getCachedPrompts.mockReturnValue([
-        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
-      ]);
+      promptAggregator.getCachedPrompts.mockReturnValue([cachedPrompt]);
       const mockClient = {
         getPrompt: vi.fn().mockResolvedValue({
           messages: [{ role: 'user', content: { type: 'text', text: 'done' } }],
@@ -622,6 +797,12 @@ describe('GatewayService', () => {
   });
 
   describe('readResourceTemplate', () => {
+    const usersTemplate = {
+      uriTemplate: 'fs://file:///users/{id}',
+      upstreamName: 'files',
+      originalUriTemplate: 'file:///users/{id}',
+    };
+
     it('should match template, expand original URI, and forward to upstream', async () => {
       resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
         {
@@ -644,52 +825,39 @@ describe('GatewayService', () => {
         { uri: 'file:///users/42/profile' },
         undefined,
       );
-      expect(result.contents).toEqual([{ uri: 'file:///users/42/profile', text: 'user data' }]);
+      expect(result.contents).toEqual([
+        { uri: 'fs://file:///users/42/profile', text: 'user data' },
+      ]);
     });
 
-    it('should return error when no template matches', async () => {
+    it('throws -32002 with data.uri when no template matches', async () => {
       resourceTemplateAggregator.getCachedTemplates.mockReturnValue([]);
 
-      const result = await service.readResourceTemplate('file:///unknown/path');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('No resource template matched') }),
-      );
+      await expect(service.readResourceTemplate('file:///unknown/path')).rejects.toMatchObject({
+        code: -32002,
+        data: { uri: 'file:///unknown/path' },
+      });
     });
 
-    it('should return error when upstream is not connected', async () => {
-      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
-        {
-          uriTemplate: 'fs://file:///users/{id}',
-          upstreamName: 'files',
-          originalUriTemplate: 'file:///users/{id}',
-        },
-      ]);
+    it('throws -32603 when the upstream is not connected', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([usersTemplate]);
       upstreamManager.getClient.mockReturnValue(undefined);
 
-      const result = await service.readResourceTemplate('fs://file:///users/42');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('not connected') }),
-      );
+      await expect(service.readResourceTemplate('fs://file:///users/42')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('not connected'),
+      });
     });
 
-    it('should return error when upstream is unhealthy', async () => {
-      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
-        {
-          uriTemplate: 'fs://file:///users/{id}',
-          upstreamName: 'files',
-          originalUriTemplate: 'file:///users/{id}',
-        },
-      ]);
+    it('throws -32603 when the upstream is unhealthy', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([usersTemplate]);
       upstreamManager.getClient.mockReturnValue({});
       upstreamManager.isHealthy.mockReturnValue(false);
 
-      const result = await service.readResourceTemplate('fs://file:///users/42');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('unhealthy') }),
-      );
+      await expect(service.readResourceTemplate('fs://file:///users/42')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('unhealthy'),
+      });
     });
 
     it('should pass signal to upstream client', async () => {
@@ -715,24 +883,31 @@ describe('GatewayService', () => {
       );
     });
 
-    it('should return error when upstream call throws', async () => {
-      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
-        {
-          uriTemplate: 'fs://file:///users/{id}',
-          upstreamName: 'files',
-          originalUriTemplate: 'file:///users/{id}',
-        },
-      ]);
+    it('maps an upstream -32002 to a gateway -32002 for the requested URI', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([usersTemplate]);
+      upstreamManager.getClient.mockReturnValue({
+        readResource: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('no user'), { code: -32002 })),
+      });
+
+      await expect(service.readResourceTemplate('fs://file:///users/42')).rejects.toMatchObject({
+        code: -32002,
+        data: { uri: 'fs://file:///users/42' },
+      });
+    });
+
+    it('throws -32603 with the upstream message when the upstream call throws', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([usersTemplate]);
       upstreamManager.getClient.mockReturnValue({
         readResource: vi.fn().mockRejectedValue(new Error('network error')),
       });
       upstreamManager.isHealthy.mockReturnValue(true);
 
-      const result = await service.readResourceTemplate('fs://file:///users/42');
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('network error') }),
-      );
+      await expect(service.readResourceTemplate('fs://file:///users/42')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('network error'),
+      });
     });
   });
 
@@ -864,75 +1039,121 @@ describe('GatewayService', () => {
 
       expect(result).toEqual({ values: [] });
     });
-  });
 
-  describe('timeout enforcement', () => {
-    afterEach(() => vi.useRealTimers());
-
-    it('should return error when callTool exceeds configured timeout', async () => {
-      vi.useFakeTimers();
-      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
-      upstreamManager.getClient.mockReturnValue({
-        callTool: vi.fn().mockImplementation(() => new Promise(() => {})),
-      });
-      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
-
-      const resultPromise = service.callTool('gh_listRepos', {});
-      await vi.advanceTimersByTimeAsync(150);
-      const result = await resultPromise;
-
-      expect(result.isError).toBe(true);
-      expect((result.content[0] as { text: string }).text).toContain(
-        'Error forwarding to upstream',
-      );
-    });
-
-    it('should return error when readResource exceeds configured timeout', async () => {
-      vi.useFakeTimers();
-      resourceAggregator.getCachedResources.mockReturnValue([
-        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
-      ]);
-      upstreamManager.getClient.mockReturnValue({
-        readResource: vi.fn().mockImplementation(() => new Promise(() => {})),
-      });
-      upstreamManager.isHealthy.mockReturnValue(true);
-      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
-
-      const resultPromise = service.readResource('fs://file:///a');
-      await vi.advanceTimersByTimeAsync(150);
-      const result = await resultPromise;
-
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({ text: expect.stringContaining('Error reading resource') }),
-      );
-    });
-
-    it('should return error when getPrompt exceeds configured timeout', async () => {
-      vi.useFakeTimers();
+    it('forwards completion context.arguments to the upstream (prompt)', async () => {
       promptAggregator.getCachedPrompts.mockReturnValue([
         { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
       ]);
-      upstreamManager.getClient.mockReturnValue({
-        getPrompt: vi.fn().mockImplementation(() => new Promise(() => {})),
+      const complete = vi.fn().mockResolvedValue({ completion: { values: ['x'] } });
+      upstreamManager.getClient.mockReturnValue({ complete });
+
+      await service.complete(
+        { type: 'ref/prompt', name: 'ai_summarize' },
+        { name: 'style', value: 's' },
+        { arguments: { language: 'en' } },
+      );
+
+      expect(complete).toHaveBeenCalledWith({
+        ref: { type: 'ref/prompt', name: 'summarize' },
+        argument: { name: 'style', value: 's' },
+        context: { arguments: { language: 'en' } },
       });
-      upstreamManager.isHealthy.mockReturnValue(true);
+    });
+
+    it('forwards completion context.arguments to the upstream (resource template)', async () => {
+      resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
+        {
+          uriTemplate: 'fs://file:///{dir}/{path}',
+          name: 'file',
+          upstreamName: 'files',
+          originalUriTemplate: 'file:///{dir}/{path}',
+        },
+      ]);
+      const complete = vi.fn().mockResolvedValue({ completion: { values: [] } });
+      upstreamManager.getClient.mockReturnValue({ complete });
+
+      await service.complete(
+        { type: 'ref/resource', uri: 'fs://file:///{dir}/{path}' },
+        { name: 'path', value: 'r' },
+        { arguments: { dir: 'docs' } },
+      );
+
+      expect(complete).toHaveBeenCalledWith({
+        ref: { type: 'ref/resource', uri: 'file:///{dir}/{path}' },
+        argument: { name: 'path', value: 'r' },
+        context: { arguments: { dir: 'docs' } },
+      });
+    });
+  });
+
+  describe('upstream timeouts and cancellation', () => {
+    const timeoutError = () =>
+      Object.assign(new Error('MCP error -32001: Request timed out'), { code: -32001 });
+
+    it('passes the configured timeout to the upstream callTool (no 60 s cap)', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      const mockClient = { callTool: vi.fn().mockResolvedValue({ content: [] }) };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 120000 });
+      const controller = new AbortController();
+
+      await service.callTool('gh_listRepos', {}, undefined, controller.signal);
+
+      expect(mockClient.callTool).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        signal: controller.signal,
+        timeout: 120000,
+      });
+    });
+
+    it('returns an isError result naming the timeout when the upstream times out', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      upstreamManager.getClient.mockReturnValue({
+        callTool: vi.fn().mockRejectedValue(timeoutError()),
+      });
       upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
 
-      const resultPromise = service.getPrompt('ai_summarize', {});
-      await vi.advanceTimersByTimeAsync(150);
-      const result = await resultPromise;
+      const result = await service.callTool('gh_listRepos', {});
 
-      expect(result.messages[0]).toEqual(
-        expect.objectContaining({
-          content: expect.objectContaining({
-            text: expect.stringContaining('Error getting prompt'),
-          }),
-        }),
+      expect(result.isError).toBe(true);
+      expect((result.content[0] as { text: string }).text).toBe(
+        'Error forwarding to upstream: request timed out after 100ms',
       );
     });
 
-    it('should return error when readResourceTemplate exceeds configured timeout', async () => {
-      vi.useFakeTimers();
+    it('passes the configured timeout to readResource and maps a timeout to -32603', async () => {
+      resourceAggregator.getCachedResources.mockReturnValue([
+        { uri: 'fs://file:///a', upstreamName: 'files', originalUri: 'file:///a' },
+      ]);
+      const readResource = vi.fn().mockRejectedValue(timeoutError());
+      upstreamManager.getClient.mockReturnValue({ readResource });
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      await expect(service.readResource('fs://file:///a')).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('timed out after 100ms'),
+      });
+      expect(readResource).toHaveBeenCalledWith({ uri: 'file:///a' }, { timeout: 100 });
+    });
+
+    it('passes the configured timeout to getPrompt', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      const getPrompt = vi.fn().mockRejectedValue(timeoutError());
+      upstreamManager.getClient.mockReturnValue({ getPrompt });
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      await expect(service.getPrompt('ai_summarize', {})).rejects.toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('timed out'),
+      });
+      expect(getPrompt).toHaveBeenCalledWith(
+        { name: 'summarize', arguments: {} },
+        { timeout: 100 },
+      );
+    });
+
+    it('passes the configured timeout to readResourceTemplate', async () => {
       resourceTemplateAggregator.getCachedTemplates.mockReturnValue([
         {
           uriTemplate: 'fs://file:///docs/{name}',
@@ -940,21 +1161,40 @@ describe('GatewayService', () => {
           originalUriTemplate: 'file:///docs/{name}',
         },
       ]);
-      upstreamManager.getClient.mockReturnValue({
-        readResource: vi.fn().mockImplementation(() => new Promise(() => {})),
-      });
-      upstreamManager.isHealthy.mockReturnValue(true);
+      const readResource = vi.fn().mockResolvedValue({ contents: [] });
+      upstreamManager.getClient.mockReturnValue({ readResource });
       upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
 
-      const resultPromise = service.readResourceTemplate('fs://file:///docs/readme');
-      await vi.advanceTimersByTimeAsync(150);
-      const result = await resultPromise;
+      await service.readResourceTemplate('fs://file:///docs/readme');
 
-      expect(result.contents[0]).toEqual(
-        expect.objectContaining({
-          text: expect.stringContaining('Error reading resource template'),
-        }),
+      expect(readResource).toHaveBeenCalledWith({ uri: 'file:///docs/readme' }, { timeout: 100 });
+    });
+
+    it('passes the configured timeout to complete', async () => {
+      promptAggregator.getCachedPrompts.mockReturnValue([
+        { name: 'ai_summarize', upstreamName: 'assistant', originalName: 'summarize' },
+      ]);
+      const complete = vi.fn().mockResolvedValue({ completion: { values: [] } });
+      upstreamManager.getClient.mockReturnValue({ complete });
+      upstreamManager.getConfig.mockReturnValue({ timeout: 100 });
+
+      await service.complete(
+        { type: 'ref/prompt', name: 'ai_summarize' },
+        { name: 'a', value: '' },
       );
+
+      expect(complete).toHaveBeenCalledWith(expect.any(Object), { timeout: 100 });
+    });
+
+    it('ignores a non-positive timeout and leaves the SDK default in place', async () => {
+      router.resolve.mockReturnValue({ upstreamName: 'github', originalToolName: 'listRepos' });
+      const mockClient = { callTool: vi.fn().mockResolvedValue({ content: [] }) };
+      upstreamManager.getClient.mockReturnValue(mockClient);
+      upstreamManager.getConfig.mockReturnValue({ timeout: 0 });
+
+      await service.callTool('gh_listRepos', {});
+
+      expect(mockClient.callTool).toHaveBeenCalledWith(expect.any(Object), undefined, undefined);
     });
   });
 });

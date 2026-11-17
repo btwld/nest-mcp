@@ -27,7 +27,7 @@ export class ToolsService {
   @Tool({
     name: 'greet',
     description: 'Greet a user by name',
-    schema: z.object({ name: z.string() }),
+    parameters: z.object({ name: z.string() }),
   })
   async greet({ name }: { name: string }) {
     return `Hello, ${name}!`;
@@ -38,15 +38,14 @@ export class ToolsService {
 ```typescript
 // app.module.ts
 import { Module } from '@nestjs/common';
-import { McpModule } from '@nest-mcp/server';
-import { McpTransportType } from '@nest-mcp/server';
+import { McpModule, McpTransportType } from '@nest-mcp/server';
 
 @Module({
   imports: [
     McpModule.forRoot({
       name: 'my-server',
       version: '1.0.0',
-      transports: [{ type: McpTransportType.STREAMABLE_HTTP }],
+      transport: McpTransportType.STREAMABLE_HTTP,
     }),
   ],
   providers: [ToolsService],

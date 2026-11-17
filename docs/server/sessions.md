@@ -8,7 +8,7 @@ Manages MCP session lifecycle with configurable timeouts and concurrency limits.
 
 ### Configuration
 
-The `SessionManager` is configured automatically from `McpModule.forRoot` session options, or can be configured manually:
+`SessionManager` is a standalone utility for tracking your own session records. It is not used by the transports; configure it yourself where you use it:
 
 ```typescript
 import { Injectable, OnModuleInit } from '@nestjs/common';
@@ -28,20 +28,7 @@ export class AppService implements OnModuleInit {
 }
 ```
 
-Or via module options:
-
-```typescript
-McpModule.forRoot({
-  name: 'my-server',
-  version: '1.0.0',
-  transport: McpTransportType.STREAMABLE_HTTP,
-  session: {
-    timeout: 60 * 60 * 1000,   // 1 hour
-    maxConcurrent: 500,
-    cleanupInterval: 60 * 1000, // 1 minute
-  },
-});
-```
+To expire idle MCP sessions or cap how many the Streamable HTTP transport keeps open, use the `session` module options instead — see [Transports: Session Limits](./transports.md#session-limits).
 
 ### API
 
@@ -163,14 +150,17 @@ await taskManager.removeSession(sessionId);
 
 | Status | Terminal | Description |
 |--------|----------|-------------|
-| `running` | No | Task is in progress |
+| `working` | No | Task is in progress |
+| `input_required` | No | Task is waiting for input from the requester |
 | `completed` | Yes | Task finished successfully |
 | `failed` | Yes | Task finished with an error |
 | `cancelled` | Yes | Task was cancelled |
 
-When `removeSession` is called, tasks in non-terminal states (`running`) are moved to `cancelled` with the message "Session closed".
+When `removeSession` is called, tasks in non-terminal states are moved to `cancelled` with the message "Session closed".
 
 ### Enabling Tasks
+
+> **Experimental.** Tasks are an experimental part of the MCP specification (revision 2025-11-25) and of the SDK. Enabling them gives the server a task store, the `tasks/*` protocol handlers and session cleanup, which is what the gateway uses to proxy upstream tasks. Tools declared with `@Tool` still run as regular calls: they are not executed as task-augmented requests.
 
 Tasks require the `tasks.enabled` capability:
 

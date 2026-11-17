@@ -158,4 +158,4 @@ await verifyClientModuleAndShutdown();
 await verifyServerAndAuthModules();
 await verifyGatewayModule();
 
-console.log('Nest 12 alpha packed TypeScript 6 ESM consumer passed');
+console.log('Nest 12 packed TypeScript 6 ESM consumer passed');

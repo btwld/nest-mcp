@@ -19,6 +19,8 @@ export class RateLimiterService {
 
   constructor() {
     this.cleanupInterval = setInterval(() => this.cleanup(), 60_000);
+    // Housekeeping only — never the reason a process stays alive.
+    this.cleanupInterval.unref?.();
   }
 
   async checkLimit(toolName: string, config: RateLimitConfig, userId?: string): Promise<void> {

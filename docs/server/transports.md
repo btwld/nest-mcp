@@ -152,11 +152,45 @@ The controller created by `createStreamableHttpController` registers three route
 
 In **stateful** mode (default), each client gets a session identified by a `mcp-session-id` header. Sessions track state across requests.
 
-In **stateless** mode, each POST request creates a temporary transport that is discarded after the response. GET requests return `405 Method Not Allowed`.
+In **stateless** mode, each POST request creates a temporary transport that is discarded after the response. GET and DELETE requests return `405 Method Not Allowed` with an `Allow: POST` header.
+
+### Session Errors and Termination
+
+In stateful mode the endpoint answers session problems with the status codes clients rely on, each with a JSON-RPC error body:
+
+| Situation | Status |
+|-----------|--------|
+| Request for an unknown, expired or terminated `Mcp-Session-Id` | `404` — the client should start a new session with `initialize` |
+| `GET` or `DELETE` without an `Mcp-Session-Id` header | `400` |
+| Session owned by another principal (OAuth session binding) | `403` |
+| New session while `session.maxConcurrent` is reached | `503` with `Retry-After` |
+
+A client ends its session with `DELETE`. The request is handled by the SDK transport, which invokes `onsessionclosed` and then closes the session.
+
+### Session Limits
+
+Stateful sessions stay open until the client sends `DELETE` or the server shuts down. To bound them, set the `session` module options:
+
+```typescript
+McpModule.forRoot({
+  name: 'my-server',
+  version: '1.0.0',
+  transport: McpTransportType.STREAMABLE_HTTP,
+  session: {
+    timeout: 30 * 60 * 1000,    // close sessions with no client request for 30 minutes
+    maxConcurrent: 500,          // refuse new sessions beyond this many (503)
+    cleanupInterval: 60 * 1000,  // how often idle sessions are swept (default: min(timeout, 60 s))
+  },
+});
+```
+
+Both limits are off unless configured. A client whose session expired gets `404` on its next request and re-initializes. Idle time is measured from the last request the client sent, so an open notification stream alone does not keep a session alive.
 
 ## SSE (Server-Sent Events)
 
 Legacy transport using separate endpoints for the SSE connection and JSON-RPC messages.
+
+> The MCP specification has deprecated the HTTP+SSE transport in favor of Streamable HTTP. Use Streamable HTTP for new servers; SSE remains available throughout 1.x for existing clients.
 
 ```typescript
 McpModule.forRoot({
@@ -251,6 +285,15 @@ const app = await bootstrapStdioApp(AppModule, {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `logLevels` | `LogLevel[]` | all levels | Which NestJS log levels to emit to stderr |
+
+## HTTP Platforms
+
+The HTTP transports (Streamable HTTP and SSE) work on both `@nestjs/platform-express` and `@nestjs/platform-fastify` without extra configuration — the transport unwraps the platform request/response before handing them to the MCP SDK.
+
+Body parsing is handled either way:
+
+- When the platform already parsed the body (a global `express.json()`, Fastify's built-in JSON parser), the parsed value is passed through to the SDK.
+- When no parser ran (for example `NestFactory.create(AppModule, { bodyParser: false })`), the transport reads the raw request stream itself.
 
 ## Multiple Transports
 

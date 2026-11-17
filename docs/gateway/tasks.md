@@ -1,5 +1,7 @@
 # Tasks
 
+> **Experimental.** Tasks are an experimental part of the MCP specification (revision 2025-11-25) and of the SDK; this proxying may change with them.
+
 The `TaskAggregatorService` proxies MCP task operations (list, get, cancel, get payload) from downstream clients to the appropriate upstream servers. Task IDs are prefixed with the upstream name so the gateway can route them back to the correct upstream.
 
 ## Task ID format
