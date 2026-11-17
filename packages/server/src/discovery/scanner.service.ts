@@ -36,11 +36,11 @@ export class McpScannerService implements OnModuleInit {
       for (const [, wrapper] of moduleRef.providers) {
         const instance = wrapper?.instance;
         const metatype = wrapper?.metatype as (new (...args: unknown[]) => unknown) | undefined;
-        const constructor = instance?.constructor ?? metatype;
-        if (!constructor) continue;
+        const providerClass = instance?.constructor ?? metatype;
+        if (!providerClass) continue;
 
         // If this provider is explicitly targeted at a server, filter by current server
-        const targetedServers = serverTargetedTokens.get(constructor as InjectionToken);
+        const targetedServers = serverTargetedTokens.get(providerClass as InjectionToken);
         if (targetedServers && !targetedServers.includes(this.options.name)) {
           continue;
         }

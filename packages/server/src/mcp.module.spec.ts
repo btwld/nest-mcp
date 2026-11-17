@@ -746,9 +746,9 @@ describe('McpModule', () => {
     });
 
     it('throws when none of useFactory/useClass/useExisting is provided', () => {
-      expect(() =>
-        createAsyncOptionsProviders({ transport: McpTransportType.STDIO }),
-      ).toThrow(McpError);
+      expect(() => createAsyncOptionsProviders({ transport: McpTransportType.STDIO })).toThrow(
+        McpError,
+      );
     });
   });
 

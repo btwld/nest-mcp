@@ -152,11 +152,7 @@ export class McpRegistryService {
     }
   }
 
-  private scanToolMetadata(
-    binding: ProviderBinding,
-    prototype: object,
-    methodName: string,
-  ): void {
+  private scanToolMetadata(binding: ProviderBinding, prototype: object, methodName: string): void {
     const metadata: ToolMetadata | undefined = Reflect.getMetadata(
       MCP_TOOL_METADATA,
       prototype,

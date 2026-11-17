@@ -1048,10 +1048,7 @@ describe('McpExecutorService', () => {
       const request = { headers: { 'x-tenant': 'acme' } };
 
       await exec.callTool('scoped-greet', { name: 'ada' }, mockMcpContext({ request }));
-      expect(moduleRef.registerRequestByContextId).toHaveBeenCalledWith(
-        request,
-        expect.anything(),
-      );
+      expect(moduleRef.registerRequestByContextId).toHaveBeenCalledWith(request, expect.anything());
     });
 
     it('does not register a request when the context has none', async () => {
