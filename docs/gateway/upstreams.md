@@ -39,10 +39,10 @@ const upstream: UpstreamConfig = {
 | `env` | `Record<string, string>` | No | -- | Environment variables for the spawned process (STDIO only). |
 | `cwd` | `string` | No | -- | Working directory for the spawned process (STDIO only). |
 | `toolPrefix` | `string` | No | `name` | Prefix added to tool and prompt names from this upstream. Falls back to `name` if not set. |
-| `timeout` | `number` | No | -- | Timeout in milliseconds for upstream calls (callTool, readResource, getPrompt). |
+| `timeout` | `number` | No | `60000` (SDK default) | Timeout in milliseconds for upstream requests (tool calls, resource reads, prompt gets, completions). See [Timeouts, cancellation and progress](#timeouts-cancellation-and-progress). |
 | `enabled` | `boolean` | No | `true` | Set to `false` to skip this upstream during connection and health checks. |
 | `healthCheck` | object | No | See below | Health check configuration. |
-| `reconnect` | object | No | See below | Reconnection configuration. |
+| `reconnect` | object | No | See below | Reconnection configuration. See [Reconnection](#reconnection). |
 
 ### Health check options
 
@@ -56,9 +56,45 @@ const upstream: UpstreamConfig = {
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `enabled` | `boolean` | -- | Enable automatic reconnection on disconnect. |
-| `maxRetries` | `number` | -- | Maximum number of reconnection attempts. |
-| `delayMs` | `number` | -- | Delay in milliseconds between reconnection attempts. |
+| `enabled` | `boolean` | `false` | Enable automatic reconnection. |
+| `maxRetries` | `number` | `5` | Maximum number of attempts per reconnect cycle. |
+| `delayMs` | `number` | `1000` | Delay in milliseconds before the first attempt. The delay doubles with each attempt, capped at 30 seconds. |
+
+## Timeouts, cancellation and progress
+
+- **Timeout.** `timeout` is passed to the MCP SDK as the request timeout of each upstream request. When it elapses, the SDK sends `notifications/cancelled` to the upstream and the call fails: a tool call returns an `isError` result (`request timed out after <timeout>ms`), and a resource read or prompt get fails with a `-32603` error. Without `timeout`, the SDK default of 60 seconds applies; set a larger value for long-running upstream tools.
+- **Cancellation.** When the downstream client cancels a request, the gateway aborts the matching upstream request, and the upstream receives `notifications/cancelled`.
+- **Progress.** The gateway asks upstreams for progress on proxied tool calls and relays every upstream `notifications/progress` to the downstream client, as long as the downstream request carried a progress token. Each progress notification resets the upstream timeout, so `timeout` bounds the time between progress updates, not the total duration of a tool call that keeps reporting progress.
+
+## Reconnection
+
+With `reconnect.enabled: true`, the gateway re-establishes the connection to an upstream when:
+
+- the upstream connection closes (for example a STDIO upstream process exits),
+- the initial connection at startup fails, or
+- a health check fails (useful for HTTP upstreams, where a server restart does not close the client transport).
+
+While reconnecting, the upstream is reported as disconnected and unhealthy, and calls routed to it fail fast with an "unhealthy" error. Each attempt uses a fresh MCP client and transport. Attempts are spaced by `delayMs`, doubling each time (capped at 30 seconds), up to `maxRetries` attempts. If every attempt fails, the upstream stays unhealthy; the next failed health check starts a new cycle.
+
+After a successful reconnect the gateway re-aggregates all of the upstream's lists, because the restarted upstream may expose a different catalog (see below).
+
+Without `reconnect.enabled`, a closed upstream stays disconnected and unhealthy until the application restarts.
+
+## Runtime list changes
+
+The gateway re-aggregates an upstream's tools, resources and resource templates, or prompts when that upstream sends `notifications/tools/list_changed`, `notifications/resources/list_changed` or `notifications/prompts/list_changed`, and re-aggregates all of them after a reconnect. It then reconciles its registry for that upstream only:
+
+- items the upstream no longer lists are unregistered,
+- new items are registered,
+- items whose definition changed are re-registered with the new definition,
+
+and sends the matching `notifications/<list>/list_changed` to downstream sessions so clients re-fetch the list. If the upstream cannot be listed at that moment, the gateway keeps its previous items.
+
+Known limitations of the current server transports:
+
+- Downstream sessions that connected before an item changed keep their original handler registration for that item. Calls still reach the current definition (the gateway resolves them by name), and `tools/list` / `prompts/list` / `resources/list` show the current definitions, but such a session keeps validating `prompts/get` arguments against the prompt's argument list as it was when the session connected.
+- An item that is removed and later re-added under the same name may stay unavailable for calls in sessions that connected while it was registered the first time, until those sessions reconnect.
+- The broadcast `list_changed` notifications reach Streamable HTTP and SSE sessions. STDIO sessions are notified when new items are added, but not when items are removed or changed.
 
 ## Transport types
 
@@ -138,6 +174,9 @@ export class MyService {
 | `getAllStatuses()` | Get statuses for all upstreams. |
 | `getAllNames()` | Get the names of all connected upstreams. |
 | `getConfig(name)` | Get the `UpstreamConfig` for an upstream. |
+| `reconnect(name)` | Start (or join) a reconnect cycle. Resolves to `true` once the upstream is connected again. |
+| `isReconnecting(name)` | Whether a reconnect cycle is in progress. |
+| `onUpstreamChange(listener)` | Subscribe to `UpstreamChangeEvent`s (`{ upstreamName, kinds, reason: 'list_changed' \| 'reconnected' }`). Returns an unsubscribe function. |
 
 ### UpstreamStatus
 

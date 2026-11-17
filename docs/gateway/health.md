@@ -39,7 +39,7 @@ Health checks are automatically started during gateway bootstrap for all enabled
 1. At each `intervalMs` interval, the `HealthCheckerService` calls `client.ping()` on the upstream's MCP client.
 2. The ping uses an `AbortController` with a timeout of `timeoutMs`.
 3. If the ping succeeds, the upstream is marked as healthy via `UpstreamManagerService.setHealthy(name, true)`.
-4. If the ping fails or times out, the upstream is marked as unhealthy with the error message via `setHealthy(name, false, errorMessage)`.
+4. If the ping fails or times out, the upstream is marked as unhealthy with the error message via `setHealthy(name, false, errorMessage)`. When the upstream has `reconnect.enabled: true`, a failed ping also starts a reconnect cycle (see [Reconnection](./upstreams.md#reconnection)). A failure of a client that a reconnect has already replaced is ignored.
 
 ## Impact of health status
 
@@ -47,8 +47,8 @@ When an upstream is marked unhealthy:
 
 - **Tool aggregation** -- the aggregator services skip unhealthy upstreams, so their tools/resources/prompts are not listed.
 - **Tool calls** -- `GatewayService.callTool()` returns an error response (`"Upstream X is unhealthy"`) instead of forwarding the call.
-- **Resource reads** -- `readResource()` and `readResourceTemplate()` return error responses for unhealthy upstreams.
-- **Prompt fetching** -- `getPrompt()` returns an error response for unhealthy upstreams.
+- **Resource reads** -- `readResource()` and `readResourceTemplate()` fail with a JSON-RPC `-32603` error for unhealthy upstreams.
+- **Prompt fetching** -- `getPrompt()` fails with a JSON-RPC `-32603` error for unhealthy upstreams.
 - **Task operations** -- `TaskAggregatorService` skips unhealthy upstreams in `listTasks`, `getTask`, and `cancelTask`.
 
 An upstream automatically recovers when the next health check ping succeeds.

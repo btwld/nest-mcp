@@ -44,7 +44,7 @@ McpGatewayModule.forRoot({
 
 1. When `GatewayService.callTool()` is called, it builds a cache key from the tool name and arguments (sorted deterministically).
 2. If a valid (non-expired) cache entry exists, it is returned immediately without contacting the upstream.
-3. If the upstream call succeeds (no error), the response is stored in the cache with the appropriate TTL.
+3. If the upstream call succeeds (no error), the response is stored in the cache with the appropriate TTL. The whole result is stored, including `structuredContent` and `_meta`, so a cache hit returns the same structured result as the original call.
 4. Error responses are never cached.
 
 ### Cache key format

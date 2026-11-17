@@ -109,8 +109,12 @@ interface ToolCallResponse {
   upstreamName: string;    // Source upstream name
   content: ToolContent[];  // Response content items
   isError?: boolean;       // Whether the upstream reported an error
+  structuredContent?: Record<string, unknown>; // Structured result from the upstream
+  _meta?: Record<string, unknown>;             // Upstream result metadata
 }
 ```
+
+`structuredContent` and `_meta` are passed through to the downstream client (and stored in the response cache) exactly as the transforms leave them. A tool that advertises an `outputSchema` must return `structuredContent` that conforms to it, so a transform that rewrites `content` for such a tool should keep `structuredContent` consistent rather than dropping it.
 
 ### ResponseTransformFn
 
