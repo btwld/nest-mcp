@@ -1,4 +1,6 @@
 import {
+  AuthenticationError,
+  AuthorizationError,
   type CompletionRequest,
   type CompletionResult,
   JSON_RPC_INTERNAL_ERROR,
@@ -21,13 +23,20 @@ import {
   paginate,
   zodToJsonSchema,
 } from '@nest-mcp/common';
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { ContextIdFactory, ModuleRef } from '@nestjs/core';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { type ContextId, ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { ZodEnum, ZodObject, type ZodType } from 'zod';
 import { McpRegistryService } from '../discovery/registry.service';
 import type { ProviderBinding, RegisteredTool } from '../discovery/registry.service';
 import { isPlainRecord } from '../utils/coerce';
 import { type FilterTarget, McpExceptionFilterRunner } from './exception-filter.runner';
+import type { McpCapabilityCall } from './mcp-arguments-host';
+import {
+  type McpHandlerLayout,
+  McpNestEnhancerService,
+  describeHttpException,
+  mapEnhancerException,
+} from './nest-enhancer.service';
 
 interface ZodIssueLike {
   path: ReadonlyArray<PropertyKey>;
@@ -41,6 +50,21 @@ function formatZodIssues(issues: ReadonlyArray<ZodIssueLike>): string {
       return path ? `[${path}]: ${issue.message}` : issue.message;
     })
     .join('; ');
+}
+
+/** Tool result reporting rejected input, so the model can correct its arguments and retry. */
+function invalidParametersResult(detail: string): ToolCallResult {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: `Invalid parameters: ${detail}` }],
+  };
+}
+
+/** A provider object resolved for one call, with the context id it was resolved under. */
+interface ResolvedBinding {
+  instance: Record<string, unknown>;
+  /** Set when the provider is request-scoped and was resolved for this call. */
+  contextId?: ContextId;
 }
 
 /**
@@ -77,13 +101,21 @@ export class McpExecutorService {
   private readonly pageSize: number | undefined;
   private readonly advertiseSecuritySchemes: boolean;
   private readonly moduleRequiresAuth: boolean;
+  /** Set only when the `nestEnhancers` option is on; handlers are invoked directly otherwise. */
+  private readonly enhancers: McpNestEnhancerService | undefined;
 
   constructor(
     private readonly registry: McpRegistryService,
     private readonly exceptionFilters: McpExceptionFilterRunner,
     @Inject(MCP_OPTIONS) options: McpModuleOptions,
     @Optional() private readonly moduleRef?: ModuleRef,
+    @Optional() nestEnhancers?: McpNestEnhancerService,
   ) {
+    if (options.nestEnhancers && !nestEnhancers) {
+      // Never fall back to direct invocation here: that would skip every guard.
+      throw new McpError("'nestEnhancers' is enabled but McpNestEnhancerService is not available");
+    }
+    this.enhancers = options.nestEnhancers ? nestEnhancers : undefined;
     this.pageSize = options.pagination?.defaultPageSize;
     this.advertiseSecuritySchemes = options.advertiseSecuritySchemes ?? false;
     this.moduleRequiresAuth =
@@ -103,16 +135,19 @@ export class McpExecutorService {
     binding: ProviderBinding,
     label: string,
     ctx?: McpExecutionContext,
-  ): Promise<Record<string, unknown>> {
-    if (binding.instance) return binding.instance;
+  ): Promise<ResolvedBinding> {
+    if (binding.instance) return { instance: binding.instance };
     if (binding.scopedTarget && this.moduleRef) {
       const contextId = ContextIdFactory.create();
       if (ctx?.request) {
         this.moduleRef.registerRequestByContextId(ctx.request, contextId);
       }
-      return this.moduleRef.resolve(binding.scopedToken ?? binding.scopedTarget, contextId, {
-        strict: false,
-      });
+      const instance = await this.moduleRef.resolve<unknown, Record<string, unknown>>(
+        binding.scopedToken ?? binding.scopedTarget,
+        contextId,
+        { strict: false },
+      );
+      return { instance, contextId };
     }
     throw new ToolExecutionError(
       label,
@@ -120,6 +155,31 @@ export class McpExecutorService {
         ? `Cannot resolve request-scoped provider '${binding.scopedTarget.name}' without a ModuleRef`
         : `No provider bound for '${label}'`,
     );
+  }
+
+  /**
+   * Call a capability handler with `args`. By default the method is invoked
+   * directly. With the `nestEnhancers` option on, the call runs through the
+   * NestJS enhancer pipeline instead (guards, then interceptors, then pipes,
+   * then the handler, with exception filters around all of it); the invoker
+   * is cached per capability for singleton providers and rebuilt per call for
+   * request-scoped ones, under the context id the provider was resolved with.
+   */
+  private async invokeHandler(
+    layout: McpHandlerLayout,
+    capability: ProviderBinding & { methodName: string },
+    call: McpCapabilityCall,
+    args: unknown[],
+    ctx: McpExecutionContext,
+  ): Promise<unknown> {
+    const { instance, contextId } = await this.resolveBinding(capability, call.name, ctx);
+    if (this.enhancers) {
+      return this.enhancers.invoke({ layout, capability, instance, contextId }, call, args);
+    }
+    const handler = instance[capability.methodName] as
+      // biome-ignore lint/complexity/noBannedTypes: dynamic method call
+      Function;
+    return handler.call(instance, ...args);
   }
 
   // ---- Tools ----
@@ -195,22 +255,19 @@ export class McpExecutorService {
         // MCP spec: tool input-validation failures must surface as a tool
         // result with `isError: true` so the model can self-correct. Throwing
         // would surface as a JSON-RPC `InvalidParams` and abort the call.
-        return {
-          isError: true,
-          content: [
-            { type: 'text', text: `Invalid parameters: ${formatZodIssues(parsed.error.issues)}` },
-          ],
-        };
+        return invalidParametersResult(formatZodIssues(parsed.error.issues));
       }
       validatedArgs = parsed.data as Record<string, unknown>;
     }
 
     try {
-      const instance = await this.resolveBinding(tool, name, ctx);
-      const handler = instance[tool.methodName] as
-        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-        Function;
-      const result = await handler.call(instance, validatedArgs, ctx);
+      const result = await this.invokeHandler(
+        'tool',
+        tool,
+        { kind: 'tool', name },
+        [validatedArgs, ctx],
+        ctx,
+      );
       return this.normalizeToolResult(result, tool);
     } catch (error) {
       if (error instanceof ToolExecutionError || error instanceof ValidationError) {
@@ -221,11 +278,49 @@ export class McpExecutorService {
       if ((error as { code?: unknown } | null)?.code === MCP_URL_ELICITATION_REQUIRED) {
         throw error;
       }
-      const err = error instanceof Error ? error : new Error(String(error));
-      const filtered = this.applyExceptionFilters(err, tool, ctx);
-      if (filtered) throw filtered;
-      throw new ToolExecutionError(name, err.message, err);
+      if (this.enhancers) return this.resolveEnhancedToolError(name, error);
+      return this.rethrowToolError(name, error, tool, ctx);
     }
+  }
+
+  /**
+   * Settle a tool error without enhancers: give the `@UseFilters` runner a
+   * chance to render it, otherwise wrap it as a `ToolExecutionError`.
+   */
+  private rethrowToolError(
+    name: string,
+    error: unknown,
+    tool: RegisteredTool,
+    ctx: McpExecutionContext,
+  ): never {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const filtered = this.applyExceptionFilters(err, tool, ctx);
+    if (filtered) throw filtered;
+    throw new ToolExecutionError(name, err.message, err);
+  }
+
+  /**
+   * Settle an error that escaped the enhancer pipeline for a tool call — one
+   * no exception filter handled. Exception filters have already run inside
+   * the pipeline, so the legacy filter runner is not consulted again.
+   *
+   * - Rejected input (`BadRequestException`, e.g. from a validation pipe) is
+   *   returned as an `isError` tool result, like schema validation failures.
+   * - Guard denials (`ForbiddenException` / `UnauthorizedException`, or the
+   *   MCP auth errors themselves) surface like the built-in authorization
+   *   checks do.
+   * - Everything else becomes a `ToolExecutionError`, as without enhancers.
+   */
+  private resolveEnhancedToolError(name: string, error: unknown): ToolCallResult {
+    if (error instanceof BadRequestException) {
+      return invalidParametersResult(describeHttpException(error));
+    }
+    const mapped = mapEnhancerException(error);
+    if (mapped instanceof AuthenticationError || mapped instanceof AuthorizationError) {
+      throw mapped;
+    }
+    const err = mapped instanceof Error ? mapped : new Error(String(mapped));
+    throw new ToolExecutionError(name, err.message, err);
   }
 
   /**
@@ -328,11 +423,13 @@ export class McpExecutorService {
     const resource = this.registry.getResource(uri);
     if (resource) {
       try {
-        const instance = await this.resolveBinding(resource, uri, ctx);
-        const handler = instance[resource.methodName] as
-          // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-          Function;
-        const result = await handler.call(instance, new URL(uri), ctx);
+        const result = await this.invokeHandler(
+          'resource',
+          resource,
+          { kind: 'resource', name: uri },
+          [new URL(uri), ctx],
+          ctx,
+        );
         return this.normalizeResourceResult(result, uri);
       } catch (error) {
         throw this.processCapabilityError(error, resource, ctx);
@@ -344,11 +441,13 @@ export class McpExecutorService {
       const match = matchUriTemplate(template.uriTemplate, uri);
       if (match) {
         try {
-          const instance = await this.resolveBinding(template, uri, ctx);
-          const handler = instance[template.methodName] as
-            // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-            Function;
-          const result = await handler.call(instance, new URL(uri), match.params, ctx);
+          const result = await this.invokeHandler(
+            'resource-template',
+            template,
+            { kind: 'resource', name: uri },
+            [new URL(uri), match.params, ctx],
+            ctx,
+          );
           return this.normalizeResourceResult(result, uri);
         } catch (error) {
           throw this.processCapabilityError(error, template, ctx);
@@ -364,6 +463,9 @@ export class McpExecutorService {
    * exception-filter pipeline. Existing protocol errors (`McpError` family)
    * are passed through untouched. Always returns a real `Error` subclass —
    * lets call sites narrow without an `unknown` cast.
+   *
+   * With `nestEnhancers` on, exception filters already ran inside the enhancer
+   * pipeline, so the error is only translated to the MCP error model.
    */
   private processCapabilityError(
     error: unknown,
@@ -371,6 +473,10 @@ export class McpExecutorService {
     ctx: McpExecutionContext,
   ): Error {
     if (error instanceof McpError) return error;
+    if (this.enhancers) {
+      const mapped = mapEnhancerException(error);
+      return mapped instanceof Error ? mapped : new Error(String(mapped));
+    }
     const err = error instanceof Error ? error : new Error(String(error));
     return this.applyExceptionFilters(err, info, ctx) ?? err;
   }
@@ -427,11 +533,13 @@ export class McpExecutorService {
 
     let result: unknown;
     try {
-      const instance = await this.resolveBinding(prompt, name, ctx);
-      const handler = instance[prompt.methodName] as
-        // biome-ignore lint/complexity/noBannedTypes: dynamic method call
-        Function;
-      result = await handler.call(instance, validatedArgs, ctx);
+      result = await this.invokeHandler(
+        'prompt',
+        prompt,
+        { kind: 'prompt', name },
+        [validatedArgs, ctx],
+        ctx,
+      );
     } catch (error) {
       throw this.processCapabilityError(error, prompt, ctx);
     }
@@ -450,7 +558,7 @@ export class McpExecutorService {
     const handler = this.registry.getCompletionHandler(request.ref.type, refName);
 
     if (handler) {
-      const instance = await this.resolveBinding(handler, `completion ${refName}`, ctx);
+      const { instance } = await this.resolveBinding(handler, `completion ${refName}`, ctx);
       const fn = instance[handler.methodName] as
         // biome-ignore lint/complexity/noBannedTypes: dynamic method call
         Function;

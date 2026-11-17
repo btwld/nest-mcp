@@ -36,6 +36,7 @@ export class AppModule {}
 | `guards` | `McpGuardClass[]` | No | Global guards applied to all requests |
 | `allowUnauthenticatedAccess` | `boolean` | No | Skip auth for all handlers |
 | `advertiseSecuritySchemes` | `boolean` | No | Advertise per-tool auth requirements in `tools/list` `_meta.securitySchemes` (`noauth` for `@Public` tools, `oauth2` + scopes for `@Scopes` tools). Default `false` |
+| `nestEnhancers` | `boolean` | No | Run capability handlers through NestJS guards, interceptors, pipes and exception filters (`@UseGuards`, `@UseInterceptors`, `@UsePipes`, `@UseFilters`, at method, class and application level) with the `'mcp'` context type. Default `false`: once on, application-level enhancers such as `APP_GUARD` also run for MCP calls. See [NestJS Enhancers](./execution-pipeline.md#nestjs-enhancers) |
 | `resilience` | `object` | No | Global resilience defaults |
 | `resilience.timeout` | `number` | No | Global timeout in ms |
 | `resilience.rateLimit` | `RateLimitConfig` | No | Global rate limit config |

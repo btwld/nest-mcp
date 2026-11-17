@@ -44,6 +44,12 @@ export { McpExecutorService } from './execution/executor.service';
 export { ExecutionPipelineService } from './execution/pipeline.service';
 export { McpContextFactory } from './execution/context.factory';
 export { McpRequestContextService } from './execution/request-context.service';
+export { MCP_CONTEXT_TYPE, McpArgumentsHost } from './execution/mcp-arguments-host';
+export type {
+  McpCapabilityCall,
+  McpCapabilityKind,
+  McpContextType,
+} from './execution/mcp-arguments-host';
 export { resolveGuard } from './utils/resolve-guard.util';
 
 // Transport

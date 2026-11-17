@@ -31,6 +31,7 @@ import { McpContextFactory } from './execution/context.factory';
 // Execution
 import { McpExceptionFilterRunner } from './execution/exception-filter.runner';
 import { McpExecutorService } from './execution/executor.service';
+import { McpNestEnhancerService } from './execution/nest-enhancer.service';
 import { ExecutionPipelineService } from './execution/pipeline.service';
 import { McpRequestContextService } from './execution/request-context.service';
 
@@ -174,6 +175,7 @@ export class McpModule {
       McpRegistryService,
       McpScannerService,
       McpExceptionFilterRunner,
+      McpNestEnhancerService,
       McpExecutorService,
       ExposureService,
       ExecutionPipelineService,
@@ -265,6 +267,7 @@ export class McpModule {
       McpRegistryService,
       McpScannerService,
       McpExceptionFilterRunner,
+      McpNestEnhancerService,
       McpExecutorService,
       ExposureService,
       ExecutionPipelineService,
