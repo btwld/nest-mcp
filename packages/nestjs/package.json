@@ -1,0 +1,93 @@
+{
+	"name": "@nest-mcp/nestjs",
+	"version": "2.0.0-alpha.0",
+	"description": "NestJS 12 module for the Nest MCP Model Context Protocol v2 runtime.",
+	"type": "module",
+	"sideEffects": false,
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/nestjs"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/nestjs#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"nestjs",
+		"nestjs-12",
+		"mcp",
+		"model-context-protocol",
+		"mcp-v2",
+		"agents",
+		"oauth",
+		"esm",
+		"nest-mcp"
+	],
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./client": {
+			"types": "./dist/client/index.d.mts",
+			"import": "./dist/client/index.mjs",
+			"default": "./dist/client/index.mjs"
+		},
+		"./manager": {
+			"types": "./dist/manager/index.d.mts",
+			"import": "./dist/manager/index.mjs",
+			"default": "./dist/manager/index.mjs"
+		},
+		"./testing": {
+			"types": "./dist/testing/index.d.mts",
+			"import": "./dist/testing/index.mjs",
+			"default": "./dist/testing/index.mjs"
+		},
+		"./package.json": "./package.json"
+	},
+	"dependencies": {
+		"@nest-mcp/auth": "workspace:^",
+		"@nest-mcp/client": "workspace:^",
+		"@nest-mcp/core": "workspace:^",
+		"@nest-mcp/gateway": "workspace:^",
+		"@nest-mcp/manager": "workspace:^",
+		"@nest-mcp/server": "workspace:^"
+	},
+	"peerDependencies": {
+		"@modelcontextprotocol/client": ">=2.0.0 <3.0.0",
+		"@modelcontextprotocol/node": ">=2.0.0 <3.0.0",
+		"@modelcontextprotocol/server": ">=2.0.0 <3.0.0",
+		"@nestjs/common": "^12.0.0",
+		"@nestjs/core": "^12.0.0",
+		"reflect-metadata": "^0.2.2",
+		"rxjs": "^7.8.0"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

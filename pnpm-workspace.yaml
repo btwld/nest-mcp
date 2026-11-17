@@ -1,3 +1,30 @@
 packages:
-  - 'packages/*'
-  - 'apps/*'
+  - "packages/*"
+  - "apps/*"
+  # Private harness for the official MCP conformance suite. Kept outside
+  # packages/* so release, publint, and attw sweeps never see it.
+  - "tests/conformance"
+
+overrides:
+  "vite": "8.2.2"
+
+allowBuilds:
+  "@nestjs/core": false
+  "@scarf/scarf": false
+  esbuild: false
+  workerd: true
+
+provenance: true
+
+minimumReleaseAgeExclude:
+  - "@nestjs/common@12.0.1"
+  - "@nestjs/config@12.0.0"
+  - "@nestjs/core@12.0.1"
+  - "@nestjs/mapped-types@12.0.0"
+  - "@nestjs/platform-express@12.0.1"
+  - "@nestjs/platform-fastify@12.0.1"
+  - "@nestjs/swagger@12.0.0"
+  - "@nestjs/testing@12.0.1"
+  - "@tanstack/query-core@5.102.8"
+  - "@tanstack/react-query@5.102.8"
+  - "@types/node@26.4.0"

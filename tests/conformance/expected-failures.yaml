@@ -1,0 +1,38 @@
+# Baseline of scenarios the official MCP conformance suite currently fails
+# against @nest-mcp/server. Every entry is a real, understood gap — never a
+# fixture bug. A scenario that starts passing must be deleted from this list in
+# the same change, or the suite fails on a stale baseline.
+#
+# Recorded against @modelcontextprotocol/conformance 0.1.16, suite "active"
+# (30 scenarios): 23 pass cleanly, 6 fail, 1 emits only warnings. The CLI's own
+# "Total: 24 passed, 6 failed" line counts checks rather than scenarios —
+# dns-rebinding-protection contributes two passing checks.
+#
+# A scenario counts as failing for this baseline when any of its checks is
+# FAILURE *or* WARNING, so a warning-only scenario belongs in this list even
+# though the summary prints it with a leading check mark.
+server:
+  # Server-to-client requests are not deliverable over the SDK's stateless
+  # legacy (2025-era) HTTP serving: createMcpHandler's `legacy: 'stateless'`
+  # mode answers each request from a fresh instance with no session, so the
+  # client's reply cannot be routed back to the waiting handler.
+  # `sampling/createMessage` reaches the client and then times out (-32001);
+  # `elicitation/create` never leaves the server.
+  - tools-call-sampling
+  - tools-call-elicitation
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+
+  # `resources/subscribe` and `resources/unsubscribe` are 2025-era methods that
+  # the MCP v2 SDK replaced with `subscriptions/listen`. McpServer registers no
+  # handler for them, so both answer -32601 Method not found.
+  - resources-subscribe
+  - resources-unsubscribe
+
+  # Stateless legacy serving issues no `Mcp-Session-Id`, so the scenario cannot
+  # open a second stream. It emits a single WARNING check ("Server provides
+  # session ID for multiple streams test") and no passing or failing check, so
+  # the summary prints it with a check mark and the failed-check total ignores
+  # it — but the baseline comparator counts WARNING as failing, which is why it
+  # belongs in this list.
+  - server-sse-multiple-streams

@@ -1,0 +1,71 @@
+{
+	"name": "@nest-mcp/conformance",
+	"version": "2.0.0-alpha.0",
+	"description": "Bounded runtime integrity and safety probes for third-party MCP servers, with canonicalization, bounded capture, and catalog fingerprinting for drift detection.",
+	"type": "module",
+	"sideEffects": false,
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/conformance"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/conformance#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"security",
+		"integrity",
+		"catalog-drift",
+		"fingerprint",
+		"tool-poisoning",
+		"nest-mcp"
+	],
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./package.json": "./package.json",
+		"./report": {
+			"types": "./dist/report.d.mts",
+			"import": "./dist/report.mjs",
+			"default": "./dist/report.mjs"
+		}
+	},
+	"dependencies": {
+		"zod": "^4.4.3"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

@@ -1,70 +1,100 @@
 {
-  "name": "@nest-mcp/client",
-  "version": "0.3.2",
-  "description": "NestJS MCP Client - Connect to and consume MCP servers from NestJS",
-  "license": "BSD-3-Clause",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "!dist/**/*.js.map",
-    "!dist/**/*.d.ts.map"
-  ],
-  "keywords": [
-    "nestjs",
-    "nest",
-    "mcp",
-    "model-context-protocol",
-    "ai",
-    "llm",
-    "mcp-client",
-    "client",
-    "typescript",
-    "anthropic",
-    "openai",
-    "claude"
-  ],
-  "homepage": "https://github.com/btwld/nest-mcp#client",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/btwld/nest-mcp",
-    "directory": "packages/client"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check src/",
-    "clean": "rm -rf dist .turbo"
-  },
-  "dependencies": {
-    "@nest-mcp/common": "workspace:*"
-  },
-  "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "@nestjs/common": "^10.0.0 || ^11.0.0 || 12.0.0-alpha.5",
-    "@nestjs/core": "^10.0.0 || ^11.0.0 || 12.0.0-alpha.5",
-    "reflect-metadata": ">=0.1.13",
-    "rxjs": "^7.0.0"
-  },
-  "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/testing": "^11.0.0",
-    "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.0",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
-  }
+	"name": "@nest-mcp/client",
+	"version": "2.0.0-alpha.0",
+	"description": "Multi-server MCP v2 client runtime with transport, middleware, lifecycle, and discovery support.",
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/client"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/client#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"client",
+		"runtime",
+		"gateway",
+		"oauth",
+		"observability",
+		"nest-mcp"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./oauth": {
+			"types": "./dist/oauth/index.d.mts",
+			"import": "./dist/oauth/index.mjs",
+			"default": "./dist/oauth/index.mjs"
+		},
+		"./oauth/dynamic-registration": {
+			"types": "./dist/oauth/dynamic-registration.d.mts",
+			"import": "./dist/oauth/dynamic-registration.mjs",
+			"default": "./dist/oauth/dynamic-registration.mjs"
+		},
+		"./package.json": "./package.json",
+		"./ai-sdk": {
+			"types": "./dist/ai-sdk/index.d.mts",
+			"import": "./dist/ai-sdk/index.mjs",
+			"default": "./dist/ai-sdk/index.mjs"
+		}
+	},
+	"files": [
+		"dist",
+		"scripts/external-smoke.mjs",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"smoke:external": "node scripts/external-smoke.mjs",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"dependencies": {
+		"@nest-mcp/conformance": "workspace:^",
+		"@nest-mcp/core": "workspace:^",
+		"zod": "^4.4.3"
+	},
+	"peerDependencies": {
+		"@modelcontextprotocol/client": ">=2.0.0 <3.0.0",
+		"ai": ">=7.0.0 <8.0.0"
+	},
+	"devDependencies": {
+		"@modelcontextprotocol/client": "2.0.0",
+		"@modelcontextprotocol/node": "2.0.0",
+		"@modelcontextprotocol/server": "2.0.0",
+		"ai": "7.0.83"
+	},
+	"peerDependenciesMeta": {
+		"ai": {
+			"optional": true
+		}
+	}
 }

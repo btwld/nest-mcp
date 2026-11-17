@@ -1,0 +1,4 @@
+coverage
+dist
+dist-tsc
+node_modules

@@ -1,0 +1,85 @@
+{
+	"name": "@nest-mcp/observability",
+	"version": "2.0.0-alpha.0",
+	"description": "Backend-neutral logging, metrics, and tracing adapters for Nest MCP runtimes.",
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/observability"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/observability#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"observability",
+		"logging",
+		"metrics",
+		"tracing",
+		"nest-mcp"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./attributes": {
+			"types": "./dist/attributes.d.mts",
+			"import": "./dist/attributes.mjs",
+			"default": "./dist/attributes.mjs"
+		},
+		"./logging": {
+			"types": "./dist/logging.d.mts",
+			"import": "./dist/logging.mjs",
+			"default": "./dist/logging.mjs"
+		},
+		"./metrics": {
+			"types": "./dist/metrics.d.mts",
+			"import": "./dist/metrics.mjs",
+			"default": "./dist/metrics.mjs"
+		},
+		"./tracing": {
+			"types": "./dist/tracing.d.mts",
+			"import": "./dist/tracing.mjs",
+			"default": "./dist/tracing.mjs"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"dependencies": {
+		"@nest-mcp/core": "workspace:^"
+	}
+}

@@ -1,0 +1,17 @@
+{
+	"files": [],
+	"references": [
+		{ "path": "./packages/core" },
+		{ "path": "./packages/client" },
+		{ "path": "./packages/manager" },
+		{ "path": "./packages/conformance" },
+		{ "path": "./packages/server" },
+		{ "path": "./packages/apps" },
+		{ "path": "./packages/auth" },
+		{ "path": "./packages/observability" },
+		{ "path": "./packages/gateway" },
+		{ "path": "./packages/nestjs" },
+		{ "path": "./apps/control-plane-api" },
+		{ "path": "./tests/conformance" }
+	]
+}

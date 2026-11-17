@@ -1,0 +1,68 @@
+{
+	"name": "@nest-mcp/apps",
+	"version": "2.0.0-alpha.0",
+	"description": "Stable MCP Apps server metadata, validation, fragments, and direct-server feature composition for MCP SDK v2.",
+	"type": "module",
+	"sideEffects": false,
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/apps"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/apps#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"mcp-apps",
+		"server",
+		"ui",
+		"esm",
+		"nest-mcp"
+	],
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./package.json": "./package.json"
+	},
+	"dependencies": {
+		"@nest-mcp/server": "workspace:^"
+	},
+	"peerDependencies": {
+		"@modelcontextprotocol/server": ">=2.0.0 <3.0.0"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

@@ -1,75 +1,181 @@
-// @nest-mcp/client - NestJS MCP Client
-
-// Module
-export { McpClientModule, McpClientBootstrap } from './mcp-client.module';
-
-// Service
-export { McpClient } from './mcp-client.service';
-export { McpClientsService } from './mcp-clients.service';
-
-// Decorators
-export { InjectMcpClient, getMcpClientToken } from './decorators/inject-mcp-client.decorator';
 export {
-  OnMcpNotification,
-  MCP_NOTIFICATION_METADATA,
-} from './decorators/on-notification.decorator';
-export type { McpNotificationMetadata } from './decorators/on-notification.decorator';
-
-// Interfaces
+	AuthorizationServerMismatchError,
+	Client,
+	ClientCredentialsProvider,
+	CrossAppAccessProvider,
+	InsecureTokenEndpointError,
+	InsufficientScopeError,
+	IssuerMismatchError,
+	OAuthClientFlowError,
+	PrivateKeyJwtProvider,
+	RegistrationRejectedError,
+	StaticPrivateKeyJwtProvider,
+	StreamableHTTPClientTransport,
+	UnauthorizedError,
+	applyMiddlewares,
+	auth,
+	createPrivateKeyJwtAuth,
+	createMiddleware,
+	discoverOAuthMetadata,
+	discoverOAuthProtectedResourceMetadata,
+	discoverOAuthServerInfo,
+	refreshAuthorization,
+	isInputRequiredResult,
+	specTypeSchemas,
+	withInputRequired,
+	withLogging,
+	withOAuth,
+} from "@modelcontextprotocol/client";
 export type {
-  McpClientModuleOptions,
-  McpClientModuleAsyncOptions,
-  McpClientConnection,
-  McpClientHttpConnectionBase,
-  McpClientStreamableHttpConnection,
-  McpClientSseConnection,
-  McpClientStdioConnection,
-  McpClientReconnectOptions,
-  McpClientAuthOptions,
-  McpClientTransportType,
-  McpSamplingHandler,
-  McpElicitationHandler,
-  McpRootsHandler,
-} from './interfaces/client-options.interface';
+	AddClientAuthentication,
+	AuthOptions,
+	AuthProvider,
+	AuthResult,
+	ClientAuthMethod,
+	ClientCredentialsProviderOptions,
+	ClientOptions,
+	CallToolRequest,
+	CallToolRequestOptions,
+	CallToolResult,
+	CompleteRequest,
+	CompleteResult,
+	ConnectOptions,
+	CrossAppAccessContext,
+	CrossAppAccessProviderOptions,
+	EmptyResult,
+	FetchLike,
+	LoggingOptions,
+	LoggingLevel,
+	GetPromptRequest,
+	GetPromptResult,
+	InputRequest,
+	InputRequests,
+	InputRequiredOptions,
+	InputRequiredResult,
+	InputResponse,
+	InputResponses,
+	McpSubscription,
+	Middleware,
+	Notification,
+	NotificationOptions,
+	OAuthClientInformationContext,
+	OAuthClientProvider,
+	OAuthDiscoveryState,
+	OAuthServerInfo,
+	PriorDiscovery,
+	PrivateKeyJwtProviderOptions,
+	RequestLogger,
+	Request,
+	RequestMethod,
+	RequestOptions,
+	RequestTypeMap,
+	ReadResourceRequest,
+	ReadResourceResult,
+	ResultTypeMap,
+	StandardSchemaV1,
+	SubscribeRequest,
+	SubscriptionFilter,
+	StaticPrivateKeyJwtProviderOptions,
+	StreamableHTTPClientTransportOptions,
+	Transport,
+	UnsubscribeRequest,
+} from "@modelcontextprotocol/client";
+export { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+export type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
 
-// Transport
-export { createClientTransport } from './transport/client-transport.factory';
-export { createStreamableHttpTransport } from './transport/streamable-client.transport';
-export { createSseTransport } from './transport/sse-client.transport';
-export { createStdioTransport } from './transport/stdio-client.transport';
-export { applyAuthHeaders } from './transport/apply-auth-headers';
-
-// Utilities
-export { formatErrorMessage } from './utils/format-error-message';
-
-// Health
-export { McpClientHealthIndicator } from './health/mcp-client.health';
-export type {
-  McpClientHealthStatus,
-  McpClientHealthResult,
-} from './health/mcp-client.health';
-
-// Testing
-export { MockMcpClient } from './testing/mock-client';
-
-// Re-export everything from @nest-mcp/common for convenience —
-// users only need to install @nest-mcp/client
-export * from '@nest-mcp/common';
-
-// OAuth
 export {
-  auth,
-  extractWWWAuthenticateParams,
-  discoverAuthorizationServerMetadata,
-  discoverOAuthProtectedResourceMetadata,
-} from '@modelcontextprotocol/sdk/client/auth.js';
+	MCP_CLIENT_NOT_CONNECTED,
+	MCP_CLIENT_LEASE_CAPACITY_EXCEEDED,
+	MCP_CLIENT_LEASE_INVALIDATED,
+	MCP_CLIENT_LEASE_MANAGER_CLOSED,
+	MCP_CLIENT_LEASE_RELEASE_MODE_CONFLICT,
+	MCP_CLIENT_RUNTIME_CLOSED,
+	MCP_CLIENT_SERVER_EXISTS,
+	MCP_CLIENT_SERVER_NOT_FOUND,
+	MCP_CLIENT_SHUTDOWN_TIMEOUT,
+	McpClientRuntimeError,
+	McpClientLeaseManagerError,
+} from "./errors.ts";
+export type { McpClientLeaseManagerErrorCode, McpClientRuntimeErrorCode } from "./errors.ts";
+
+export { McpClientRuntime } from "./runtime.ts";
+export {
+	discoverMcpClientCatalog,
+	createMcpClientInspectionTarget,
+	McpClientCatalogLimitError,
+} from "./catalog-inspection.ts";
 export type {
-  OAuthClientProvider,
-  AuthResult,
-} from '@modelcontextprotocol/sdk/client/auth.js';
+	McpClientCatalogSnapshot,
+	McpClientCatalogInspectionOptions,
+} from "./catalog-inspection.ts";
+
+export { McpClientLeaseManager } from "./lease-manager.ts";
 export type {
-  OAuthClientMetadata,
-  OAuthTokens,
-  AuthorizationServerMetadata,
-  OAuthProtectedResourceMetadata,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
+	McpClientLease,
+	McpClientLeaseAcquireOptions,
+	McpClientLeaseFactoryContext,
+	McpClientLeaseManagerOptions,
+	McpClientLeaseManagerSnapshot,
+	McpClientLeaseReleaseMode,
+} from "./lease-manager.ts";
+
+export { createMcpClientToolSchema } from "./tool-schema.ts";
+export type {
+	McpClientToolSchema,
+	McpClientToolSchemaIssue,
+	McpClientToolSchemaResult,
+	McpClientToolStandardSchema,
+} from "./tool-schema.ts";
+
+export {
+	bindMcpClientMiddleware,
+	createMcpClientPassthroughMiddleware,
+	defineMcpClientTransform,
+} from "./middleware.ts";
+
+export {
+	composeMcpFetchMiddleware,
+	createMcpClientTransport,
+	createMcpHttpClientTransport,
+	createMcpStdioClientTransport,
+	defaultMcpClientTransportFactory,
+} from "./transport.ts";
+export type {
+	McpClientTransportDefinition,
+	McpClientTransportFactory,
+	McpClientTransportFactoryContext,
+	McpHttpClientTransportDefinition,
+	McpStdioClientTransportDefinition,
+} from "./transport.ts";
+
+export type {
+	McpClientAttributesResolver,
+	McpClientConfigurationContext,
+	McpClientConfigurator,
+	McpClientConnectionSnapshot,
+	McpClientConnectionState,
+	McpClientMiddleware,
+	McpClientMrtrMethod,
+	McpClientMrtrRequest,
+	McpClientMrtrRequestOptions,
+	McpClientMrtrResult,
+	McpClientOperationContext,
+	McpClientOperationInput,
+	McpClientPassthroughMiddleware,
+	McpClientPrincipalResolver,
+	McpClientProtocolRequest,
+	McpClientReadonly,
+	McpClientRequestMethod,
+	McpClientRuntimeOptions,
+	McpClientServerDefinition,
+	McpClientSubscription,
+	McpClientTransform,
+	McpClientTransformInput,
+	McpClientTransformOptions,
+	McpClientTransformResult,
+	McpClientTool,
+	McpClientToolInputSchema,
+	McpClientToolOutputSchema,
+	McpSdkClientFactory,
+	McpSdkClientFactoryContext,
+} from "./types.ts";

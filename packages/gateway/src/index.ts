@@ -1,80 +1,91 @@
-// @nest-mcp/gateway - NestJS MCP Gateway
+export { createMcpClientRuntimeUpstream } from "./client-runtime-adapter.ts";
 
-// Module
-export { McpGatewayModule } from './mcp-gateway.module';
-export type { McpGatewayOptions, McpGatewayAsyncOptions } from './mcp-gateway.module';
+export { InMemoryMcpGatewayDiscoveryCache } from "./discovery-cache.ts";
+export type { InMemoryMcpGatewayDiscoveryCacheOptions } from "./discovery-cache.ts";
 
-// Gateway service
-export { GatewayService } from './gateway.service';
-export type { GatewayCallToolResult } from './gateway.service';
+export { GatewayNameCodec } from "./gateway-name-codec.ts";
+export { GatewayPromptNameCodec } from "./gateway-prompt-name-codec.ts";
+export { GatewayResourceTemplateUriCodec } from "./gateway-resource-template-uri-codec.ts";
+export type { GatewayResourceTemplateUriCodecOptions } from "./gateway-resource-template-uri-codec.ts";
+export { GatewayResourceUriCodec } from "./gateway-resource-uri-codec.ts";
+export type { GatewayResourceUriCodecOptions } from "./gateway-resource-uri-codec.ts";
+
+export {
+	bindMcpGatewayMiddleware,
+	createMcpGatewayPassthroughMiddleware,
+	defineMcpGatewayTransform,
+} from "./gateway-middleware.ts";
+
+export { McpGatewayError } from "./mcp-gateway.errors.ts";
+export type { McpGatewayErrorCode } from "./mcp-gateway.errors.ts";
+
+export {
+	McpGateway,
+	allowAllMcpGatewayPolicy,
+	defaultMcpGatewayAuthorizationContext,
+} from "./mcp-gateway.ts";
+
 export type {
-  GatewayReadResourceResult,
-  GatewayGetPromptResult,
-  GatewayCompleteResult,
-} from './gateway.service';
-
-// Routing
-export { RouterService } from './routing/router.service';
-export { ToolAggregatorService } from './routing/tool-aggregator.service';
-export type { AggregatedTool, ToolInputSchema } from './routing/tool-aggregator.service';
-export { ResourceAggregatorService } from './routing/resource-aggregator.service';
-export type { AggregatedResource } from './routing/resource-aggregator.service';
-export { ResourceTemplateAggregatorService } from './routing/resource-template-aggregator.service';
-export type { AggregatedResourceTemplate } from './routing/resource-template-aggregator.service';
-export { PromptAggregatorService } from './routing/prompt-aggregator.service';
-export type { AggregatedPrompt } from './routing/prompt-aggregator.service';
-export type {
-  RoutingConfig,
-  ToolRoutingStrategy,
-  ResolvedRoute,
-} from './routing/route-config.interface';
-
-// Upstream
-export { UpstreamManagerService } from './upstream/upstream-manager.service';
-export { HealthCheckerService } from './upstream/health-checker.service';
-export type {
-  UpstreamConfig,
-  UpstreamTransportType,
-  UpstreamStatus,
-} from './upstream/upstream.interface';
-
-// Policies
-export { PolicyEngineService } from './policies/policy-engine.service';
-export type {
-  PolicyEffect,
-  PolicyRule,
-  PolicyContext,
-  PoliciesConfig,
-  PolicyEvaluationResult,
-} from './policies/policy.interface';
-
-// Cache
-export { ResponseCacheService } from './cache/response-cache.service';
-export type {
-  CacheConfig,
-  CacheRule,
-  CacheEntry,
-} from './cache/cache.interface';
-
-// Transform
-export { RequestTransformService } from './transform/request-transform.service';
-export type {
-  RequestTransformFn,
-  ToolCallRequest,
-} from './transform/request-transform.service';
-export { ResponseTransformService } from './transform/response-transform.service';
-export type {
-  ResponseTransformFn,
-  ToolCallResponse,
-} from './transform/response-transform.service';
-
-// Tasks
-export { TaskAggregatorService } from './task/task-aggregator.service';
-
-// Utils
-export { matchGlobPattern } from './utils/pattern-matcher';
-export { collectFulfilled } from './utils/settled-results';
-
-// Re-export everything from @nest-mcp/common for convenience —
-// users only need to install @nest-mcp/gateway
-export * from '@nest-mcp/common';
+	McpGatewayAuthorizationContextResolver,
+	McpGatewayCallToolOptions,
+	McpGatewayClientRequestOptions,
+	McpGatewayClientResolver,
+	McpGatewayClientRuntime,
+	McpGatewayClient,
+	McpGatewayCompletionOperationInput,
+	McpGatewayDecodedName,
+	McpGatewayDecodedPromptName,
+	McpGatewayDecodedResourceTemplateUri,
+	McpGatewayDecodedResourceUri,
+	McpGatewayDiscoveryCache,
+	McpGatewayDiscoveryCacheKey,
+	McpGatewayDiscoveryOperationInput,
+	McpGatewayDiscoverySnapshot,
+	McpGatewayInvocationOperationInput,
+	McpGatewayLifecycleObserver,
+	McpGatewayListPromptsResult,
+	McpGatewayListResourceTemplatesResult,
+	McpGatewayListResourcesResult,
+	McpGatewayListToolsResult,
+	McpGatewayMiddleware,
+	McpGatewayNameCodec,
+	McpGatewayOperationContext,
+	McpGatewayOperationInput,
+	McpGatewayOperationInputFor,
+	McpGatewayOperationKind,
+	McpGatewayOperationOutput,
+	McpGatewayOperationOutputFor,
+	McpGatewayOperationOutputForKind,
+	McpGatewayOperationOutputMap,
+	McpGatewayOptions,
+	McpGatewayServerFeatureOptions,
+	McpGatewayPassthroughMiddleware,
+	McpGatewayPolicy,
+	McpGatewayPolicyInput,
+	McpGatewayPromptGetOperationInput,
+	McpGatewayPromptNameCodec,
+	McpGatewayPromptPolicy,
+	McpGatewayPromptPolicyInput,
+	McpGatewayPrincipal,
+	McpGatewayReadonly,
+	McpGatewayProjectedPrompt,
+	McpGatewayProjectedResource,
+	McpGatewayProjectedResourceTemplate,
+	McpGatewayProjectedTool,
+	McpGatewayRequestContext,
+	McpGatewayResolvedRequestContext,
+	McpGatewayResourcePolicy,
+	McpGatewayResourcePolicyInput,
+	McpGatewayResourceReadOperationInput,
+	McpGatewayResourceTemplateDefinition,
+	McpGatewayResourceTemplatePolicy,
+	McpGatewayResourceTemplatePolicyInput,
+	McpGatewayResourceTemplateReadOperationInput,
+	McpGatewayResourceTemplateUriCodec,
+	McpGatewayResourceUriCodec,
+	McpGatewayToolClient,
+	McpGatewayTopologyMutationOptions,
+	McpGatewayTopologySnapshot,
+	McpGatewayTransform,
+	McpGatewayUpstream,
+} from "./mcp-gateway.types.ts";

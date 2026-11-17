@@ -1,0 +1,72 @@
+{
+	"name": "@nest-mcp/manager",
+	"version": "2.0.0-alpha.0",
+	"description": "Framework-neutral bounded lifecycle manager for dynamic MCP client runtime generations.",
+	"type": "module",
+	"sideEffects": false,
+	"license": "BSD-3-Clause",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/manager"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/manager#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"manager",
+		"lifecycle",
+		"client",
+		"runtime",
+		"nest-mcp"
+	],
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./package.json": "./package.json"
+	},
+	"dependencies": {
+		"@nest-mcp/client": "workspace:^",
+		"@nest-mcp/core": "workspace:^"
+	},
+	"peerDependencies": {
+		"@modelcontextprotocol/client": ">=2.0.0 <3.0.0"
+	},
+	"devDependencies": {
+		"@modelcontextprotocol/client": "2.0.0"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

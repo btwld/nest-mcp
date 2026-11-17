@@ -1,11 +1,24 @@
 {
-  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": "@changesets/cli/changelog",
-  "commit": false,
-  "fixed": [],
-  "linked": [],
-  "access": "public",
-  "baseBranch": "main",
-  "updateInternalDependencies": "patch",
-  "ignore": []
+	"$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+	"changelog": "@changesets/cli/changelog",
+	"commit": false,
+	"fixed": [
+		[
+			"@nest-mcp/core",
+			"@nest-mcp/client",
+			"@nest-mcp/manager",
+			"@nest-mcp/conformance",
+			"@nest-mcp/server",
+			"@nest-mcp/apps",
+			"@nest-mcp/auth",
+			"@nest-mcp/observability",
+			"@nest-mcp/gateway",
+			"@nest-mcp/nestjs"
+		]
+	],
+	"linked": [],
+	"access": "public",
+	"baseBranch": "main",
+	"updateInternalDependencies": "patch",
+	"ignore": []
 }

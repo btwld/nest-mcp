@@ -1,0 +1,150 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.04);
+}
+
+:root {
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.19 0.018 255);
+  --card: oklch(1 0 0 / 0.92);
+  --card-foreground: oklch(0.19 0.018 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.018 255);
+  --primary: oklch(0.32 0.085 255);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.95 0.012 250);
+  --secondary-foreground: oklch(0.28 0.035 255);
+  --muted: oklch(0.958 0.008 250);
+  --muted-foreground: oklch(0.51 0.025 255);
+  --accent: oklch(0.94 0.025 245);
+  --accent-foreground: oklch(0.26 0.06 255);
+  --destructive: oklch(0.57 0.225 27);
+  --success: oklch(0.49 0.13 151);
+  --warning: oklch(0.68 0.14 75);
+  --warning-foreground: oklch(0.42 0.11 66);
+  --info: oklch(0.53 0.16 255);
+  --border: oklch(0.9 0.012 250);
+  --input: oklch(0.93 0.012 250);
+  --ring: oklch(0.59 0.12 253);
+  --radius: 0.7rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    background: var(--background);
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 6% 0%, oklch(0.86 0.055 245 / 0.28), transparent 28rem),
+      radial-gradient(circle at 95% 5%, oklch(0.88 0.04 170 / 0.2), transparent 25rem);
+    background-attachment: fixed;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: oklch(0.75 0.1 250 / 0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  [data-json-code-editor]:has(.cm-editor.cm-focused) {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+  }
+
+  [data-json-code-editor][aria-disabled="true"] .cm-editor {
+    cursor: not-allowed;
+  }
+
+  .json-code-mirror .cm-editor {
+    background: transparent;
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .json-code-mirror .cm-scroller {
+    line-height: 1.625;
+  }
+
+  .json-code-mirror .cm-content {
+    min-width: max-content;
+    padding-block: 0.65rem;
+  }
+
+  .json-code-mirror .cm-line {
+    padding-inline: 0.75rem;
+  }
+
+  .json-code-mirror .cm-gutters {
+    border-right-color: var(--border);
+    background: color-mix(in oklab, var(--muted) 45%, transparent);
+    color: var(--muted-foreground);
+  }
+
+  .json-code-mirror .cm-activeLine,
+  .json-code-mirror .cm-activeLineGutter {
+    background: color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+
+  .json-code-mirror .cm-tooltip {
+    border-color: var(--border);
+    background: var(--popover);
+    color: var(--popover-foreground);
+  }
+}

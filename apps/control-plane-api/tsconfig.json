@@ -1,0 +1,20 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"composite": true,
+		"rootDir": ".",
+		"outDir": "dist-tsc",
+		"tsBuildInfoFile": "dist-tsc/tsconfig.tsbuildinfo"
+	},
+	"include": ["src", "tests", "*.config.ts"],
+	"references": [
+		{ "path": "../../packages/auth" },
+		{ "path": "../../packages/client" },
+		{ "path": "../../packages/conformance" },
+		{ "path": "../../packages/gateway" },
+		{ "path": "../../packages/manager" },
+		{ "path": "../../packages/observability" },
+		{ "path": "../../packages/server" },
+		{ "path": "../../packages/nestjs" }
+	]
+}

@@ -1,0 +1,83 @@
+{
+	"name": "@nest-mcp/core",
+	"version": "2.0.0-alpha.0",
+	"description": "Framework-neutral runtime primitives for composing MCP clients, servers, and gateways.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git",
+		"directory": "packages/core"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp/tree/main/packages/core#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"runtime",
+		"middleware",
+		"authorization",
+		"observability",
+		"esm",
+		"nest-mcp"
+	],
+	"license": "BSD-3-Clause",
+	"type": "module",
+	"sideEffects": false,
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"types": "./dist/index.d.mts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./authorization": {
+			"types": "./dist/authorization.d.mts",
+			"import": "./dist/authorization.mjs",
+			"default": "./dist/authorization.mjs"
+		},
+		"./lifecycle": {
+			"types": "./dist/lifecycle.d.mts",
+			"import": "./dist/lifecycle.mjs",
+			"default": "./dist/lifecycle.mjs"
+		},
+		"./middleware": {
+			"types": "./dist/middleware.d.mts",
+			"import": "./dist/middleware.mjs",
+			"default": "./dist/middleware.mjs"
+		},
+		"./operation": {
+			"types": "./dist/operation.d.mts",
+			"import": "./dist/operation.mjs",
+			"default": "./dist/operation.mjs"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"build:watch": "tsdown --watch src",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"verify:pack": "pnpm run build && publint --strict",
+		"prepack": "pnpm run build"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

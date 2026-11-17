@@ -1,0 +1,28 @@
+{
+	"$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "import", "oxc"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn",
+		"pedantic": "off"
+	},
+	"rules": {
+		"typescript/no-explicit-any": "error",
+		"typescript/consistent-type-imports": "off",
+		"typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }],
+		"import/no-unassigned-import": ["error", { "allow": ["reflect-metadata"] }],
+		"no-console": "error",
+		"import/no-default-export": "error"
+	},
+	"ignorePatterns": ["dist", "dist-tsc", "coverage", "references", "apps/control-plane-web"],
+	"overrides": [
+		{
+			"files": ["*.config.ts", "**/*.config.ts"],
+			"rules": { "import/no-default-export": "off" }
+		},
+		{
+			"files": ["scripts/**/*.mjs"],
+			"rules": { "no-console": "off" }
+		}
+	]
+}

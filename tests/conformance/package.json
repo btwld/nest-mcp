@@ -1,0 +1,28 @@
+{
+	"name": "@nest-mcp/conformance-harness",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Private harness that runs the official @modelcontextprotocol/conformance server suite against @nest-mcp/server.",
+	"type": "module",
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"scripts": {
+		"start": "node --experimental-strip-types src/start.ts",
+		"conformance": "node --experimental-strip-types src/run.ts",
+		"typecheck": "tsc -b",
+		"lint": "oxlint --type-aware .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/node": "2.0.0",
+		"@modelcontextprotocol/server": "2.0.0",
+		"@nest-mcp/server": "workspace:^",
+		"zod": "4.4.3"
+	},
+	"devDependencies": {
+		"@modelcontextprotocol/conformance": "0.1.16",
+		"@types/node": "26.4.0"
+	}
+}

@@ -1,33 +1,73 @@
 {
-  "name": "nest-mcp",
-  "private": true,
-  "license": "BSD-3-Clause",
-  "packageManager": "pnpm@9.15.4",
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "scripts": {
-    "build": "turbo run build",
-    "test": "turbo run test",
-    "test:compat:nest12": "turbo run build --filter=@nest-mcp/common --filter=@nest-mcp/client --filter=@nest-mcp/server --filter=@nest-mcp/gateway && node scripts/test-nest12-compat.mjs",
-    "test:watch": "vitest",
-    "lint": "turbo run lint && biome check scripts/ test/compat/",
-    "lint:fix": "biome check --write .",
-    "typecheck": "turbo run typecheck",
-    "format": "biome format --write .",
-    "clean": "turbo run clean && rm -rf node_modules",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "turbo run build && changeset publish"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.0",
-    "@changesets/cli": "^2.27.0",
-    "@types/node": "^22.0.0",
-    "tsup": "^8.3.0",
-    "tsx": "^4.21.0",
-    "turbo": "^2.3.0",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
-  }
+	"name": "nest-mcp",
+	"version": "0.0.0",
+	"private": true,
+	"description": "NestJS 12 runtime, server, client, and gateway modules for Model Context Protocol v2.",
+	"license": "BSD-3-Clause",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/btwld/nest-mcp.git"
+	},
+	"homepage": "https://github.com/btwld/nest-mcp#readme",
+	"bugs": {
+		"url": "https://github.com/btwld/nest-mcp/issues"
+	},
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"packageManager": "pnpm@11.24.0",
+	"scripts": {
+		"dev": "pnpm --parallel --stream --filter \"./apps/*\" run dev",
+		"dev:api": "pnpm --filter @nest-mcp/control-plane-api run dev",
+		"dev:web": "pnpm --filter @nest-mcp/control-plane-web run dev",
+		"build": "pnpm --filter \"./packages/*\" run build && pnpm --filter \"./apps/*\" run build",
+		"build:watch": "pnpm --parallel --filter \"./packages/*\" --filter @nest-mcp/control-plane-api run build:watch",
+		"clean": "node scripts/clean.mjs",
+		"lint": "oxlint --type-aware . && pnpm --filter @nest-mcp/control-plane-web run lint",
+		"lint:fix": "oxlint --type-aware --fix .",
+		"format": "prettier --write . --ignore-unknown",
+		"format:check": "prettier --check . --ignore-unknown",
+		"typecheck": "tsc -b && pnpm --filter @nest-mcp/control-plane-web run typecheck",
+		"typecheck:clean": "tsc -b --clean",
+		"check": "pnpm run lint && pnpm run format:check && pnpm run typecheck",
+		"test": "vitest run && pnpm --filter @nest-mcp/control-plane-web run test",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage && pnpm --filter @nest-mcp/control-plane-web run test:coverage",
+		"verify:pack": "pnpm run build && pnpm --filter \"./packages/*\" exec publint --strict && node scripts/check-package-dependencies.mjs && node scripts/verify-report-consumer.mjs && node scripts/verify-ai-sdk-consumer.mjs",
+		"verify:attw": "pnpm run build && for package in packages/*; do pnpm exec attw --pack \"$package\" --profile esm-only || exit 1; done",
+		"verify:apps": "pnpm --filter @nest-mcp/control-plane-api run smoke:dist",
+		"verify": "pnpm run check && pnpm run test && pnpm run verify:pack && pnpm run verify:apps && pnpm run verify:attw",
+		"changeset": "changeset",
+		"release:version": "node scripts/version.mjs",
+		"release": "node scripts/publish.mjs"
+	},
+	"devDependencies": {
+		"@arethetypeswrong/cli": "0.18.5",
+		"@changesets/cli": "3.0.1",
+		"@modelcontextprotocol/client": "2.0.0",
+		"@modelcontextprotocol/core": "2.0.0",
+		"@modelcontextprotocol/node": "2.0.0",
+		"@modelcontextprotocol/server": "2.0.0",
+		"@nestjs/common": "12.0.1",
+		"@nestjs/core": "12.0.1",
+		"@nestjs/platform-express": "12.0.1",
+		"@nestjs/platform-fastify": "12.0.1",
+		"@nestjs/testing": "12.0.1",
+		"@types/node": "26.4.0",
+		"@vitest/coverage-v8": "4.1.11",
+		"express": "5.2.1",
+		"fastify": "5.12.1",
+		"oxlint": "1.80.0",
+		"oxlint-tsgolint": "7.0.2001",
+		"prettier": "3.9.6",
+		"publint": "0.3.24",
+		"reflect-metadata": "0.2.2",
+		"rxjs": "7.8.2",
+		"supports-color": "11.0.0",
+		"tsdown": "0.22.14",
+		"typescript": "7.0.2",
+		"vitest": "4.1.11",
+		"zod": "4.4.3"
+	}
 }
